@@ -1,0 +1,132 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ── Dark theme overrides ─────────────────────────────────── */
+/* Flip all bg-white cards/panels to dark surface */
+.bg-white {
+  background-color: #161B27 !important;
+}
+.bg-gray-50, .bg-gray-100 {
+  background-color: #111520 !important;
+}
+
+/* Text color overrides for dark */
+.text-gray-900, .text-gray-800 {
+  color: #E2E8F0 !important;
+}
+.text-gray-700 {
+  color: #C8D0DE !important;
+}
+.text-gray-600 {
+  color: #8B95A8 !important;
+}
+.text-gray-500 {
+  color: #7A849A !important;
+}
+.text-gray-400 {
+  color: #5F6B80 !important;
+}
+
+/* Border overrides */
+.border-gray-200, .border-gray-100, .border-gray-50 {
+  border-color: #1E2836 !important;
+}
+
+/* Divide overrides */
+.divide-gray-50 > :not([hidden]) ~ :not([hidden]),
+.divide-gray-100 > :not([hidden]) ~ :not([hidden]) {
+  border-color: #1E2836 !important;
+}
+
+/* Input/textarea overrides */
+input, textarea, select {
+  background-color: #111520 !important;
+  border-color: #1E2836 !important;
+  color: #E2E8F0 !important;
+}
+input::placeholder, textarea::placeholder {
+  color: #4F5B6E !important;
+}
+input:focus, textarea:focus, select:focus {
+  border-color: #00D4AA !important;
+  box-shadow: 0 0 0 2px rgba(0, 212, 170, 0.15) !important;
+}
+
+/* Shadow overrides */
+.shadow-sm {
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3), 0 1px 2px rgba(0, 0, 0, 0.2) !important;
+}
+
+/* Hover states */
+.hover\:bg-gray-50:hover {
+  background-color: #1C2233 !important;
+}
+.hover\:bg-blue-50:hover {
+  background-color: rgba(59, 130, 246, 0.1) !important;
+}
+
+/* Severity color adjustments for dark backgrounds */
+.bg-red-50 {
+  background-color: rgba(239, 68, 68, 0.1) !important;
+}
+.bg-amber-50 {
+  background-color: rgba(245, 158, 11, 0.1) !important;
+}
+.bg-blue-50 {
+  background-color: rgba(59, 130, 246, 0.1) !important;
+}
+.bg-green-50 {
+  background-color: rgba(16, 185, 129, 0.1) !important;
+}
+.bg-purple-50 {
+  background-color: rgba(168, 85, 247, 0.1) !important;
+}
+
+/* Code blocks */
+code {
+  background-color: #1C2233 !important;
+  color: #00D4AA !important;
+  padding: 1px 5px;
+  border-radius: 3px;
+  font-family: 'JetBrains Mono', 'SF Mono', monospace;
+  font-size: 0.85em;
+}
+pre {
+  background-color: #0B0E14 !important;
+  color: #C8D0DE !important;
+  font-family: 'JetBrains Mono', 'SF Mono', monospace;
+}
+
+/* ── Scrollbar styling ────────────────────────────────────── */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: #2A3548;
+  border-radius: 3px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #3A4A60;
+}
+
+/* ── Selection ────────────────────────────────────────────── */
+::selection {
+  background: rgba(0, 212, 170, 0.25);
+  color: #E2E8F0;
+}
+
+/* ── Smooth transitions everywhere ────────────────────────── */
+*, *::before, *::after {
+  transition-property: background-color, border-color, color, box-shadow;
+  transition-duration: 150ms;
+  transition-timing-function: ease;
+}
+/* Exempt animations from the global transition */
+.animate-spin, [class*="animate-"] {
+  transition: none !important;
+}
