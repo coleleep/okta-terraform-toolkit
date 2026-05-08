@@ -263,10 +263,13 @@ export function registerIpcHandlers() {
     targetOrgUrl: string;
   }) => {
     try {
+      console.log(`[sync:convert] Starting conversion: ${params.matches.length} matches, targetOrg=${params.targetOrgUrl}`);
       const result = await convertConfig(params.tfContent, params.matches, params.targetOrgUrl);
+      console.log(`[sync:convert] Success`);
       return { success: true, data: result };
     } catch (error: unknown) {
       const message = error instanceof Error ? error.message : String(error);
+      console.error(`[sync:convert] ERROR: ${message}`, error);
       return { success: false, error: message };
     }
   });

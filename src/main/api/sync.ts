@@ -1,5 +1,46 @@
+import { AxiosInstance } from 'axios';
 import { getClient } from './auth';
 import { SUB_RESOURCE_SYNC_CONFIG } from '../../shared/constants';
+
+interface OktaListResponse {
+  id: string;
+  name?: string;
+  label?: string;
+  title?: string;
+  login?: string;
+  profile?: { name?: string; login?: string };
+  [key: string]: unknown;
+}
+
+const MAX_PAGES = 10; // Cap at 2000 items (200 per page)
+
+function parseNextLink(linkHeader: string | undefined): string | null {
+  if (!linkHeader) return null;
+  const match = linkHeader.match(/<([^>]+)>;\s*rel="next"/);
+  return match ? match[1] : null;
+}
+
+async function fetchAllPages(client: AxiosInstance, endpoint: string, params?: Record<string, unknown>): Promise<OktaListResponse[]> {
+  const results: OktaListResponse[] = [];
+  let url: string | null = endpoint;
+  let page = 0;
+
+  while (url && page < MAX_PAGES) {
+    const response = page === 0
+      ? await client.get<OktaListResponse[]>(url, { params: { limit: 200, ...params } })
+      : await client.get<OktaListResponse[]>(url);
+
+    if (Array.isArray(response.data)) {
+      results.push(...response.data);
+    }
+
+    const linkHeader = response.headers?.link as string | undefined;
+    url = parseNextLink(linkHeader);
+    page++;
+  }
+
+  return results;
+}
 
 // ── State file parser ──────────────────────────────────────
 
@@ -95,16 +136,6 @@ export interface TargetResource {
   parentId?: string;     // target parent's Okta ID (for sub-resources)
 }
 
-interface OktaListResponse {
-  id: string;
-  name?: string;
-  label?: string;
-  title?: string;
-  login?: string;
-  profile?: { name?: string; login?: string };
-  [key: string]: unknown;
-}
-
 const RESOURCE_LIST_ENDPOINTS: Record<string, string> = {
   okta_group: '/api/v1/groups',
   okta_group_rule: '/api/v1/groups/rules',
@@ -154,11 +185,9 @@ export async function discoverTargetResources(resourceTypes: string[]): Promise<
     discoveredEndpoints.add(baseEndpoint);
 
     try {
-      const response = await client.get<OktaListResponse[]>(endpoint, {
-        params: { limit: 200 },
-      });
+      const items = await fetchAllPages(client, endpoint);
 
-      for (const item of response.data) {
+      for (const item of items) {
         const displayName = item.label || item.name || item.title ||
           (item.profile as { name?: string })?.name ||
           (item.profile as { login?: string })?.login ||
@@ -234,11 +263,9 @@ export async function discoverSubResources(
       discoveredEndpoints.add(endpoint);
 
       try {
-        const response = await client.get<OktaListResponse[]>(endpoint, {
-          params: { limit: 200 },
-        });
+        const items = await fetchAllPages(client, endpoint);
 
-        for (const item of response.data) {
+        for (const item of items) {
           results.push({
             type: subType,
             oktaId: item.id,
@@ -291,11 +318,9 @@ export async function discoverSubResources(
       discoveredEndpoints.add(endpoint);
 
       try {
-        const response = await client.get<OktaListResponse[]>(endpoint, {
-          params: { limit: 200 },
-        });
+        const items = await fetchAllPages(client, endpoint);
 
-        for (const item of response.data) {
+        for (const item of items) {
           results.push({
             type: subType,
             oktaId: item.id,

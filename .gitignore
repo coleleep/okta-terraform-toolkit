@@ -5,3 +5,4 @@ dist/
 *.tfstate
 *.tfstate.backup
 .terraform/
+test-data/

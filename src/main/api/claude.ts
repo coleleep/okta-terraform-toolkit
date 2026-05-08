@@ -34,7 +34,7 @@ export function setApiKey(key: string): void {
 function getClient(): Anthropic {
   const apiKey = getApiKey();
   if (!apiKey) throw new Error('No Claude API key configured. Set your key in Settings or via CLAUDE_API_KEY environment variable.');
-  return new Anthropic({ apiKey, baseURL: 'https://llm.atko.ai' });
+  return new Anthropic({ apiKey, baseURL: 'https://llm.atko.ai', timeout: 120000 });
 }
 
 // --- Log Interpreter ---
