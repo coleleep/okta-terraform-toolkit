@@ -165,29 +165,44 @@ export default function SyncSection() {
 
   const handleExport = async () => {
     if (!converted) return;
+    let portableHcl = converted.portableHcl;
+
+    // Inject probe recommendations into the existing provider block
+    if (recommendation?.recommended) {
+      const config = recommendation.recommended;
+      const rateLimitBlock = [
+        `  # Rate limit optimization (from endpoint probe)`,
+        `  max_retries      = ${config.max_retries}`,
+        `  backoff          = ${config.backoff}`,
+        `  min_wait_seconds = ${config.min_wait_seconds}`,
+        `  max_wait_seconds = ${config.max_wait_seconds}`,
+        `  request_timeout  = ${config.request_timeout}`,
+        `  max_api_capacity = ${config.max_api_capacity}`,
+      ].join('\n');
+
+      portableHcl = portableHcl.replace(
+        /(provider\s+"okta"\s*\{[^}]*)(})/,
+        `$1\n${rateLimitBlock}\n}`
+      );
+    }
+
     const exportFiles: Record<string, string> = {
-      'main.tf': converted.portableHcl,
+      'main.tf': portableHcl,
     };
     if (converted.importBlocks) {
       exportFiles['imports.tf'] = converted.importBlocks;
     }
-    // Include provider config with rate limit optimization from probe
+
+    // Only emit separate versions/variables files if portable HCL doesn't already have them
+    const hasVariables = /^\s*variable\s+"/m.test(portableHcl);
+    const hasTerraformBlock = /^\s*terraform\s*\{/m.test(portableHcl);
+
     if (connection.orgUrl) {
-      exportFiles['versions.tf'] = generateVersionsTf(providerVersion);
-      exportFiles['variables.tf'] = generateVariablesTf('api_token');
-      if (recommendation?.recommended) {
-        exportFiles['provider.tf'] = generateProviderTf(
-          recommendation.recommended,
-          connection.orgUrl,
-          'api_token'
-        );
-      } else {
-        // Fallback: provider block without rate limit tuning
-        exportFiles['provider.tf'] = generateProviderTf(
-          { max_retries: 5, backoff: true, min_wait_seconds: 30, max_wait_seconds: 300, request_timeout: 0, max_api_capacity: 100, parallelism: 1 },
-          connection.orgUrl,
-          'api_token'
-        );
+      if (!hasTerraformBlock) {
+        exportFiles['versions.tf'] = generateVersionsTf(providerVersion);
+      }
+      if (!hasVariables) {
+        exportFiles['variables.tf'] = generateVariablesTf('api_token');
       }
     }
     await api.saveProjectDir(exportFiles);
@@ -228,21 +243,31 @@ export default function SyncSection() {
 
       {/* Step indicator */}
       <div className="flex items-center gap-2">
-        {(['upload', 'compare', 'convert'] as SyncStep[]).map((s, i) => (
-          <React.Fragment key={s}>
-            <div className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-medium ${
-              step === s ? 'bg-accent-teal/10 text-accent-teal' :
-              (['upload', 'compare', 'convert'].indexOf(step) > i) ? 'text-accent-green' : 'text-text-muted'
-            }`}>
-              <span className={`w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold ${
-                step === s ? 'bg-accent-teal text-surface-0' :
-                (['upload', 'compare', 'convert'].indexOf(step) > i) ? 'bg-accent-green/20 text-accent-green' : 'bg-surface-3 text-text-muted'
-              }`}>{i + 1}</span>
-              {s === 'upload' ? 'Upload' : s === 'compare' ? 'Compare' : 'Convert'}
-            </div>
-            {i < 2 && <div className="w-8 h-px bg-border" />}
-          </React.Fragment>
-        ))}
+        {(['upload', 'compare', 'convert'] as SyncStep[]).map((s, i) => {
+          const isCurrent = step === s;
+          const hasData = s === 'compare' ? !!summary : s === 'convert' ? !!converted : !!files;
+          const isClickable = !isCurrent && hasData;
+
+          return (
+            <React.Fragment key={s}>
+              <button
+                onClick={() => isClickable && setStep(s)}
+                disabled={!isClickable}
+                className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
+                  isCurrent ? 'bg-accent-teal/10 text-accent-teal' :
+                  hasData ? 'text-accent-green hover:bg-accent-green/5 cursor-pointer' : 'text-text-muted cursor-default'
+                }`}
+              >
+                <span className={`w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold ${
+                  isCurrent ? 'bg-accent-teal text-surface-0' :
+                  hasData ? 'bg-accent-green/20 text-accent-green' : 'bg-surface-3 text-text-muted'
+                }`}>{i + 1}</span>
+                {s === 'upload' ? 'Upload' : s === 'compare' ? 'Compare' : 'Convert'}
+              </button>
+              {i < 2 && <div className="w-8 h-px bg-border" />}
+            </React.Fragment>
+          );
+        })}
       </div>
 
       {/* Upload step */}
@@ -497,6 +522,76 @@ export default function SyncSection() {
       {/* Convert step */}
       {step === 'convert' && converted && !loading && (
         <>
+          {/* Condensed compare summary */}
+          {summary && (
+            <div className="bg-surface-2 rounded-xl border border-border p-4">
+              <div className="flex items-center justify-between mb-2">
+                <h3 className="text-[10px] uppercase tracking-widest font-semibold text-text-muted">Sync Summary</h3>
+                <button
+                  onClick={() => setStep('compare')}
+                  className="text-[10px] text-accent-teal hover:underline"
+                >
+                  View full comparison
+                </button>
+              </div>
+              <div className="flex gap-6 text-xs">
+                <span className="text-text-secondary"><span className="font-mono font-bold text-text-primary">{summary.totalResources}</span> total</span>
+                <span className="text-text-secondary"><span className="font-mono font-bold text-accent-green">{summary.matched}</span> matched</span>
+                <span className="text-text-secondary"><span className="font-mono font-bold text-accent-amber">{summary.missing}</span> to create</span>
+                {summary.ambiguous > 0 && (
+                  <span className="text-text-secondary"><span className="font-mono font-bold text-accent-red">{summary.ambiguous}</span> ambiguous</span>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* Provider config that will be applied */}
+          {recommendation?.recommended && (
+            <div className="bg-surface-2 rounded-xl border border-border p-4">
+              <h3 className="text-[10px] uppercase tracking-widest font-semibold text-text-muted mb-2">Provider Config (applied on export)</h3>
+              <div className="grid grid-cols-3 gap-3 text-xs">
+                <div>
+                  <span className="text-text-muted block">Parallelism</span>
+                  <span className="font-mono font-bold text-accent-teal">{recommendation.recommended.parallelism}</span>
+                </div>
+                <div>
+                  <span className="text-text-muted block">Max API Capacity</span>
+                  <span className="font-mono font-bold text-text-primary">{recommendation.recommended.max_api_capacity}%</span>
+                </div>
+                <div>
+                  <span className="text-text-muted block">Request Timeout</span>
+                  <span className="font-mono font-bold text-text-primary">{recommendation.recommended.request_timeout}s</span>
+                </div>
+                <div>
+                  <span className="text-text-muted block">Max Retries</span>
+                  <span className="font-mono font-bold text-text-primary">{recommendation.recommended.max_retries}</span>
+                </div>
+                <div>
+                  <span className="text-text-muted block">Min Wait</span>
+                  <span className="font-mono font-bold text-text-primary">{recommendation.recommended.min_wait_seconds}s</span>
+                </div>
+                <div>
+                  <span className="text-text-muted block">Max Wait</span>
+                  <span className="font-mono font-bold text-text-primary">{recommendation.recommended.max_wait_seconds}s</span>
+                </div>
+              </div>
+              <div className="mt-3 pt-3 border-t border-border">
+                <span className="text-[10px] text-text-muted uppercase tracking-widest font-semibold">Apply Command</span>
+                <div className="mt-1 flex items-center gap-2">
+                  <code className="text-xs font-mono text-accent-teal bg-surface-0 px-3 py-1.5 rounded-lg border border-border flex-1">
+                    terraform apply -parallelism={recommendation.recommended.parallelism}
+                  </code>
+                  <button
+                    onClick={() => handleCopy(`terraform apply -parallelism=${recommendation.recommended.parallelism}`)}
+                    className="px-2 py-1.5 text-xs text-text-muted hover:text-text-secondary bg-surface-3 rounded-lg transition-colors"
+                  >
+                    {copied ? 'Copied!' : 'Copy'}
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+
           {/* Warnings */}
           {converted.warnings.length > 0 && (
             <div className="bg-accent-amber/5 border border-accent-amber/20 rounded-xl p-4">
@@ -555,6 +650,12 @@ export default function SyncSection() {
                   <span>{s}</span>
                 </li>
               ))}
+              {recommendation?.recommended && (
+                <li className="text-xs text-text-secondary flex gap-2">
+                  <span className="text-accent-teal font-bold flex-shrink-0 font-mono">{converted.instructions.length + 1}.</span>
+                  <span>Run <code className="font-mono bg-surface-0 px-1 py-0.5 rounded text-accent-teal">terraform apply -parallelism={recommendation.recommended.parallelism}</code> to apply with optimized concurrency</span>
+                </li>
+              )}
             </ol>
           </div>
 

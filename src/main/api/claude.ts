@@ -1,3 +1,5 @@
+process.env.NODE_TLS_REJECT_UNAUTHORIZED = '0';
+
 import Anthropic from '@anthropic-ai/sdk';
 import { app } from 'electron';
 import { join } from 'path';
@@ -72,6 +74,13 @@ RESOURCE ERRORS:
 - 404 = resource not found — could be wrong ID, resource was deleted, or endpoint doesn't exist for this org type (OIE vs Classic)
 - 409 = conflict — resource already exists or concurrent modification
 - 405 = method not allowed — endpoint doesn't support that HTTP method (common with deprecated features)
+
+PRIORITY CONFLICTS:
+- 409 on policy rule endpoints (paths containing /rules or /policies) = concurrent priority modification
+- The Okta API shifts priorities automatically when conflicts occur, causing Terraform state drift
+- If you see multiple 409s on policy/rule endpoints in the same run: the root cause is missing depends_on chains between rules sharing the same parent policy
+- Fix: chain all rules under each policy with depends_on in ascending priority order. This serializes rule operations without reducing parallelism for other resources
+- Do NOT recommend parallelism=1 for this — depends_on chains are the correct fix
 
 PROVIDER-SPECIFIC:
 - Import errors: resource exists in Okta but state doesn't match schema expectations
@@ -298,6 +307,15 @@ PROVIDER CONFIG BEST PRACTICES:
 - Import operations: ~1.15 API calls per resource. Create: ~2. Update: ~2.5. Full lifecycle: ~3.
 - Throughput with capacity throttling: ~90% of theoretical max
 
+POLICY RULE PRIORITY MANAGEMENT:
+- The Okta API shifts existing rule priorities when conflicts occur (assigning priority 2 pushes existing priority-2 to 3)
+- Concurrent rule modifications at parallelism > 1 cause 409 conflicts and priority drift
+- ALWAYS chain policy rules with depends_on in ascending priority order within each parent policy
+- This serializes rule operations naturally — no need to reduce parallelism globally
+- For priority swaps: use a two-step approach — first move rules to temporary high priorities (100+), apply, then move to final priorities
+- Policies themselves also have priority — chain policies under the same scope by priority
+- Do NOT recommend parallelism=1 to solve priority conflicts — depends_on chains are the correct fix
+
 RULES:
 1. If a resource/attribute doesn't exist in the provider, say so clearly in limitations. Don't invent resources.
 2. If a resource requires a specific version, flag it. If user's version is too old, warn them.
@@ -442,9 +460,10 @@ Your job:
 - Replace ALL hardcoded Okta IDs with data source lookups (lookup by name) to make the config portable
 - Generate import blocks for every matched resource in the target org
 - Flag any resources marked MISSING that exist in source but not target
-- Preserve all resource configuration (attributes, settings, lifecycle blocks)
+- COPY ALL resource attributes from the original config verbatim — every name, description, priority, status, grant_type_whitelist, scope_whitelist, group_whitelist, audiences, session_lifetime, etc. must appear in the output. NEVER leave placeholder comments like "preserve original attributes" — write the actual values
 - Use variables for org_url and api_token
 - Keep the same resource addresses/names from the original config
+- The variable for the API token MUST be named "okta_api_token" (not "api_token")
 
 Sub-resource handling:
 - Sub-resources (indented with └─) are children of the parent resource above them
@@ -484,7 +503,46 @@ Rules:
 - Every app assignment app_id → reference to parent app resource
 - Generate one import block per matched resource (including sub-resources)
 - Do NOT invent resources or attributes not in the original config
-- If a resource is MISSING in target, add a comment noting it will be created`,
+- If a resource is MISSING in target, add a comment noting it will be created
+
+IMPORTANT — Resources that require special handling:
+
+1. SYSTEM AUTH SERVER SCOPES: The scopes "openid", "profile", "email", "offline_access", and "address" are system-default scopes that exist on every auth server. They CANNOT be modified via API. For these scopes:
+   - Do NOT include them as resource blocks in the output — they already exist and are immutable
+   - Do NOT generate import blocks for them — importing then applying will fail with "system cannot be modified"
+   - Only include CUSTOM (non-system) scopes in the resource definitions and import blocks
+
+2. GRANT TYPE WHITELIST: When an okta_auth_server_policy_rule has "authorization_code", "implicit", or "password" in grant_type_whitelist, the Okta API REQUIRES either user_whitelist or group_whitelist to be set. If the source config includes any of these grant types but has no user_whitelist or group_whitelist, you MUST add:
+   group_whitelist = ["EVERYONE"]
+
+3. DYNAMIC NETWORK ZONES: Resources with type = "DYNAMIC" MUST have at least one of: dynamic_locations, asns, or dynamic_proxy_type configured. If the source config has a dynamic zone without these attributes, add a warning that the zone cannot be created without location/ASN/proxy configuration and comment out the resource block.
+
+4. POLICY NAME CONFLICTS: If a resource is marked MATCHED with a target_id, it MUST have an import block and should NOT be created from scratch. If a resource is marked MISSING, it will be created — warn the user that if a resource with the same name already exists (matching may have missed it due to case/whitespace differences), the apply will fail with "name already in use" and they should import it instead.
+
+5. POLICY RULE PRIORITY ORDERING: All policy rules (okta_auth_server_policy_rule, okta_policy_rule_signon, okta_policy_rule_password, okta_policy_rule_mfa, okta_policy_rule_profile_enrollment, okta_app_signon_policy_rule) MUST be chained with depends_on in ascending priority order within each parent policy. This prevents concurrent priority modifications that cause 409 conflicts and drift.
+
+For example, if a policy has 3 rules with priorities 1, 2, 3:
+
+resource "okta_auth_server_policy_rule" "rule_1" {
+  priority = 1
+}
+resource "okta_auth_server_policy_rule" "rule_2" {
+  depends_on = [okta_auth_server_policy_rule.rule_1]
+  priority   = 2
+}
+resource "okta_auth_server_policy_rule" "rule_3" {
+  depends_on = [okta_auth_server_policy_rule.rule_2]
+  priority   = 3
+}
+
+Chain rules within the same parent policy. Rules under different policies can run in parallel — only rules sharing the same parent need chaining.
+
+Similarly, if multiple policies exist under the same auth server or scope, chain the policies themselves by priority:
+
+resource "okta_auth_server_policy" "policy_2" {
+  depends_on = [okta_auth_server_policy.policy_1]
+  priority   = 2
+}`,
     messages: [{
       role: 'user',
       content: `Target org: ${targetOrgUrl}\n\nResource mapping:\n${matchContext}\n\nOriginal .tf configuration:\n${tfContent}`,

@@ -650,12 +650,28 @@ function GotchasContent() {
         <li>Metadata endpoint rate limits are separate from the app endpoint — check both.</li>
       </UL>
 
-      <H3>Policy Rules</H3>
+      <H3>Policy Rules &amp; Priority Ordering</H3>
       <UL>
-        <li>Policy rules have an implicit <strong>priority order</strong>. Use the <code className="bg-gray-100 px-1 rounded">priority</code> attribute to control ordering.</li>
-        <li>If you manage some rules in Terraform and some manually, priority conflicts will cause drift.</li>
-        <li>Best practice: manage <strong>all rules</strong> for a given policy in Terraform, or none.</li>
+        <li>Policy rules have a <code className="bg-gray-100 px-1 rounded">priority</code> attribute that controls evaluation order. The Okta API <strong>shifts priorities automatically</strong> when conflicts occur — assigning priority 2 pushes existing priority-2 to 3.</li>
+        <li>Concurrent rule modifications cause <strong>409 conflicts and state drift</strong>. This is the #1 cause of flaky Terraform applies with policies.</li>
+        <li><strong>Required fix:</strong> Chain all rules under each policy with <code className="bg-gray-100 px-1 rounded">depends_on</code> in ascending priority order. This serializes rule operations while other resources still run in parallel.</li>
+        <li>Do <strong>NOT</strong> use <code className="bg-gray-100 px-1 rounded">parallelism=1</code> globally — it&apos;s wasteful. The <code className="bg-gray-100 px-1 rounded">depends_on</code> chain achieves serialization only where needed.</li>
+        <li><strong>Priority swaps:</strong> Move rules to temporary high priorities (100+) first, apply, then move to final priorities. Direct swaps cause cascading shifts.</li>
+        <li>Manage <strong>all rules</strong> for a given policy in Terraform, or none. Mixed management (some in Terraform, some manual) causes priority drift.</li>
       </UL>
+      <div className="bg-gray-50 border border-gray-200 rounded p-3 mt-2 mb-3 text-xs font-mono whitespace-pre">{`resource "okta_auth_server_policy_rule" "rule_1" {
+  priority = 1
+}
+
+resource "okta_auth_server_policy_rule" "rule_2" {
+  depends_on = [okta_auth_server_policy_rule.rule_1]
+  priority   = 2
+}
+
+resource "okta_auth_server_policy_rule" "rule_3" {
+  depends_on = [okta_auth_server_policy_rule.rule_2]
+  priority   = 3
+}`}</div>
 
       <H3>SMS Templates</H3>
       <UL>

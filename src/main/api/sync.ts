@@ -180,9 +180,9 @@ export async function discoverTargetResources(resourceTypes: string[]): Promise<
     if (!endpoint) continue;
 
     // Avoid hitting the same endpoint twice (e.g., all app types share /api/v1/apps)
-    const baseEndpoint = endpoint.split('?')[0];
-    if (discoveredEndpoints.has(baseEndpoint)) continue;
-    discoveredEndpoints.add(baseEndpoint);
+    // Use the full endpoint (including query params) so ?type=X variants aren't deduplicated
+    if (discoveredEndpoints.has(endpoint)) continue;
+    discoveredEndpoints.add(endpoint);
 
     try {
       const items = await fetchAllPages(client, endpoint);

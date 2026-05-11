@@ -23,5 +23,6 @@ module.exports = {
   },
   externals: {
     'jsonwebtoken': 'commonjs jsonwebtoken',
+    '@anthropic-ai/sdk': 'commonjs @anthropic-ai/sdk',
   },
 };

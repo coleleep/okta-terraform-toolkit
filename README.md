@@ -74,8 +74,17 @@ npm start
 
 1. Launch the app
 2. Enter your Okta org URL (e.g., `https://dev-123456.okta.com`)
-3. Authenticate with an API token or OAuth client credentials
+3. Enter an API token (Super Admin permissions required)
 4. Start probing
+
+## Testing
+
+The `test-data/` folder contains reusable Terraform fixtures for validating the cross-org sync feature. Each subfolder has a `main.tf` (source org config) and `source.tfstate` (synthetic state with fake IDs). See [`test-data/README.md`](test-data/README.md) for setup instructions.
+
+| Scenario | Focus |
+|----------|-------|
+| `sync-priority` | Policy rule priority ordering, `depends_on` chain generation |
+| `sync-comprehensive` | Groups, memberships, apps, assignments, trusted origins, auth server scopes/claims, policies |
 
 ## Architecture
 
@@ -93,21 +102,17 @@ src/
 │   ├── types.ts
 │   ├── versions.ts
 │   └── terraform-gen.ts
-└── preload.ts      # Secure IPC bridge
+├── preload.ts      # Secure IPC bridge
+test-data/          # Reusable sync test fixtures (see test-data/README.md)
 ```
 
 **Stack:** Electron · React 18 · TypeScript · Tailwind CSS · Zustand · Webpack 5
 
 ## Authentication
 
-OTTO supports two auth methods:
+OTTO requires an Okta API token with Super Admin permissions. Some endpoints used for rate limit probing and resource discovery are not accessible via OAuth client credentials, so an API token is the only supported auth method.
 
-| Method | Use case |
-|--------|----------|
-| API Token | Quick setup, single admin |
-| OAuth (client credentials) | Service apps, scoped access, no token rotation |
-
-For OAuth, OTTO generates the required scopes based on the resource types you select.
+**Important:** For accurate probing and configuration recommendations, the API token must be set to **100% rate limit capacity**. By default, Okta may throttle individual tokens below the org-wide limit. See [API Token Rate Limit Violation](https://support.okta.com/help/s/article/API-Token-Rate-Limit-Violation?language=en_US) for instructions on adjusting this setting.
 
 ## AI Features
 

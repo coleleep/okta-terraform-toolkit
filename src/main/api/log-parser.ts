@@ -111,6 +111,12 @@ export async function parseLogFile(filePath: string): Promise<LogAnalysis> {
         configParsed = true;
       }
 
+      // max_api_capacity detection
+      if (!detectedConfig.maxApiCapacity && line.includes('max_api_capacity configuration at')) {
+        const capMatch = line.match(/max_api_capacity configuration at (\d+)%/);
+        if (capMatch) detectedConfig.maxApiCapacity = parseInt(capMatch[1]);
+      }
+
       // Request tracking
       if (line.includes('performing request:')) {
         const urlMatch = line.match(/url=(https?:\/\/[^\s]+)/);
@@ -415,12 +421,31 @@ function detectIssues(
 
   // Warning: Conflict errors (409)
   if (errorsByStatus[409] > 0) {
-    issues.push({
-      severity: 'warning',
-      title: `${errorsByStatus[409]} conflict errors (409)`,
-      detail: 'Resource conflicts detected — typically means a resource already exists or was modified concurrently.',
-      recommendation: 'If importing existing resources, use import blocks instead of creating. If running concurrent applies, reduce parallelism or use state locking.',
-    });
+    const policyRuleEndpoints = endpoints.filter(e =>
+      e.pattern.includes('/rules') || (e.pattern.includes('/policies') && !e.pattern.includes('/policies?'))
+    );
+    const policyRule409s = policyRuleEndpoints.reduce((sum, e) =>
+      sum + (e.errorsByStatus?.[409] || 0), 0
+    );
+
+    if (policyRule409s > 0) {
+      issues.push({
+        severity: 'critical',
+        title: `${policyRule409s} priority conflict(s) on policy rule endpoints`,
+        detail: `The Okta API returned 409 Conflict when modifying policy rules concurrently. This happens when multiple rules under the same policy have their priority changed in parallel — the API shifts priorities automatically, causing conflicts and state drift.`,
+        recommendation: `Add depends_on chains between all policy rules sharing the same parent policy, ordered by ascending priority. This serializes rule operations without reducing parallelism globally. Do NOT use parallelism=1 — depends_on chains are the correct fix.`,
+      });
+    }
+
+    const nonPolicyRule409s = errorsByStatus[409] - policyRule409s;
+    if (nonPolicyRule409s > 0) {
+      issues.push({
+        severity: 'warning',
+        title: `${nonPolicyRule409s} conflict errors (409) on non-rule endpoints`,
+        detail: 'Resource conflicts detected — typically means a resource already exists or was modified concurrently.',
+        recommendation: 'If importing existing resources, use import blocks instead of creating. If running concurrent applies, reduce parallelism or use state locking.',
+      });
+    }
   }
 
   // Warning: Server errors (500+)

@@ -5,4 +5,7 @@ dist/
 *.tfstate
 *.tfstate.backup
 .terraform/
-test-data/
+.terraform.lock.hcl
+
+# Allow test fixture state files (contain only fake IDs)
+!test-data/**/source.tfstate

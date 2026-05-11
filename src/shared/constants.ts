@@ -442,6 +442,12 @@ export const SUB_RESOURCE_SYNC_CONFIG: Record<string, SubResourceSyncDef> = {
     grandparentIdField: 'auth_server_id',
   },
   // ─── Policy rules (level 1 — children of global policies) ───
+  okta_policy_rule_signon: {
+    parentTerraformType: 'okta_policy_signon',
+    parentIdField: 'policy_id',
+    listEndpoint: '/api/v1/policies/{parentId}/rules',
+    level: 1,
+  },
   okta_policy_rule_sign_on: {
     parentTerraformType: 'okta_policy_signon',
     parentIdField: 'policy_id',
