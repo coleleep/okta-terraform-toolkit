@@ -58,6 +58,10 @@ const api = {
   generateSolution: (description: string, providerVersion: string) => ipcRenderer.invoke('claude:generate-solution', { description, providerVersion }),
   hasClaudeKey: () => ipcRenderer.invoke('claude:has-key'),
   setClaudeKey: (key: string) => ipcRenderer.invoke('claude:set-key', key),
+  getClaudeConfig: () => ipcRenderer.invoke('claude:get-config'),
+  setClaudeConfig: (config: { apiKey: string; baseUrl?: string }) =>
+    ipcRenderer.invoke('claude:set-config', config),
+  removeClaudeConfig: () => ipcRenderer.invoke('claude:remove-config'),
 
   // Sync
   syncOpenFiles: () => ipcRenderer.invoke('sync:open-files'),

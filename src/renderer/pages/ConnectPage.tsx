@@ -1,10 +1,29 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useStore } from '../hooks/useStore';
+
+const api = (window as any).oktaTerraform;
 
 export default function ConnectPage() {
   const { connecting, connection, connect } = useStore();
   const [orgUrl, setOrgUrl] = useState('');
   const [token, setToken] = useState('');
+
+  // Claude config state
+  const [claudeKey, setClaudeKey] = useState('');
+  const [claudeEndpoint, setClaudeEndpoint] = useState('');
+  const [showAdvanced, setShowAdvanced] = useState(false);
+  const [claudeConfigured, setClaudeConfigured] = useState(false);
+  const [claudeSaved, setClaudeSaved] = useState(false);
+  const [editingClaude, setEditingClaude] = useState(false);
+
+  useEffect(() => {
+    api.getClaudeConfig().then((r: any) => {
+      if (r.data?.hasKey) {
+        setClaudeConfigured(true);
+        setClaudeEndpoint(r.data.baseUrl || '');
+      }
+    });
+  }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -93,6 +112,102 @@ export default function ConnectPage() {
               {connecting ? 'Connecting...' : 'Connect & Analyze'}
             </button>
           </form>
+
+          {/* AI Configuration */}
+          <div className="mt-6 bg-surface-2 border border-border rounded-xl p-6">
+            <h2 className="text-sm font-semibold text-text-primary mb-1">AI Configuration</h2>
+            <p className="text-xs text-text-muted mb-4">Powers config conversion, log analysis, and error decoding.</p>
+
+            {claudeConfigured && !editingClaude ? (
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <div className="w-2 h-2 rounded-full bg-accent-teal" />
+                  <span className="text-sm text-text-secondary">API key configured</span>
+                  {claudeEndpoint && (
+                    <span className="text-xs text-text-muted font-mono bg-surface-3 px-2 py-0.5 rounded">{claudeEndpoint}</span>
+                  )}
+                </div>
+                <button
+                  onClick={() => setEditingClaude(true)}
+                  className="text-xs text-accent-teal hover:underline"
+                >
+                  Change
+                </button>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                <div>
+                  <label htmlFor="claudeKey" className="block text-xs font-medium text-text-secondary mb-1.5 uppercase tracking-wide">
+                    Claude API Key
+                  </label>
+                  <input
+                    id="claudeKey"
+                    type="password"
+                    value={claudeKey}
+                    onChange={(e) => setClaudeKey(e.target.value)}
+                    placeholder="sk-ant-..."
+                    className="w-full px-3 py-2.5 bg-surface-0 border border-border rounded-lg text-sm text-text-primary placeholder-text-muted focus:outline-none focus:ring-2 focus:ring-accent-teal/30 focus:border-accent-teal/50 font-mono"
+                  />
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => setShowAdvanced(!showAdvanced)}
+                  className="text-xs text-text-muted hover:text-text-secondary flex items-center gap-1"
+                >
+                  <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.5" className={`transition-transform ${showAdvanced ? 'rotate-90' : ''}`}>
+                    <path d="M4 2l4 4-4 4" />
+                  </svg>
+                  Advanced
+                </button>
+
+                {showAdvanced && (
+                  <div>
+                    <label htmlFor="claudeEndpoint" className="block text-xs font-medium text-text-secondary mb-1.5 uppercase tracking-wide">
+                      Endpoint URL
+                    </label>
+                    <input
+                      id="claudeEndpoint"
+                      type="text"
+                      value={claudeEndpoint}
+                      onChange={(e) => setClaudeEndpoint(e.target.value)}
+                      placeholder="https://api.anthropic.com"
+                      className="w-full px-3 py-2.5 bg-surface-0 border border-border rounded-lg text-sm text-text-primary placeholder-text-muted focus:outline-none focus:ring-2 focus:ring-accent-teal/30 focus:border-accent-teal/50 font-mono"
+                    />
+                    <p className="text-xs text-text-muted mt-1.5">Leave blank for default Anthropic endpoint.</p>
+                  </div>
+                )}
+
+                <div className="flex gap-2">
+                  <button
+                    type="button"
+                    onClick={async () => {
+                      if (!claudeKey.trim()) return;
+                      await api.setClaudeConfig({ apiKey: claudeKey.trim(), baseUrl: claudeEndpoint.trim() || undefined });
+                      setClaudeConfigured(true);
+                      setEditingClaude(false);
+                      setClaudeSaved(true);
+                      setClaudeKey('');
+                      setTimeout(() => setClaudeSaved(false), 2000);
+                    }}
+                    disabled={!claudeKey.trim()}
+                    className="px-4 py-2 text-xs font-medium bg-accent-teal/15 text-accent-teal hover:bg-accent-teal/25 disabled:opacity-40 rounded-lg transition-colors"
+                  >
+                    {claudeSaved ? 'Saved!' : 'Save'}
+                  </button>
+                  {editingClaude && (
+                    <button
+                      type="button"
+                      onClick={() => setEditingClaude(false)}
+                      className="px-4 py-2 text-xs font-medium text-text-muted hover:text-text-secondary bg-surface-3 hover:bg-surface-4 rounded-lg transition-colors"
+                    >
+                      Cancel
+                    </button>
+                  )}
+                </div>
+              </div>
+            )}
+          </div>
 
           <p className="text-center text-text-muted/50 text-xs mt-6 font-mono tracking-wider">
             OTTO v0.1.0

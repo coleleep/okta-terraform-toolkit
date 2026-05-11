@@ -7,7 +7,7 @@ import { countResources } from './api/resource-counter';
 import { analyzeTargetRuntime } from './api/target-analyzer';
 import { probeSubResourceEndpoint } from './api/deep-probe';
 import { parseLogFile } from './api/log-parser';
-import { interpretLog, buildWorkload, decodeError, generateSolution, convertConfig, getApiKey, setApiKey } from './api/claude';
+import { interpretLog, buildWorkload, decodeError, generateSolution, convertConfig, getApiKey, setApiKey, getClaudeConfig, setClaudeConfig, removeClaudeConfig } from './api/claude';
 import { parseStateFile, syncWithSubResources, buildSyncSummary } from './api/sync';
 import { getMainWindow } from './index';
 import { ConnectionStatus, ManagedResourceType, ResourceCount, LogAnalysis } from '../shared/types';
@@ -203,6 +203,32 @@ export function registerIpcHandlers() {
   ipcMain.handle('claude:set-key', async (_event, key: string) => {
     try {
       setApiKey(key);
+      return { success: true };
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : String(error);
+      return { success: false, error: message };
+    }
+  });
+
+  ipcMain.handle('claude:get-config', () => {
+    const config = getClaudeConfig();
+    if (!config) return { success: true, data: null };
+    return { success: true, data: { hasKey: true, baseUrl: config.baseUrl || '' } };
+  });
+
+  ipcMain.handle('claude:set-config', async (_event, config: { apiKey: string; baseUrl?: string }) => {
+    try {
+      setClaudeConfig({ apiKey: config.apiKey, baseUrl: config.baseUrl || undefined });
+      return { success: true };
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : String(error);
+      return { success: false, error: message };
+    }
+  });
+
+  ipcMain.handle('claude:remove-config', () => {
+    try {
+      removeClaudeConfig();
       return { success: true };
     } catch (error: unknown) {
       const message = error instanceof Error ? error.message : String(error);

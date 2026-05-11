@@ -123,7 +123,23 @@ OTTO uses Claude to power:
 - **Log interpretation** — explain what went wrong in a failed Terraform run
 - **Error decoding** — translate Okta API errors into actionable fixes
 
-Requires a Claude API key (configured in Settings).
+### Setup
+
+1. Get a Claude API key from [console.anthropic.com](https://console.anthropic.com)
+2. On the **Connect** page, expand the **AI Configuration** section and enter your API key
+3. Click **Save** — the key persists across app restarts
+
+You can also update your key later from the **gear icon** in the top bar.
+
+### Custom Endpoint (Optional)
+
+By default, OTTO connects to the Anthropic API (`https://api.anthropic.com`). If your organization uses a proxy or custom gateway:
+
+1. Click **Advanced** in the AI Configuration section
+2. Enter your endpoint URL (e.g., `https://your-proxy.example.com`)
+3. Leave blank to use the default Anthropic endpoint
+
+Configuration is stored locally in Electron's app data directory and never transmitted anywhere other than the configured API endpoint.
 
 ## Resource Coverage
 

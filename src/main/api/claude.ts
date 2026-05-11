@@ -9,34 +9,70 @@ import { RESOURCE_DICTIONARY } from '../../shared/resource-dictionary';
 import { SCOPE_REQUIREMENTS, API_KEY_ONLY_ENDPOINTS } from '../../shared/scopes';
 import { SUPPORTED_VERSIONS } from '../../shared/versions';
 
-// --- API Key Management ---
+// --- Claude Configuration Management ---
 
-const KEY_FILE = 'claude-key.json';
+interface ClaudeConfig {
+  apiKey: string;
+  baseUrl?: string;
+}
 
-function getKeyPath(): string {
-  return join(app.getPath('userData'), KEY_FILE);
+const CONFIG_FILE = 'claude-config.json';
+const LEGACY_KEY_FILE = 'claude-key.json';
+
+function getConfigPath(): string {
+  return join(app.getPath('userData'), CONFIG_FILE);
+}
+
+export function getClaudeConfig(): ClaudeConfig | null {
+  const configPath = getConfigPath();
+  if (existsSync(configPath)) {
+    try {
+      const data = JSON.parse(readFileSync(configPath, 'utf-8'));
+      if (data.apiKey) return data;
+    } catch { /* fall through */ }
+  }
+  // Backward compat: read old claude-key.json
+  const legacyPath = join(app.getPath('userData'), LEGACY_KEY_FILE);
+  if (existsSync(legacyPath)) {
+    try {
+      const data = JSON.parse(readFileSync(legacyPath, 'utf-8'));
+      if (data.apiKey) return { apiKey: data.apiKey };
+    } catch { /* fall through */ }
+  }
+  const envKey = process.env.CLAUDE_API_KEY;
+  if (envKey) return { apiKey: envKey, baseUrl: process.env.CLAUDE_BASE_URL };
+  return null;
+}
+
+export function setClaudeConfig(config: ClaudeConfig): void {
+  writeFileSync(getConfigPath(), JSON.stringify(config), 'utf-8');
+}
+
+export function removeClaudeConfig(): void {
+  const configPath = getConfigPath();
+  if (existsSync(configPath)) {
+    const { unlinkSync } = require('fs');
+    unlinkSync(configPath);
+  }
 }
 
 export function getApiKey(): string | null {
-  // Priority: user override > bundled default
-  const keyPath = getKeyPath();
-  if (existsSync(keyPath)) {
-    try {
-      const data = JSON.parse(readFileSync(keyPath, 'utf-8'));
-      if (data.apiKey) return data.apiKey;
-    } catch { /* fall through */ }
-  }
-  return process.env.CLAUDE_API_KEY || null;
+  return getClaudeConfig()?.apiKey || null;
 }
 
 export function setApiKey(key: string): void {
-  writeFileSync(getKeyPath(), JSON.stringify({ apiKey: key }), 'utf-8');
+  const existing = getClaudeConfig();
+  setClaudeConfig({ apiKey: key, baseUrl: existing?.baseUrl });
 }
 
 function getClient(): Anthropic {
-  const apiKey = getApiKey();
-  if (!apiKey) throw new Error('No Claude API key configured. Set your key in Settings or via CLAUDE_API_KEY environment variable.');
-  return new Anthropic({ apiKey, baseURL: 'https://llm.atko.ai', timeout: 120000 });
+  const config = getClaudeConfig();
+  if (!config?.apiKey) throw new Error('No Claude API key configured. Set your key in Settings.');
+  return new Anthropic({
+    apiKey: config.apiKey,
+    timeout: 120000,
+    ...(config.baseUrl ? { baseURL: config.baseUrl } : {}),
+  });
 }
 
 // --- Log Interpreter ---

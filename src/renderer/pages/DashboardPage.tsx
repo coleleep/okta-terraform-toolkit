@@ -7,6 +7,7 @@ import PlanSection from '../components/PlanSection';
 import DebugSection from '../components/DebugSection';
 import LearnSection from '../components/LearnSection';
 import SyncSection from '../components/SyncSection';
+import SettingsModal from '../components/SettingsModal';
 import { SUPPORTED_VERSIONS, ProviderVersion } from '../../shared/versions';
 
 type Section = 'rate-limits' | 'plan' | 'sync' | 'debug' | 'learn';
@@ -69,6 +70,7 @@ export default function DashboardPage() {
   } = useStore();
 
   const [activeSection, setActiveSection] = useState<Section>('rate-limits');
+  const [showSettings, setShowSettings] = useState(false);
   const hasWorkload = selectedResources.length > 0 && resourceCounts.length > 0;
 
   return (
@@ -104,6 +106,16 @@ export default function DashboardPage() {
           </select>
         </div>
         <div className="flex items-center gap-2">
+          <button
+            onClick={() => setShowSettings(true)}
+            className="p-1.5 text-text-muted hover:text-text-primary bg-surface-3 hover:bg-surface-4 rounded-lg transition-colors"
+            title="Settings"
+          >
+            <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+              <circle cx="8" cy="8" r="2.5" />
+              <path d="M13.5 8a5.5 5.5 0 01-.3 1.8l1.3.8-.9 1.5-1.4-.5a5.5 5.5 0 01-1.5 1l.1 1.5h-1.8l.1-1.5a5.5 5.5 0 01-1.5-1l-1.4.5-.9-1.5 1.3-.8A5.5 5.5 0 012.5 8a5.5 5.5 0 01.3-1.8l-1.3-.8.9-1.5 1.4.5a5.5 5.5 0 011.5-1L5.2 1.9H7l-.1 1.5a5.5 5.5 0 011.5 1l1.4-.5.9 1.5-1.3.8A5.5 5.5 0 0113.5 8z" />
+            </svg>
+          </button>
           <button
             onClick={startProbe}
             disabled={probing}
@@ -210,6 +222,8 @@ export default function DashboardPage() {
           )}
         </main>
       </div>
+
+      {showSettings && <SettingsModal onClose={() => setShowSettings(false)} />}
     </div>
   );
 }
