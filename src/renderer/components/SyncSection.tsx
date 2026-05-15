@@ -516,7 +516,8 @@ export default function SyncSection() {
 
     try {
       setTfStage('apply');
-      const applyResult = await api.terraformRun(exportedDir, ['apply', '-auto-approve', '-parallelism=8', '-no-color'], swapped);
+      const parallelism = recommendation?.recommended?.parallelism ?? 4;
+      const applyResult = await api.terraformRun(exportedDir, ['apply', '-auto-approve', `-parallelism=${parallelism}`, '-no-color'], swapped);
       if (!applyResult.success) {
         setTfStage('error');
         setTfError(applyResult.error ?? `terraform apply exited with code ${applyResult.exitCode}`);
@@ -631,7 +632,8 @@ export default function SyncSection() {
   };
 
   const handleCopyApply = () => {
-    navigator.clipboard.writeText('terraform apply -parallelism=8');
+    const parallelism = recommendation?.recommended?.parallelism ?? 4;
+    navigator.clipboard.writeText(`terraform apply -parallelism=${parallelism}`);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
   };
@@ -1143,7 +1145,7 @@ export default function SyncSection() {
           <p className="text-[11px] font-bold uppercase tracking-widest text-text-muted">Ready to Apply</p>
 
           <div className="flex items-center gap-2 bg-surface-0 border border-border rounded-lg px-3 py-2.5">
-            <code className="flex-1 font-mono text-xs text-green-400">terraform apply -parallelism=8</code>
+            <code className="flex-1 font-mono text-xs text-green-400">terraform apply -parallelism={recommendation?.recommended?.parallelism ?? 4}</code>
             <button
               onClick={handleCopyApply}
               className="px-2.5 py-1 bg-surface-3 border border-border rounded text-[11px] text-text-muted hover:bg-surface-4 transition-colors"
