@@ -70,7 +70,7 @@ const api = (window as unknown as {
     terraformCancel: () => Promise<{ success: boolean }>;
     onTerraformLine: (callback: (line: string) => void) => () => void;
     getSelectedProviderVersion: () => Promise<{ success?: boolean; data?: string }>;
-    saveRollback: (exportedDir: string, targetOrgUrl: string, providerVersion: string, exactProviderVersion?: string) => Promise<{ success: boolean; error?: string }>;
+    saveRollback: (exportedDir: string, targetOrgUrl: string, providerVersion: string, exactProviderVersion?: string, swapped?: boolean, importedAddresses?: string[]) => Promise<{ success: boolean; error?: string }>;
     checkRollback: () => Promise<{ success: boolean; data?: { available: boolean; manifest: RollbackManifest | null }; error?: string }>;
     prepareRollback: () => Promise<{ success: boolean; data?: { rollbackDir: string; manifest: RollbackManifest }; error?: string }>;
     clearRollback: () => Promise<{ success: boolean; error?: string }>;
@@ -78,7 +78,14 @@ const api = (window as unknown as {
 }).oktaTerraform;
 
 export default function SyncSection() {
-  const { connection, probeResult, recommendation, providerVersion } = useStore();
+  const { connection, probeResult, recommendation, providerVersion, connect: connectTargetOrg, disconnect: disconnectTargetOrg } = useStore();
+
+  // Target org panel state (tf-files mode)
+  const [targetUrl, setTargetUrl] = useState('');
+  const [targetToken, setTargetToken] = useState('');
+  const [targetConnecting, setTargetConnecting] = useState(false);
+  const [targetError, setTargetError] = useState<string | null>(null);
+  const [targetEditing, setTargetEditing] = useState(false);
 
   // Source org panel state
   const [sourceUrl, setSourceUrl] = useState('');
@@ -274,6 +281,29 @@ export default function SyncSection() {
     setProbeProgress(null);
   };
 
+  // ── Target org handlers (tf-files mode) ───────────────────
+
+  const handleConnectTarget = async () => {
+    if (!targetUrl.trim() || !targetToken.trim()) return;
+    setTargetConnecting(true);
+    setTargetError(null);
+    const ok = await connectTargetOrg({ orgUrl: targetUrl.trim(), authMethod: 'token', token: targetToken.trim() });
+    if (ok) {
+      setTargetUrl('');
+      setTargetToken('');
+      setTargetEditing(false);
+    } else {
+      setTargetError(useStore.getState().connection.error ?? 'Connection failed');
+    }
+    setTargetConnecting(false);
+  };
+
+  const handleDisconnectTarget = () => {
+    disconnectTargetOrg();
+    setTargetEditing(false);
+    setTargetError(null);
+  };
+
   // ── Pipeline handlers ──────────────────────────────────────
 
   const handleRunPipeline = async () => {
@@ -303,17 +333,36 @@ export default function SyncSection() {
       const exactVersion = managedProviderVersion !== 'system' ? managedProviderVersion : undefined;
       filesToStage['versions.tf'] = generateVersionsTf(providerVersion, exactVersion);
 
+      // Stage files to disk (creates temp dir for any downstream TF operations)
       const stageResult = await api.stageTfFiles(filesToStage, stateContent);
       if (!stageResult.success || !stageResult.data) {
         setPipelineError(stageResult.error ?? 'Failed to stage files');
         setStage('error');
         return;
       }
-      setExportedDir(stageResult.data);
-      setStage('done');
+      // Don't expose staged dir as exportedDir yet — handleExport() will set the
+      // properly converted dir (with provider.tf, variables.tf, etc.) when the user exports.
+
+      // Analyze uploaded files against connected target org
+      const analyzeResult = await api.syncAnalyze(tfFiles, stateContent);
+      if (!analyzeResult.success || !analyzeResult.data) {
+        setPipelineError(analyzeResult.error ?? 'Discovery failed');
+        setStage('error');
+        return;
+      }
+
+      const { summary: newSummary, diff: newDiff } = analyzeResult.data;
+      setSummary(newSummary);
+      setDiff(newDiff);
+      setStage('match');
+
+      // Kick off background deep probe
+      const terraformTypes = [...new Set(newSummary.matches.map(m => m.sourceType))];
+      triggerDeepProbe(terraformTypes);
       return;
     }
 
+    // compare mode — live org-to-org analysis (no tf files)
     setStage('discover');
 
     const analyzeResult = await api.syncAnalyze(tfFiles, stateContent);
@@ -358,6 +407,41 @@ export default function SyncSection() {
         instructions: result.data.instructions ?? [],
         warnings: result.data.warnings ?? [],
       });
+
+      if (mode === 'tf-files') {
+        // Auto-stage converted files so the TF runner is ready immediately —
+        // no manual export needed since the user already supplied their tf files.
+        // Mirror handleExport() deduplication: don't add provider.tf/variables.tf
+        // if portableHcl already contains those blocks (AI conversion may include them).
+        let portableHcl = result.data.portableHcl ?? '';
+        const exactVersion = managedProviderVersion !== 'system' ? managedProviderVersion : undefined;
+        const hasVariables = /^\s*variable\s+"/m.test(portableHcl);
+        const hasTerraformBlock = /^\s*terraform\s*\{/m.test(portableHcl);
+        const hasProviderBlock = /^\s*provider\s+"okta"/m.test(portableHcl);
+        // Strip terraform {} block from main.tf — goes into versions.tf separately
+        if (hasTerraformBlock) {
+          portableHcl = portableHcl.replace(
+            /^\s*terraform\s*\{(?:[^{}]|\{(?:[^{}]|\{[^{}]*\})*\})*\}\s*\n?/m,
+            '',
+          );
+        }
+        const filesToStage: Record<string, string> = {
+          'main.tf': portableHcl,
+          'versions.tf': generateVersionsTf(providerVersion, exactVersion),
+        };
+        if (result.data.importBlocks) filesToStage['imports.tf'] = result.data.importBlocks;
+        if (!hasVariables) filesToStage['variables.tf'] = generateVariablesTf('api_token');
+        if (!hasProviderBlock) {
+          const targetOrgUrlForProvider = swapped ? sourceConnectedUrl : (connection.orgUrl ?? '');
+          const { orgName, baseUrl } = getOrgInfo(targetOrgUrlForProvider);
+          filesToStage['provider.tf'] = `provider "okta" {\n  org_name  = "${orgName}"\n  base_url  = "${baseUrl}"\n  api_token = var.okta_api_token\n}\n`;
+        }
+        const stageResult = await api.stageTfFiles(filesToStage);
+        if (stageResult.success && stageResult.data) {
+          setExportedDir(stageResult.data);
+        }
+      }
+
       setActiveStage('done');
     } else {
       setActivePipelineError(result.error ?? 'Conversion failed');
@@ -525,8 +609,14 @@ export default function SyncSection() {
       }
       setTfStage('done');
       // Save rollback bundle with post-apply state (has target org resource IDs)
-      const targetOrgUrl = connection?.orgUrl ?? '';
-      const saveResult = await api.saveRollback(exportedDir, targetOrgUrl, managedProviderVersion);
+      const targetOrgUrl = swapped ? sourceConnectedUrl : (connection?.orgUrl ?? '');
+      // Track which addresses were imported (pre-existing in target) vs created (new)
+      // On rollback, imported resources must only be state-rm'd (not destroyed in Okta)
+      const activeMatches = mode === 'compare' ? compareMatches : summary?.matches ?? null;
+      const importedAddresses = (activeMatches ?? [])
+        .filter(m => m.status === 'matched')
+        .map(m => m.sourceAddress);
+      const saveResult = await api.saveRollback(exportedDir, targetOrgUrl, managedProviderVersion, undefined, swapped, importedAddresses);
       if (saveResult.success) {
         const checkResult = await api.checkRollback();
         if (checkResult?.data?.available) {
@@ -563,17 +653,27 @@ export default function SyncSection() {
     });
 
     try {
+      const rollbackSwapped = rollbackManifest?.swapped ?? false;
+
       setRollbackStage('init');
-      const initResult = await api.terraformRun(dir, ['init', '-no-color'], false);
+      const initResult = await api.terraformRun(dir, ['init', '-no-color'], rollbackSwapped);
       if (!initResult.success) {
         setRollbackStage('error');
         setRollbackError(initResult.error ?? `terraform init exited with code ${initResult.exitCode}`);
         return;
       }
 
+      // State-rm imported resources so rollback only destroys resources that were created
+      // (not resources that were pre-existing in the target org and imported)
+      const importedAddresses = rollbackManifest?.importedAddresses ?? [];
+      for (const addr of importedAddresses) {
+        await api.terraformRun(dir, ['state', 'rm', addr], rollbackSwapped);
+        // Ignore failures — address may not be in state (e.g. system zone that was filtered)
+      }
+
       setRollbackStage('plan');
       setRollbackLines([]);
-      const planResult = await api.terraformRun(dir, ['plan', '-no-color'], false);
+      const planResult = await api.terraformRun(dir, ['plan', '-no-color'], rollbackSwapped);
       if (!planResult.success) {
         setRollbackStage('error');
         setRollbackError(planResult.error ?? `terraform plan exited with code ${planResult.exitCode}`);
@@ -596,7 +696,7 @@ export default function SyncSection() {
 
     try {
       setRollbackStage('apply');
-      const applyResult = await api.terraformRun(rollbackDir, ['apply', '-auto-approve', '-no-color'], false);
+      const applyResult = await api.terraformRun(rollbackDir, ['apply', '-auto-approve', '-no-color'], rollbackManifest?.swapped ?? false);
       if (!applyResult.success) {
         setRollbackStage('error');
         setRollbackError(applyResult.error ?? `terraform apply exited with code ${applyResult.exitCode}`);
@@ -773,11 +873,61 @@ export default function SyncSection() {
       {mode === 'tf-files' && (
         <div className="space-y-3">
           <div className="bg-surface-2 border border-border rounded-xl p-4">
-            <p className="text-[11px] font-bold uppercase tracking-widest text-text-muted mb-2">Target Org</p>
-            {connection.connected ? (
-              <span className="text-xs text-green-400">✓ {connection.orgUrl}</span>
+            <p className="text-[11px] font-bold uppercase tracking-widest text-text-muted mb-3">Target Org</p>
+            {connection.connected && !targetEditing ? (
+              <div className="flex items-center justify-between">
+                <span className="text-xs text-green-400">✓ {connection.orgUrl}</span>
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => { setTargetEditing(true); setTargetError(null); }}
+                    className="text-[10px] text-text-muted hover:text-text-secondary"
+                  >
+                    Change
+                  </button>
+                  <button
+                    onClick={handleDisconnectTarget}
+                    className="text-[10px] text-text-muted hover:text-text-secondary"
+                  >
+                    Disconnect
+                  </button>
+                </div>
+              </div>
             ) : (
-              <span className="text-xs text-text-muted">Connect an org in the Connection panel above</span>
+              <div className="space-y-2">
+                <input
+                  type="text"
+                  placeholder="Org URL (e.g. trial-123456.okta.com)"
+                  value={targetUrl}
+                  onChange={e => setTargetUrl(e.target.value)}
+                  className="w-full bg-surface-1 border border-border rounded-lg px-3 py-2 text-xs text-text-primary placeholder:text-text-muted focus:outline-none focus:border-accent-teal/50"
+                />
+                <input
+                  type="password"
+                  placeholder="API Token"
+                  value={targetToken}
+                  onChange={e => setTargetToken(e.target.value)}
+                  onKeyDown={e => e.key === 'Enter' && handleConnectTarget()}
+                  className="w-full bg-surface-1 border border-border rounded-lg px-3 py-2 text-xs text-text-primary placeholder:text-text-muted focus:outline-none focus:border-accent-teal/50"
+                />
+                {targetError && <p className="text-[11px] text-red-400">{targetError}</p>}
+                <div className="flex gap-2">
+                  <button
+                    onClick={handleConnectTarget}
+                    disabled={targetConnecting || !targetUrl.trim() || !targetToken.trim()}
+                    className="flex-1 py-2 text-xs font-semibold bg-accent-teal/15 text-accent-teal hover:bg-accent-teal/25 rounded-lg border border-accent-teal/30 transition-colors disabled:opacity-50"
+                  >
+                    {targetConnecting ? 'Connecting…' : 'Connect'}
+                  </button>
+                  {targetEditing && (
+                    <button
+                      onClick={() => { setTargetEditing(false); setTargetError(null); }}
+                      className="px-3 py-2 text-xs bg-surface-3 text-text-muted hover:bg-surface-4 rounded-lg border border-border"
+                    >
+                      Cancel
+                    </button>
+                  )}
+                </div>
+              </div>
             )}
           </div>
 
@@ -1049,10 +1199,12 @@ export default function SyncSection() {
           onProceed={(selectedAddresses) => {
             if (mode === 'compare' && compareMatches && selectedAddresses) {
               const tfFilesGenerated = generateTfFromMatches(compareMatches, activeDiff, selectedAddresses);
-              runConvert(
-                compareMatches.filter(m => selectedAddresses.has(m.sourceAddress)),
-                tfFilesGenerated,
+              const SYSTEM_ZONE_NAMES = /^(BlockedIpZone|LegacyIpZone|DefaultExemptIpZone|DefaultEnhancedDynamicZone)$/i;
+              const filteredMatches = compareMatches.filter(m =>
+                selectedAddresses.has(m.sourceAddress) &&
+                !(m.sourceAddress.startsWith('okta_network_zone.') && SYSTEM_ZONE_NAMES.test(m.sourceName))
               );
+              runConvert(filteredMatches, tfFilesGenerated);
             } else if (activeSummary) {
               runConvert(activeSummary.matches, tfFiles);
             }
@@ -1160,15 +1312,19 @@ export default function SyncSection() {
             </div>
           )}
 
-          <button
-            onClick={handleExport}
-            className="w-full py-2.5 text-sm font-bold bg-accent-teal text-surface-0 hover:bg-accent-teal/90 rounded-lg transition-colors"
-          >
-            Export Project Files
-          </button>
-          <p className="text-[11px] text-text-muted text-center">
-            Exports: main.tf · imports.tf · versions.tf · variables.tf
-          </p>
+          {mode !== 'tf-files' && (
+            <>
+              <button
+                onClick={handleExport}
+                className="w-full py-2.5 text-sm font-bold bg-accent-teal text-surface-0 hover:bg-accent-teal/90 rounded-lg transition-colors"
+              >
+                Export Project Files
+              </button>
+              <p className="text-[11px] text-text-muted text-center">
+                Exports: main.tf · imports.tf · versions.tf · variables.tf
+              </p>
+            </>
+          )}
         </div>
       )}
 

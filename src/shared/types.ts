@@ -300,4 +300,6 @@ export interface RollbackManifest {
   providerVersion: string;
   exactProviderVersion?: string;
   mode: 'tf-state';
+  swapped?: boolean;
+  importedAddresses?: string[];
 }

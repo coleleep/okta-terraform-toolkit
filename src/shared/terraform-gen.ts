@@ -1,9 +1,15 @@
 import { TerraformProviderConfig, DiffResult } from './types';
 import { getVersionConstraint } from './versions';
 
+export function normalizeOrgUrl(url: string): string {
+  const withScheme = /^https?:\/\//i.test(url) ? url : `https://${url}`;
+  return withScheme.replace(/\/+$/, '');
+}
+
 export function getOrgInfo(orgUrl: string) {
-  const orgName = new URL(orgUrl).hostname.split('.')[0];
-  const baseUrl = new URL(orgUrl).hostname.includes('oktapreview')
+  const normalized = normalizeOrgUrl(orgUrl);
+  const orgName = new URL(normalized).hostname.split('.')[0];
+  const baseUrl = new URL(normalized).hostname.includes('oktapreview')
     ? 'oktapreview.com'
     : 'okta.com';
   return { orgName, baseUrl };
@@ -215,7 +221,9 @@ export function extractTfAttrs(type: string, rawAttrs: Record<string, unknown>):
     const result: Record<string, unknown> = {};
     if (rawAttrs.name != null) result.name = rawAttrs.name;
     if (rawAttrs.description != null) result.description = rawAttrs.description;
-    if (rawAttrs.audiences != null) result.audiences = rawAttrs.audiences;
+    result.audiences = Array.isArray(rawAttrs.audiences) && (rawAttrs.audiences as unknown[]).length > 0
+      ? rawAttrs.audiences
+      : ['api://default'];
     if (rawAttrs.issuerMode != null) result.issuer_mode = rawAttrs.issuerMode;
     if (rawAttrs.status != null) result.status = rawAttrs.status;
     return result;

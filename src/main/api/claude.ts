@@ -557,6 +557,16 @@ IMPORTANT — Resources that require special handling:
 
 5. POLICY RULE PRIORITY ORDERING: All policy rules (okta_auth_server_policy_rule, okta_policy_rule_signon, okta_policy_rule_password, okta_policy_rule_mfa, okta_policy_rule_profile_enrollment, okta_app_signon_policy_rule) MUST be chained with depends_on in ascending priority order within each parent policy. This prevents concurrent priority modifications that cause 409 conflicts and drift.
 
+6. SYSTEM NETWORK ZONES: The network zones named "BlockedIpZone", "LegacyIpZone", "DefaultExemptIpZone", and "DefaultEnhancedDynamicZone" are system-managed zones that CANNOT be created, modified, or destroyed via Terraform. If any of these appear in the resource mapping context:
+   - Do NOT generate any resource block for them — omit them entirely from the output HCL
+   - Do NOT generate import blocks for them
+   - These are pre-existing system resources that Terraform cannot manage
+
+7. AUTH SERVER AUDIENCES: The "audiences" argument is REQUIRED for every okta_auth_server resource block. It MUST always be included:
+   - If the source config specifies audiences, copy them verbatim
+   - If the source config does not include audiences (e.g., empty config), default to: audiences = ["api://default"]
+   - NEVER emit an okta_auth_server resource block without the audiences argument
+
 For example, if a policy has 3 rules with priorities 1, 2, 3:
 
 resource "okta_auth_server_policy_rule" "rule_1" {

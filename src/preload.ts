@@ -135,8 +135,8 @@ const api = {
     ipcRenderer.invoke('provider:set-selected', { version }),
 
   // Rollback
-  saveRollback: (exportedDir: string, targetOrgUrl: string, providerVersion: string, exactProviderVersion?: string) =>
-    ipcRenderer.invoke('rollback:save-tf', { exportedDir, targetOrgUrl, providerVersion, exactProviderVersion }),
+  saveRollback: (exportedDir: string, targetOrgUrl: string, providerVersion: string, exactProviderVersion?: string, swapped?: boolean, importedAddresses?: string[]) =>
+    ipcRenderer.invoke('rollback:save-tf', { exportedDir, targetOrgUrl, providerVersion, exactProviderVersion, swapped, importedAddresses }),
   checkRollback: () =>
     ipcRenderer.invoke('rollback:check'),
   prepareRollback: () =>

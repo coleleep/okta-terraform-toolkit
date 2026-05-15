@@ -703,9 +703,9 @@ export function registerIpcHandlers() {
     return { success: true };
   });
 
-  ipcMain.handle('rollback:save-tf', (_event, { exportedDir, targetOrgUrl, providerVersion, exactProviderVersion }: { exportedDir: string; targetOrgUrl: string; providerVersion: string; exactProviderVersion?: string }) => {
+  ipcMain.handle('rollback:save-tf', (_event, { exportedDir, targetOrgUrl, providerVersion, exactProviderVersion, swapped, importedAddresses }: { exportedDir: string; targetOrgUrl: string; providerVersion: string; exactProviderVersion?: string; swapped?: boolean; importedAddresses?: string[] }) => {
     try {
-      saveTfStateRollbackBundle(exportedDir, targetOrgUrl, providerVersion, exactProviderVersion);
+      saveTfStateRollbackBundle(exportedDir, targetOrgUrl, providerVersion, exactProviderVersion, swapped, importedAddresses);
       return { success: true };
     } catch (error: unknown) {
       const message = error instanceof Error ? error.message : String(error);

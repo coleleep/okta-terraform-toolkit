@@ -3,6 +3,7 @@ import { join } from 'path';
 import { writeFileSync, readFileSync, existsSync } from 'fs';
 import { app } from 'electron';
 import { ConnectionConfig, SourceConnectionStatus, IpcResponse } from '../../shared/types';
+import { normalizeOrgUrl } from '../../shared/terraform-gen';
 
 const CONFIG_FILE = 'source-org-config.json';
 
@@ -51,9 +52,10 @@ export async function connectSource(
   config: ConnectionConfig,
 ): Promise<IpcResponse<SourceConnectionStatus>> {
   try {
+    const normalizedConfig = { ...config, orgUrl: normalizeOrgUrl(config.orgUrl) };
     const cleanToken = config.token.trim().replace(/^SSWS\s+/i, '');
     const client = axios.create({
-      baseURL: config.orgUrl,
+      baseURL: normalizedConfig.orgUrl,
       headers: {
         Authorization: `SSWS ${cleanToken}`,
         Accept: 'application/json',
@@ -64,12 +66,12 @@ export async function connectSource(
     await client.get('/api/v1/org');
 
     sourceClient = client;
-    sourceConfig = config;
-    saveConfig(config);
+    sourceConfig = normalizedConfig;
+    saveConfig(normalizedConfig);
 
     return {
       success: true,
-      data: { connected: true, orgUrl: config.orgUrl },
+      data: { connected: true, orgUrl: normalizedConfig.orgUrl },
     };
   } catch (err: unknown) {
     sourceClient = null;

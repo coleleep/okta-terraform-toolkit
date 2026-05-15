@@ -1,15 +1,16 @@
 import axios, { AxiosInstance } from 'axios';
 import { ConnectionConfig } from '../../shared/types';
+import { normalizeOrgUrl } from '../../shared/terraform-gen';
 
 let httpClient: AxiosInstance | null = null;
 let currentConfig: ConnectionConfig | null = null;
 
 export async function connect(config: ConnectionConfig): Promise<void> {
-  currentConfig = config;
+  currentConfig = { ...config, orgUrl: normalizeOrgUrl(config.orgUrl) };
 
   const cleanToken = config.token.trim().replace(/^SSWS\s+/i, '');
   httpClient = axios.create({
-    baseURL: config.orgUrl,
+    baseURL: currentConfig.orgUrl,
     headers: {
       Authorization: `SSWS ${cleanToken}`,
       Accept: 'application/json',

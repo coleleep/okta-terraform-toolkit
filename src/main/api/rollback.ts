@@ -14,6 +14,8 @@ export function saveTfStateRollbackBundle(
   targetOrgUrl: string,
   providerVersion: string,
   exactProviderVersion?: string,
+  swapped?: boolean,
+  importedAddresses?: string[],
 ): void {
   const bundleDir = getBundleDir();
   fs.mkdirSync(bundleDir, { recursive: true });
@@ -27,6 +29,8 @@ export function saveTfStateRollbackBundle(
     providerVersion,
     exactProviderVersion,
     mode: 'tf-state',
+    swapped,
+    importedAddresses,
   };
   fs.writeFileSync(path.join(bundleDir, 'manifest.json'), JSON.stringify(manifest, null, 2), 'utf8');
 }
