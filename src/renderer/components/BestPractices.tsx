@@ -737,7 +737,7 @@ export default function BestPractices() {
   };
 
   return (
-    <div className="max-w-4xl">
+    <div>
       {/* Header */}
       <div className="mb-4">
         <h1 className="text-lg font-bold text-okta-navy">Okta Terraform Provider Best Practices</h1>

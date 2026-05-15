@@ -71,7 +71,7 @@ export default function LogAnalyzer() {
 
   if (!analysis && !loading) {
     return (
-      <div className="max-w-4xl">
+      <div>
         <h1 className="text-lg font-bold text-okta-navy mb-2">TF_LOG Analyzer</h1>
         <p className="text-xs text-gray-500 mb-6">
           Load a Terraform debug log (<code className="bg-gray-100 px-1 rounded">TF_LOG=DEBUG</code>) to analyze rate limit behavior, identify bottlenecks, and get optimization recommendations.
@@ -93,7 +93,7 @@ export default function LogAnalyzer() {
 
   if (loading) {
     return (
-      <div className="max-w-4xl">
+      <div>
         <h1 className="text-lg font-bold text-okta-navy mb-4">TF_LOG Analyzer</h1>
         <div className="flex items-center gap-3 p-8 bg-white rounded-xl border border-gray-200">
           <div className="animate-spin w-5 h-5 border-2 border-okta-blue border-t-transparent rounded-full" />
@@ -106,7 +106,7 @@ export default function LogAnalyzer() {
   if (!analysis) return null;
 
   return (
-    <div className="max-w-4xl space-y-4">
+    <div className="space-y-4">
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>

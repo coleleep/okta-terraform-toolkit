@@ -42,7 +42,7 @@ export default function ErrorDecoder() {
   };
 
   return (
-    <div className="max-w-4xl">
+    <div>
       <h1 className="text-lg font-bold text-okta-navy mb-2">Error Decoder</h1>
       <p className="text-xs text-gray-500 mb-4">
         Paste any Terraform + Okta error message and get a plain-English explanation with a specific fix.

@@ -77,7 +77,7 @@ export default function SolutionBuilder() {
 
   if (!result && !loading) {
     return (
-      <div className="max-w-4xl">
+      <div>
         <h1 className="text-lg font-bold text-okta-navy mb-2">Solution Builder</h1>
         <p className="text-xs text-gray-500 mb-4">
           Describe what you need to accomplish with Okta Terraform in plain English. Get a complete, exportable solution with config, instructions, and provider-specific guidance.
@@ -114,7 +114,7 @@ export default function SolutionBuilder() {
 
   if (loading) {
     return (
-      <div className="max-w-4xl">
+      <div>
         <h1 className="text-lg font-bold text-okta-navy mb-4">Solution Builder</h1>
         <div className="flex items-center gap-3 p-8 bg-white rounded-xl border border-gray-200">
           <div className="animate-spin w-5 h-5 border-2 border-purple-500 border-t-transparent rounded-full" />
@@ -135,7 +135,7 @@ export default function SolutionBuilder() {
   const activeContent = fileOptions.find(f => f.id === activeFile)?.content ?? '';
 
   return (
-    <div className="max-w-4xl space-y-4">
+    <div className="space-y-4">
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>

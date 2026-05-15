@@ -709,7 +709,7 @@ export default function SyncSection() {
   // ── Render ─────────────────────────────────────────────────
 
   return (
-    <div className="max-w-3xl space-y-4">
+    <div className="space-y-4">
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
