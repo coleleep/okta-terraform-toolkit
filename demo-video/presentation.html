@@ -1,0 +1,740 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>OTTO — Okta Terraform Toolkit</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --teal:    #00D4AA;
+      --teal-dim: rgba(0,212,170,0.15);
+      --teal-mid: rgba(0,212,170,0.30);
+      --bg0:     #0d0f14;
+      --bg1:     #13161e;
+      --bg2:     #1a1e29;
+      --bg3:     #222736;
+      --border:  rgba(255,255,255,0.08);
+      --text:    #e8eaf0;
+      --muted:   #7a8499;
+      --accent:  #4f7dff;
+    }
+
+    html, body {
+      width: 100%; height: 100%;
+      background: var(--bg0);
+      color: var(--text);
+      font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+      overflow: hidden;
+    }
+
+    /* ── Slide deck ─────────────────────────────────────────── */
+    .deck { width: 100vw; height: 100vh; position: relative; }
+
+    .slide {
+      position: absolute; inset: 0;
+      display: flex; flex-direction: column;
+      padding: 56px 72px;
+      opacity: 0; pointer-events: none;
+      transform: translateY(18px);
+      transition: opacity 0.45s ease, transform 0.45s ease;
+    }
+    .slide.active {
+      opacity: 1; pointer-events: all; transform: none;
+    }
+    .slide.exit {
+      opacity: 0; transform: translateY(-18px);
+    }
+
+    /* ── Common ─────────────────────────────────────────────── */
+    .tag {
+      display: inline-block;
+      font-size: 10px; font-weight: 700; letter-spacing: .15em;
+      text-transform: uppercase; color: var(--teal);
+      background: var(--teal-dim); border: 1px solid var(--teal-mid);
+      padding: 3px 10px; border-radius: 20px; margin-bottom: 20px;
+    }
+    h1 { font-size: 52px; font-weight: 800; line-height: 1.1; letter-spacing: -.02em; }
+    h2 { font-size: 36px; font-weight: 700; line-height: 1.2; letter-spacing: -.015em; }
+    h3 { font-size: 20px; font-weight: 600; color: var(--teal); margin-bottom: 8px; }
+    p  { font-size: 16px; line-height: 1.7; color: #b0b8cc; }
+    .sub { font-size: 20px; color: var(--muted); margin-top: 12px; font-weight: 400; }
+
+    .teal { color: var(--teal); }
+    .dim  { color: var(--muted); }
+
+    /* ── Progress bar ───────────────────────────────────────── */
+    #progress-bar {
+      position: fixed; bottom: 0; left: 0;
+      height: 3px; background: var(--teal);
+      transition: width 0.4s ease;
+      z-index: 100;
+    }
+
+    /* ── Slide counter ──────────────────────────────────────── */
+    #counter {
+      position: fixed; bottom: 18px; right: 28px;
+      font-size: 12px; color: var(--muted); font-family: monospace;
+      z-index: 100;
+    }
+
+    /* ── Nav hint ───────────────────────────────────────────── */
+    #nav-hint {
+      position: fixed; bottom: 18px; left: 28px;
+      font-size: 11px; color: var(--muted);
+      z-index: 100;
+    }
+
+    /* ── Grid / card helpers ─────────────────────────────────── */
+    .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-top: 28px; }
+    .grid-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 18px; margin-top: 28px; }
+    .grid-4 { display: grid; grid-template-columns: 1fr 1fr 1fr 1fr; gap: 16px; margin-top: 28px; }
+
+    .card {
+      background: var(--bg2); border: 1px solid var(--border);
+      border-radius: 14px; padding: 22px 24px;
+    }
+    .card-teal {
+      background: var(--teal-dim); border: 1px solid var(--teal-mid);
+      border-radius: 14px; padding: 22px 24px;
+    }
+    .card h3 { font-size: 15px; font-weight: 600; color: var(--teal); margin-bottom: 6px; }
+    .card p  { font-size: 14px; color: #9099b0; line-height: 1.6; }
+    .card .icon { font-size: 24px; margin-bottom: 10px; }
+
+    /* ── Lists ───────────────────────────────────────────────── */
+    ul { list-style: none; margin-top: 20px; display: flex; flex-direction: column; gap: 12px; }
+    ul li { display: flex; align-items: flex-start; gap: 12px; font-size: 16px; color: #b0b8cc; line-height: 1.5; }
+    ul li::before { content: ''; display: block; flex-shrink: 0; width: 6px; height: 6px;
+      border-radius: 50%; background: var(--teal); margin-top: 8px; }
+
+    /* ── Table ───────────────────────────────────────────────── */
+    table { width: 100%; border-collapse: collapse; margin-top: 24px; }
+    th { font-size: 11px; font-weight: 700; letter-spacing: .1em; text-transform: uppercase;
+      color: var(--muted); text-align: left; padding: 10px 16px;
+      border-bottom: 1px solid var(--border); }
+    td { font-size: 15px; padding: 12px 16px; border-bottom: 1px solid var(--border);
+      color: #c0c8dc; line-height: 1.5; }
+    td:first-child { color: var(--teal); font-weight: 600; font-size: 14px; }
+    tr:last-child td { border-bottom: none; }
+
+    /* ── Pipeline steps ─────────────────────────────────────── */
+    .pipeline {
+      display: flex; align-items: stretch; gap: 0; margin-top: 28px;
+    }
+    .pipe-step {
+      flex: 1; background: var(--bg2); border: 1px solid var(--border);
+      border-radius: 12px; padding: 18px 16px; text-align: center;
+      position: relative;
+    }
+    .pipe-step + .pipe-step { margin-left: 10px; }
+    .pipe-step::after {
+      content: '→';
+      position: absolute; right: -14px; top: 50%; transform: translateY(-50%);
+      color: var(--teal); font-size: 18px; font-weight: 700;
+      z-index: 2;
+    }
+    .pipe-step:last-child::after { display: none; }
+    .pipe-step .num {
+      font-size: 11px; font-weight: 700; letter-spacing: .1em;
+      color: var(--teal); margin-bottom: 6px;
+    }
+    .pipe-step .label { font-size: 14px; font-weight: 600; color: var(--text); margin-bottom: 4px; }
+    .pipe-step .desc { font-size: 12px; color: var(--muted); line-height: 1.4; }
+
+    /* ── Quote callout ──────────────────────────────────────── */
+    .callout {
+      background: var(--bg2); border-left: 3px solid var(--teal);
+      border-radius: 0 10px 10px 0; padding: 16px 20px; margin-top: 24px;
+      font-size: 16px; color: #c8d0e0; font-style: italic; line-height: 1.6;
+    }
+
+    /* ── Comparison table ───────────────────────────────────── */
+    .compare { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-top: 24px; }
+    .compare-col { border-radius: 12px; padding: 20px 22px; }
+    .compare-col.before { background: rgba(255,80,80,0.07); border: 1px solid rgba(255,80,80,0.2); }
+    .compare-col.after  { background: var(--teal-dim); border: 1px solid var(--teal-mid); }
+    .compare-col h4 {
+      font-size: 11px; font-weight: 700; letter-spacing: .12em; text-transform: uppercase;
+      margin-bottom: 14px;
+    }
+    .compare-col.before h4 { color: #ff6b6b; }
+    .compare-col.after  h4 { color: var(--teal); }
+    .compare-col ul { margin-top: 0; gap: 8px; }
+    .compare-col ul li { font-size: 14px; }
+    .compare-col.before ul li::before { background: #ff6b6b; }
+
+    /* ── OTTO logo ──────────────────────────────────────────── */
+    .otto-logo {
+      display: flex; align-items: center; gap: 12px; margin-bottom: 32px;
+    }
+    .otto-logo span {
+      font-size: 14px; font-weight: 800; letter-spacing: .2em; color: var(--teal);
+    }
+
+    /* ── Badge row ──────────────────────────────────────────── */
+    .badges { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 20px; }
+    .badge {
+      font-size: 12px; font-weight: 600; padding: 5px 14px;
+      border-radius: 20px; background: var(--bg3); border: 1px solid var(--border);
+      color: #9099b0;
+    }
+    .badge.highlight {
+      background: var(--teal-dim); border-color: var(--teal-mid); color: var(--teal);
+    }
+
+    /* ── Slide-specific overrides ────────────────────────────── */
+
+    /* Title slide */
+    #s1 { justify-content: center; }
+    #s1 .eyebrow { font-size: 13px; font-weight: 700; letter-spacing: .2em;
+      text-transform: uppercase; color: var(--teal); margin-bottom: 20px; }
+    #s1 h1 { font-size: 64px; }
+    #s1 h1 span { color: var(--teal); }
+    #s1 .tagline { font-size: 22px; color: var(--muted); margin-top: 16px; font-weight: 400; }
+    #s1 .divider { width: 60px; height: 3px; background: var(--teal); border-radius: 2px;
+      margin: 28px 0; }
+    #s1 .built-by { font-size: 14px; color: var(--muted); }
+
+    /* Slide header */
+    .slide-header { margin-bottom: 32px; }
+    .slide-header h2 { color: var(--text); }
+    .slide-header p  { font-size: 16px; color: var(--muted); margin-top: 8px; }
+
+    /* Centered layout */
+    .center { text-align: center; justify-content: center; align-items: center; }
+
+    /* Big number */
+    .big-stat { font-size: 64px; font-weight: 800; color: var(--teal); font-family: monospace; line-height: 1; }
+    .big-stat-label { font-size: 14px; color: var(--muted); margin-top: 6px; }
+
+    /* Okta for AI agents specific */
+    .ai-agent-box {
+      background: linear-gradient(135deg, rgba(79,125,255,0.12), rgba(0,212,170,0.08));
+      border: 1px solid rgba(79,125,255,0.3);
+      border-radius: 16px; padding: 24px 28px; margin-top: 20px;
+    }
+    .ai-agent-box h3 { color: var(--accent); margin-bottom: 12px; }
+
+    /* step list */
+    .step-list { display: flex; flex-direction: column; gap: 10px; margin-top: 16px; }
+    .step-item { display: flex; align-items: flex-start; gap: 14px; }
+    .step-num {
+      flex-shrink: 0; width: 26px; height: 26px; border-radius: 50%;
+      background: var(--teal-dim); border: 1px solid var(--teal-mid);
+      display: flex; align-items: center; justify-content: center;
+      font-size: 12px; font-weight: 700; color: var(--teal);
+    }
+    .step-text { font-size: 14px; color: #b0b8cc; line-height: 1.5; padding-top: 4px; }
+    .step-text strong { color: var(--text); }
+
+    /* two column layout */
+    .two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 32px; align-items: start; }
+    .two-col-wide { display: grid; grid-template-columns: 1.3fr 1fr; gap: 32px; align-items: start; }
+
+  </style>
+</head>
+<body>
+
+<div class="deck" id="deck">
+
+  <!-- ══════════════════════════════════════════════════
+       SLIDE 1 — TITLE
+  ══════════════════════════════════════════════════ -->
+  <section class="slide active" id="s1">
+    <div>
+      <div class="otto-logo">
+        <svg width="36" height="36" viewBox="0 0 40 40" fill="none">
+          <path d="M10 6L16 3L22 6V14L16 17L10 14V6Z" stroke="#00D4AA" stroke-width="1.8" stroke-linejoin="round"/>
+          <path d="M18 26L24 23L30 26V34L24 37L18 34V26Z" stroke="#00D4AA" stroke-width="1.8" stroke-linejoin="round"/>
+          <path d="M16 14L24 26" stroke="#00D4AA" stroke-width="1.8" stroke-linecap="round"/>
+          <path d="M12 12L20 12" stroke="#00D4AA" stroke-width="1.4" stroke-linecap="round" opacity="0.5"/>
+          <path d="M20 28L28 28" stroke="#00D4AA" stroke-width="1.4" stroke-linecap="round" opacity="0.5"/>
+        </svg>
+        <span>OTTO</span>
+      </div>
+
+      <div class="eyebrow">Hackathon 2026</div>
+      <h1>Okta <span>Terraform</span><br/>Toolkit</h1>
+      <p class="tagline">The complete toolkit for managing Okta with Terraform —<br/>from rate limits to cross-org sync, powered by AI.</p>
+      <div class="divider"></div>
+      <div class="built-by">Built for Okta customers who live in Terraform</div>
+    </div>
+  </section>
+
+  <!-- ══════════════════════════════════════════════════
+       SLIDE 2 — THE PROBLEM
+  ══════════════════════════════════════════════════ -->
+  <section class="slide" id="s2">
+    <div class="slide-header">
+      <div class="tag">The Problem</div>
+      <h2>Okta + Terraform is powerful — but painful in practice</h2>
+      <p>Customers hit the same walls every time they try to operationalize Okta with Terraform.</p>
+    </div>
+
+    <div class="grid-2">
+      <div class="card">
+        <div class="icon">⚡</div>
+        <h3>Rate limit errors</h3>
+        <p>No visibility into which API endpoint is the bottleneck. Terraform hits Okta limits mid-run and fails silently.</p>
+      </div>
+      <div class="card">
+        <div class="icon">🔄</div>
+        <h3>Cross-environment promotion</h3>
+        <p>dev → staging → prod means every Group ID, Policy ID, Auth Server ID is different. Manual substitution is error-prone and slow.</p>
+      </div>
+      <div class="card">
+        <div class="icon">🔍</div>
+        <h3>Debugging failed runs</h3>
+        <p>Thousands of lines of TF_LOG=DEBUG output with no easy way to find the actual root cause of a failure.</p>
+      </div>
+      <div class="card">
+        <div class="icon">📝</div>
+        <h3>Writing Terraform from scratch</h3>
+        <p>30+ Okta resource types, complex provider settings, import blocks — customers spend hours just getting started.</p>
+      </div>
+    </div>
+
+    <div class="callout">
+      "Most teams are flying blind when Terraform hits Okta."
+    </div>
+  </section>
+
+  <!-- ══════════════════════════════════════════════════
+       SLIDE 3 — THE SOLUTION
+  ══════════════════════════════════════════════════ -->
+  <section class="slide" id="s3">
+    <div class="slide-header">
+      <div class="tag">The Solution</div>
+      <h2>One desktop app for the entire Okta Terraform lifecycle</h2>
+    </div>
+
+    <table>
+      <thead>
+        <tr>
+          <th>Tab</th>
+          <th>What it does</th>
+          <th>Who it helps</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>⏱ Rate Limits</td>
+          <td>Live-probe 30+ Okta API endpoints, identify your bottleneck, generate optimized provider.tf</td>
+          <td>Anyone running terraform apply against Okta</td>
+        </tr>
+        <tr>
+          <td>📐 Plan</td>
+          <td>AI solution builder, workload sizing, config comparison, export scaffold, target runtime planner</td>
+          <td>Teams setting up Okta Terraform for the first time</td>
+        </tr>
+        <tr>
+          <td>🔄 Sync</td>
+          <td>Cross-org comparison, field-level diff, AI ID conversion, in-app terraform apply</td>
+          <td>Teams promoting config across environments</td>
+        </tr>
+        <tr>
+          <td>🐛 Debug</td>
+          <td>Okta error decoder + TF_LOG analyzer with AI root cause analysis</td>
+          <td>Anyone troubleshooting a failed Terraform run</td>
+        </tr>
+        <tr>
+          <td>📚 Learn</td>
+          <td>Built-in guidance on rate limits, tuning, best practices</td>
+          <td>New Okta Terraform users</td>
+        </tr>
+      </tbody>
+    </table>
+  </section>
+
+  <!-- ══════════════════════════════════════════════════
+       SLIDE 4 — RATE LIMITS
+  ══════════════════════════════════════════════════ -->
+  <section class="slide" id="s4">
+    <div class="slide-header">
+      <div class="tag">Rate Limits Tab</div>
+      <h2>Know your limits before Terraform does</h2>
+      <p>The #1 silent killer of Okta Terraform runs — now fully visible before you run a single plan.</p>
+    </div>
+
+    <div class="two-col" style="flex: 1; align-items: stretch;">
+      <div style="display: flex; flex-direction: column; justify-content: space-between;">
+        <ul>
+          <li>Probes <strong>30+</strong> Okta API endpoints in real time — including sub-resource paths most tools miss</li>
+          <li>Classifies each endpoint by remaining capacity and identifies the <strong>exact bottleneck</strong></li>
+          <li>Generates a ready-to-use <strong>provider.tf</strong> with tuned settings based on live data</li>
+          <li>Volume-aware — recommendations differ for 100 vs. 10,000 resources</li>
+          <li>Includes <strong>parallelism, max_retries, backoff, request_timeout</strong> and more</li>
+        </ul>
+
+        <div class="callout" style="margin-top: 20px; font-style: normal; font-size: 14px;">
+          <strong style="color: var(--teal)">Key insight:</strong> Terraform's default parallelism of 10 is too aggressive for most Okta orgs. OTTO surfaces this before it causes a production incident.
+        </div>
+      </div>
+
+      <div style="display: flex; flex-direction: column; gap: 14px;">
+        <div class="card-teal" style="text-align: center;">
+          <div class="big-stat">30+</div>
+          <div class="big-stat-label">API endpoints probed</div>
+        </div>
+        <div class="card" style="flex: 1;">
+          <h3>Generated settings</h3>
+          <p style="font-family: monospace; font-size: 13px; line-height: 1.8; color: #00D4AA;">
+            max_retries = 10<br/>
+            backoff = true<br/>
+            min_wait_seconds = 1<br/>
+            max_wait_seconds = 30<br/>
+            request_timeout = 45<br/>
+            max_api_capacity = 90
+          </p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ══════════════════════════════════════════════════
+       SLIDE 5 — PLAN TAB
+  ══════════════════════════════════════════════════ -->
+  <section class="slide" id="s5">
+    <div class="slide-header">
+      <div class="tag">Plan Tab</div>
+      <h2>From idea to deployable Terraform in minutes</h2>
+      <p>Five sub-tools that take you from "I want to manage Okta with Terraform" to a production-ready project.</p>
+    </div>
+
+    <div class="grid-3" style="margin-top: 20px;">
+      <div class="card">
+        <div class="icon">🤖</div>
+        <h3>Solution Builder</h3>
+        <p>Describe your use case in plain English. AI generates complete <code style="color: var(--teal)">provider.tf</code>, <code style="color: var(--teal)">resources.tf</code>, <code style="color: var(--teal)">variables.tf</code> + import blocks.</p>
+      </div>
+      <div class="card">
+        <div class="icon">📊</div>
+        <h3>Workload Sizing</h3>
+        <p>Select resource types, input counts, and get a runtime estimate before you ever run a plan.</p>
+      </div>
+      <div class="card">
+        <div class="icon">⚙️</div>
+        <h3>Config Comparison</h3>
+        <p>Side-by-side view of Terraform provider defaults vs. OTTO's recommendations — see exactly what changes and why.</p>
+      </div>
+      <div class="card">
+        <div class="icon">📦</div>
+        <h3>Export Project</h3>
+        <p>Download a complete, ready-to-run Terraform project scaffold with all generated files.</p>
+      </div>
+      <div class="card">
+        <div class="icon">🎯</div>
+        <h3>Target Planner</h3>
+        <p>Input a desired run duration — OTTO tells you if your current rate limits can support it and what limit increases you'd need.</p>
+      </div>
+      <div class="card-teal">
+        <div class="icon">✅</div>
+        <h3>Provider versions</h3>
+        <p>Download, cache, and pin specific Okta provider versions. OTTO manages the binary so you don't have to.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ══════════════════════════════════════════════════
+       SLIDE 6 — SYNC TAB (DEEP DIVE)
+  ══════════════════════════════════════════════════ -->
+  <section class="slide" id="s6">
+    <div class="slide-header">
+      <div class="tag">Sync Tab — Deep Dive</div>
+      <h2>Cross-environment promotion, fully automated</h2>
+      <p>The hardest Okta Terraform problem: promoting config from dev → staging → production without breaking everything.</p>
+    </div>
+
+    <div class="pipeline">
+      <div class="pipe-step">
+        <div class="num">01</div>
+        <div class="label">Connect</div>
+        <div class="desc">Source org (dev) + Target org (prod) — live API or .tf/.tfstate upload</div>
+      </div>
+      <div class="pipe-step">
+        <div class="num">02</div>
+        <div class="label">Discover</div>
+        <div class="desc">30+ resource types enumerated via live API</div>
+      </div>
+      <div class="pipe-step">
+        <div class="num">03</div>
+        <div class="label">Diff</div>
+        <div class="desc">Field-level view — changed, missing, same</div>
+      </div>
+      <div class="pipe-step">
+        <div class="num">04</div>
+        <div class="label">Convert</div>
+        <div class="desc">AI resolves all IDs, generates import blocks</div>
+      </div>
+      <div class="pipe-step">
+        <div class="num">05</div>
+        <div class="label">Apply</div>
+        <div class="desc">init → plan → review → apply inside the app</div>
+      </div>
+    </div>
+
+    <div class="grid-3" style="margin-top: 20px;">
+      <div class="card">
+        <h3>Two input modes</h3>
+        <p><strong style="color: var(--text)">Live Org</strong> — connect directly via API token<br/><br/>
+        <strong style="color: var(--text)">File Upload</strong> — use existing .tf + .tfstate for offline comparison</p>
+      </div>
+      <div class="card">
+        <h3>Smart capabilities</h3>
+        <p>Bi-directional swap, selective sync, 3-level hierarchy resolution (auth server → policy → rule), rollback bundles</p>
+      </div>
+      <div class="card-teal">
+        <h3>30+ resource types</h3>
+        <p>Users, Groups, Apps, Auth Servers, Policies, Network Zones, IdPs, Authenticators, Event Hooks, Custom Roles, and more</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ══════════════════════════════════════════════════
+       SLIDE 7 — DEBUG TAB
+  ══════════════════════════════════════════════════ -->
+  <section class="slide" id="s7">
+    <div class="slide-header">
+      <div class="tag">Debug Tab</div>
+      <h2>When Terraform fails, find the answer fast</h2>
+      <p>Two AI-powered tools that turn cryptic errors and dense log files into actionable fixes.</p>
+    </div>
+
+    <div class="grid-2" style="margin-top: 24px;">
+      <div>
+        <div class="card" style="height: 100%;">
+          <div class="icon">🔴</div>
+          <h3>Error Decoder</h3>
+          <p style="margin-bottom: 16px;">Paste any Okta API error or Terraform failure message. OTTO returns:</p>
+          <ul style="margin-top: 0;">
+            <li>Plain-English explanation of what went wrong</li>
+            <li>Root cause analysis powered by Claude</li>
+            <li>Specific config or API changes to fix it</li>
+            <li>Links to relevant Okta documentation</li>
+          </ul>
+        </div>
+      </div>
+      <div>
+        <div class="card" style="height: 100%;">
+          <div class="icon">📋</div>
+          <h3>TF_LOG Analyzer</h3>
+          <p style="margin-bottom: 16px;">Upload a <code style="color: var(--teal)">TF_LOG=DEBUG</code> output file. OTTO:</p>
+          <ul style="margin-top: 0;">
+            <li>Extracts per-endpoint request stats and rate-limit hits</li>
+            <li>Detects schema validation errors (even with no HTTP requests)</li>
+            <li>Shows error frequency by endpoint</li>
+            <li>AI root cause with actionable provider config recommendations</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+
+    <div class="callout">
+      No more manually searching through 50,000 lines of debug output. OTTO finds the signal in the noise.
+    </div>
+  </section>
+
+  <!-- ══════════════════════════════════════════════════
+       SLIDE 8 — THE IMPACT
+  ══════════════════════════════════════════════════ -->
+  <section class="slide" id="s8">
+    <div class="slide-header">
+      <div class="tag">The Impact</div>
+      <h2>Hours of manual work → Minutes, automated</h2>
+    </div>
+
+    <div class="compare">
+      <div class="compare-col before">
+        <h4>❌ Before OTTO</h4>
+        <ul>
+          <li>Manual ID substitution between orgs</li>
+          <li>Terraform rate limit errors mid-run with no warning</li>
+          <li>Debugging with raw TF_LOG=DEBUG output</li>
+          <li>Writing provider config from memory or docs</li>
+          <li>No visibility into what changes before apply</li>
+          <li>Static Super Admin API token with no audit trail</li>
+          <li>Hours to set up a new environment</li>
+        </ul>
+      </div>
+      <div class="compare-col after">
+        <h4>✅ After OTTO</h4>
+        <ul>
+          <li>AI-automated ID resolution across orgs</li>
+          <li>Pre-run rate limit probing — know before you run</li>
+          <li>AI root cause analysis in seconds</li>
+          <li>Optimized config generated from live API data</li>
+          <li>Field-level diff + in-app plan review before apply</li>
+          <li>Scoped, delegated credentials (roadmap)</li>
+          <li>Minutes from source to applied in production</li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="badges" style="margin-top: 20px;">
+      <div class="badge highlight">30+ resource types</div>
+      <div class="badge highlight">30+ endpoints probed</div>
+      <div class="badge">dev → staging → prod</div>
+      <div class="badge">org migrations</div>
+      <div class="badge">disaster recovery</div>
+      <div class="badge">works offline (file mode)</div>
+      <div class="badge">rollback support</div>
+    </div>
+  </section>
+
+  <!-- ══════════════════════════════════════════════════
+       SLIDE 9 — NEXT STEPS
+  ══════════════════════════════════════════════════ -->
+  <section class="slide" id="s9">
+    <div class="slide-header">
+      <div class="tag">Next Steps</div>
+      <h2>Where OTTO goes from here</h2>
+    </div>
+
+    <div class="grid-3">
+      <div class="card">
+        <div class="icon">🧠</div>
+        <h3>Multi-LLM Support</h3>
+        <p>Extend AI features beyond Claude to support <strong style="color: var(--text)">OpenAI, Azure OpenAI, and other providers</strong>. Teams bring their own enterprise-approved LLM — no lock-in.</p>
+        <div class="badges" style="margin-top: 14px;">
+          <div class="badge">OpenAI</div>
+          <div class="badge">Azure OpenAI</div>
+          <div class="badge">Bedrock</div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="icon">🔐</div>
+        <h3>SSO Integration</h3>
+        <p>Authenticate into OTTO using <strong style="color: var(--text)">company SSO via SAML/OIDC</strong>. Enterprise-ready access control, user provisioning, and audit trail without managing individual API tokens.</p>
+        <div class="badges" style="margin-top: 14px;">
+          <div class="badge">SAML</div>
+          <div class="badge">OIDC</div>
+          <div class="badge">MFA enforced</div>
+        </div>
+      </div>
+
+      <div class="ai-agent-box">
+        <div class="icon">🤖</div>
+        <h3>Okta for AI Agents</h3>
+        <p style="font-size: 13px; color: #9099b0; line-height: 1.6; margin-bottom: 12px;">Today OTTO uses a static Super Admin token. With Okta's AI Agent identity platform:</p>
+        <div class="step-list">
+          <div class="step-item">
+            <div class="step-num" style="background: rgba(79,125,255,0.15); border-color: rgba(79,125,255,0.3); color: var(--accent);">1</div>
+            <div class="step-text"><strong>Agent Identity</strong> — OTTO gets its own non-human identity in your org</div>
+          </div>
+          <div class="step-item">
+            <div class="step-num" style="background: rgba(79,125,255,0.15); border-color: rgba(79,125,255,0.3); color: var(--accent);">2</div>
+            <div class="step-text"><strong>Scoped delegation</strong> — OAuth tokens scoped to only the permissions needed (least-privilege)</div>
+          </div>
+          <div class="step-item">
+            <div class="step-num" style="background: rgba(79,125,255,0.15); border-color: rgba(79,125,255,0.3); color: var(--accent);">3</div>
+            <div class="step-text"><strong>Full audit trail</strong> — every AI action logged against the agent identity, not a generic token</div>
+          </div>
+          <div class="step-item">
+            <div class="step-num" style="background: rgba(79,125,255,0.15); border-color: rgba(79,125,255,0.3); color: var(--accent);">4</div>
+            <div class="step-text"><strong>XAA protocol</strong> — act on behalf of users via OAuth without credential sharing</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ══════════════════════════════════════════════════
+       SLIDE 10 — CLOSE
+  ══════════════════════════════════════════════════ -->
+  <section class="slide" id="s10">
+    <div style="display: flex; flex-direction: column; justify-content: center; height: 100%; gap: 32px;">
+
+      <div class="otto-logo" style="justify-content: center;">
+        <svg width="48" height="48" viewBox="0 0 40 40" fill="none">
+          <path d="M10 6L16 3L22 6V14L16 17L10 14V6Z" stroke="#00D4AA" stroke-width="1.8" stroke-linejoin="round"/>
+          <path d="M18 26L24 23L30 26V34L24 37L18 34V26Z" stroke="#00D4AA" stroke-width="1.8" stroke-linejoin="round"/>
+          <path d="M16 14L24 26" stroke="#00D4AA" stroke-width="1.8" stroke-linecap="round"/>
+          <path d="M12 12L20 12" stroke="#00D4AA" stroke-width="1.4" stroke-linecap="round" opacity="0.5"/>
+          <path d="M20 28L28 28" stroke="#00D4AA" stroke-width="1.4" stroke-linecap="round" opacity="0.5"/>
+        </svg>
+        <span style="font-size: 20px;">OTTO</span>
+      </div>
+
+      <div style="text-align: center;">
+        <h1 style="font-size: 48px; line-height: 1.15;">
+          Okta Terraform,<br/>
+          <span class="teal">finally under control.</span>
+        </h1>
+        <p style="font-size: 18px; color: var(--muted); margin-top: 16px; max-width: 560px; margin-left: auto; margin-right: auto;">
+          Rate limits probed. Config generated. Environments synced.<br/>
+          Failures debugged. All in one app.
+        </p>
+      </div>
+
+      <div class="grid-4" style="margin-top: 0;">
+        <div class="card" style="text-align: center; padding: 16px;">
+          <div style="font-size: 28px; font-weight: 800; color: var(--teal); font-family: monospace;">30+</div>
+          <div style="font-size: 12px; color: var(--muted);">endpoints probed</div>
+        </div>
+        <div class="card" style="text-align: center; padding: 16px;">
+          <div style="font-size: 28px; font-weight: 800; color: var(--teal); font-family: monospace;">30+</div>
+          <div style="font-size: 12px; color: var(--muted);">resource types</div>
+        </div>
+        <div class="card" style="text-align: center; padding: 16px;">
+          <div style="font-size: 28px; font-weight: 800; color: var(--teal); font-family: monospace;">5</div>
+          <div style="font-size: 12px; color: var(--muted);">tabs, one toolkit</div>
+        </div>
+        <div class="card" style="text-align: center; padding: 16px;">
+          <div style="font-size: 28px; font-weight: 800; color: var(--teal); font-family: monospace;">0</div>
+          <div style="font-size: 12px; color: var(--muted);">manual ID swaps</div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+</div><!-- /deck -->
+
+<!-- ── UI Chrome ─────────────────────────────────────────────── -->
+<div id="progress-bar"></div>
+<div id="counter"></div>
+<div id="nav-hint">← → or click to navigate</div>
+
+<script>
+  const slides = Array.from(document.querySelectorAll('.slide'));
+  const total  = slides.length;
+  let   cur    = 0;
+
+  const bar     = document.getElementById('progress-bar');
+  const counter = document.getElementById('counter');
+
+  function goTo(idx) {
+    if (idx < 0 || idx >= total) return;
+    slides[cur].classList.remove('active');
+    slides[cur].classList.add('exit');
+    setTimeout(() => slides[cur > idx ? cur : cur].classList.remove('exit'), 500);
+
+    cur = idx;
+    slides[cur].classList.add('active');
+    slides.forEach((s, i) => { if (i !== cur) s.classList.remove('exit'); });
+
+    bar.style.width = ((cur + 1) / total * 100) + '%';
+    counter.textContent = (cur + 1) + ' / ' + total;
+  }
+
+  // Init
+  goTo(0);
+
+  // Keyboard
+  document.addEventListener('keydown', e => {
+    if (e.key === 'ArrowRight' || e.key === 'ArrowDown' || e.key === ' ') goTo(cur + 1);
+    if (e.key === 'ArrowLeft'  || e.key === 'ArrowUp')                     goTo(cur - 1);
+    if (e.key === 'Home') goTo(0);
+    if (e.key === 'End')  goTo(total - 1);
+  });
+
+  // Click
+  document.getElementById('deck').addEventListener('click', e => {
+    const x = e.clientX / window.innerWidth;
+    goTo(x > 0.5 ? cur + 1 : cur - 1);
+  });
+</script>
+</body>
+</html>
