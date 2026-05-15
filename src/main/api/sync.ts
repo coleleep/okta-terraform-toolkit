@@ -2,6 +2,7 @@ import { AxiosInstance } from 'axios';
 import { getClient } from './auth';
 import { SUB_RESOURCE_SYNC_CONFIG } from '../../shared/constants';
 import { FieldDiff, ResourceDiff, DiffResult } from '../../shared/types';
+import { extractTfAttrs } from '../../shared/terraform-gen';
 
 interface OktaListResponse {
   id: string;
@@ -847,7 +848,9 @@ export async function fetchAttributeDiff(
           return;
         }
 
-        const fieldDiffs = diffAttributes(sourceAttrs, targetAttrs);
+        const tfSourceAttrs = extractTfAttrs(m.sourceType, sourceAttrs);
+        const tfTargetAttrs = extractTfAttrs(m.sourceType, targetAttrs);
+        const fieldDiffs = diffAttributes(tfSourceAttrs, tfTargetAttrs);
         diffs[i] = {
           sourceAddress: m.sourceAddress,
           sourceType: m.sourceType,

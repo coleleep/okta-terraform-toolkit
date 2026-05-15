@@ -37,7 +37,7 @@ interface ConvertedConfig {
 }
 
 type SyncStage = 'idle' | 'discover' | 'match' | 'convert' | 'done' | 'error';
-type TfRunStage = 'idle' | 'init' | 'plan' | 'awaiting-confirm' | 'apply' | 'done' | 'error';
+type TfRunStage = 'idle' | 'init' | 'plan' | 'awaiting-confirm' | 'apply' | 'done' | 'no-changes' | 'error';
 type RollbackStage = 'idle' | 'init' | 'plan' | 'awaiting-confirm' | 'apply' | 'done' | 'error';
 
 const ALL_COMPARABLE_TYPES = [
@@ -455,7 +455,8 @@ export default function SyncSection() {
       // Generate provider.tf if the HCL doesn't already contain a provider block
       const hasProviderBlock = /^\s*provider\s+"okta"/m.test(portableHcl);
       if (!hasProviderBlock) {
-        const { orgName, baseUrl } = getOrgInfo(connection.orgUrl);
+        const targetOrgUrlForProvider = swapped ? sourceConnectedUrl : (connection.orgUrl ?? '');
+        const { orgName, baseUrl } = getOrgInfo(targetOrgUrlForProvider);
         exportFiles['provider.tf'] = `provider "okta" {\n  org_name  = "${orgName}"\n  base_url  = "${baseUrl}"\n  api_token = var.okta_api_token\n}\n`;
       }
     }
@@ -486,11 +487,16 @@ export default function SyncSection() {
       }
 
       setTfStage('plan');
-      const planResult = await api.terraformRun(exportedDir, ['plan', '-input=false', '-no-color'], swapped);
+      const planResult = await api.terraformRun(exportedDir, ['plan', '-input=false', '-no-color', '-detailed-exitcode'], swapped);
       // exit code 2 means "changes present" — still valid; only 1 is a real error
       if (planResult.exitCode === 1) {
         setTfStage('error');
         setTfError(planResult.error ?? `terraform plan exited with code ${planResult.exitCode}`);
+        return;
+      }
+      // exit code 0 means no changes needed — nothing to apply
+      if (planResult.exitCode === 0) {
+        setTfStage('no-changes');
         return;
       }
 
@@ -1219,6 +1225,11 @@ export default function SyncSection() {
               <p className="text-[11px] text-red-400">{tfError}</p>
             )}
 
+            {/* No changes message */}
+            {tfStage === 'no-changes' && (
+              <p className="text-[11px] text-yellow-400 font-semibold">✓ No changes — target org is already up to date</p>
+            )}
+
             {/* Success message */}
             {tfStage === 'done' && (
               <p className="text-[11px] text-green-400 font-semibold">✓ Apply complete</p>
@@ -1257,6 +1268,14 @@ export default function SyncSection() {
                     Confirm &amp; Apply →
                   </button>
                 </>
+              )}
+              {tfStage === 'no-changes' && (
+                <button
+                  onClick={() => { setTfStage('idle'); setTfLines([]); }}
+                  className="flex-1 py-2 text-xs bg-surface-3 text-text-muted hover:bg-surface-4 rounded-lg border border-border transition-colors"
+                >
+                  Run Again
+                </button>
               )}
               {tfStage === 'error' && (
                 <button

@@ -154,7 +154,7 @@ function isComputedField(key: string): boolean {
 }
 
 // Maps raw Okta API response fields to terraform-compatible attribute key/value pairs.
-function extractTfAttrs(type: string, rawAttrs: Record<string, unknown>): Record<string, unknown> {
+export function extractTfAttrs(type: string, rawAttrs: Record<string, unknown>): Record<string, unknown> {
   if (type === 'okta_user') {
     const profile = (rawAttrs.profile as Record<string, unknown>) ?? {};
     const result: Record<string, unknown> = {};
