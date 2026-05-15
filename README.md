@@ -16,14 +16,32 @@ Recommendations are volume-aware — the config for 100 users differs from 10,00
 
 ### Cross-Org Sync
 
-Migrate Terraform state between Okta orgs (e.g., dev → staging → prod):
+Replicate Terraform-managed Okta configurations between orgs (e.g., dev → staging → prod, org migration, environment parity).
 
-1. **Parse** — reads your `.tfstate` and `.tf` files from the source org
-2. **Match** — compares each resource against the target org's live API
-3. **Convert** — AI regenerates HCL with correct target-org resource IDs
-4. **Export** — produces ready-to-apply Terraform with `import` blocks, optimized provider config, and proper variable definitions
+**Two input modes:**
 
-Supports parent/child/grandchild relationships: auth server → policy → rule, app → user/group assignments, group → memberships.
+- **Live Org Connection** — connect directly to a source org via API token. OTTO discovers resources from the source API, compares against the target, and shows a field-by-field attribute diff.
+- **File Upload** — upload `.tf` and `.tfstate` files from a source org for offline comparison.
+
+**Pipeline:**
+
+1. **Discover** — connects to source org (live API or file upload) and enumerates all managed resources
+2. **Match & Diff** — matches resources by name against the target org, then fetches field-level attribute differences
+3. **Convert** — AI-powered or deterministic ID substitution with import block generation
+4. **Apply** — export ready-to-apply config or run `terraform init/plan/apply` directly in-app
+
+**Capabilities:**
+
+- 30+ Okta resource types supported
+- 3-level hierarchy resolution (auth server → policy → rule) with correct composite import IDs
+- Field-level attribute diff view with filtering (changed/missing/same)
+- Selective sync — choose individual resources to include
+- Bi-directional comparison (swap source/target with one click)
+- Deterministic convert mode (no AI key required) with automatic camelCase → snake_case field mapping
+- In-app Terraform runner with live output streaming
+- Rollback support — saves tfstate bundle, generates destroy config to undo a sync
+- Provider version management — download, cache, and pin specific Okta provider versions
+- System zone and computed field exclusion to prevent apply errors
 
 ### Target Runtime Planner
 
@@ -32,6 +50,7 @@ Specify a desired Terraform run duration (e.g., 30 minutes) and OTTO identifies 
 ### Debug & Log Analysis
 
 - Parse `TF_LOG=DEBUG` output to extract per-endpoint request stats, rate-limit hits, and error breakdowns
+- Detects Terraform validation errors (provider/schema mismatches) even when no HTTP requests were made
 - AI-powered root cause analysis with actionable config fix recommendations
 - Okta API error decoder with remediation suggestions
 
@@ -73,9 +92,10 @@ npm start
 ### Connect to Your Org
 
 1. Launch the app
-2. Enter your Okta org URL (e.g., `https://dev-123456.okta.com`)
+2. Enter your **target** org URL (e.g., `https://dev-123456.okta.com`)
 3. Enter an API token (Super Admin permissions required)
-4. Start probing
+4. For cross-org sync: connect a **source** org in the Sync tab
+5. Start probing or comparing
 
 ## Testing
 
@@ -90,20 +110,35 @@ The `test-data/` folder contains reusable Terraform fixtures for validating the 
 
 ```
 src/
-├── main/           # Electron main process
-│   ├── api/        # Okta API, Claude AI, probing, sync logic
+├── main/               # Electron main process
+│   ├── api/
+│   │   ├── auth.ts              # Target org connection
+│   │   ├── source-auth.ts       # Source org connection
+│   │   ├── sync.ts              # Resource discovery, matching, diffing
+│   │   ├── sync-convert.ts      # Deterministic HCL conversion
+│   │   ├── claude.ts            # AI-powered conversion & analysis
+│   │   ├── terraform.ts         # In-app terraform runner
+│   │   ├── rollback.ts          # Tfstate rollback bundles
+│   │   ├── okta-provider-manager.ts  # Provider version download & mirror
+│   │   ├── log-parser.ts        # TF_LOG debug file parser
+│   │   └── probe.ts / deep-probe.ts  # Rate limit probing
+│   ├── logger.ts       # Structured audit logging with rotation
 │   └── ipc-handlers.ts
-├── renderer/       # React UI
-│   ├── components/ # Feature panels (probe, sync, debug, plan)
-│   ├── pages/      # Connect + Dashboard
-│   └── hooks/      # Zustand state store
-├── shared/         # Types, constants, code generation
-│   ├── constants.ts
+├── renderer/           # React UI
+│   ├── components/
+│   │   ├── SyncSection.tsx   # Cross-org sync pipeline UI
+│   │   ├── DiffView.tsx      # Field-level resource comparison
+│   │   ├── LogAnalyzer.tsx   # TF_LOG analysis UI
+│   │   └── ...
+│   ├── pages/          # Connect + Dashboard
+│   └── hooks/          # Zustand state store
+├── shared/             # Types, constants, code generation
+│   ├── terraform-gen.ts  # HCL generation with type-aware field mapping
 │   ├── types.ts
 │   ├── versions.ts
-│   └── terraform-gen.ts
-├── preload.ts      # Secure IPC bridge
-test-data/          # Reusable sync test fixtures (see test-data/README.md)
+│   └── constants.ts
+├── preload.ts          # Secure IPC bridge
+test-data/              # Reusable sync test fixtures
 ```
 
 **Stack:** Electron · React 18 · TypeScript · Tailwind CSS · Zustand · Webpack 5
@@ -143,7 +178,7 @@ Configuration is stored locally in Electron's app data directory and never trans
 
 ## Resource Coverage
 
-25+ Okta resource categories including:
+30+ Okta resource categories including:
 
 - Users, Groups, Applications (with assignments)
 - Auth Servers (policies, scopes, claims, rules)
