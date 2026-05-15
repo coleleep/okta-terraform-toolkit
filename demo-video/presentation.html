@@ -349,302 +349,170 @@
   </section>
 
   <!-- ══════════════════════════════════════════════════
-       SLIDE 4 — RATE LIMITS
+       SLIDE 4 — RATE LIMITS + PLAN
   ══════════════════════════════════════════════════ -->
   <section class="slide" id="s4">
     <div class="slide-header">
-      <div class="tag">Rate Limits Tab</div>
-      <h2>Know your limits before Terraform does</h2>
-      <p>The #1 silent killer of Okta Terraform runs — now fully visible before you run a single plan.</p>
+      <div class="tag">Rate Limits + Plan</div>
+      <h2>Probe your org, generate ready-to-use config</h2>
     </div>
 
-    <div class="two-col" style="flex: 1; align-items: stretch;">
-      <div style="display: flex; flex-direction: column; justify-content: space-between;">
-        <ul>
-          <li>Probes <strong>30+</strong> Okta API endpoints in real time — including sub-resource paths most tools miss</li>
-          <li>Classifies each endpoint by remaining capacity and identifies the <strong>exact bottleneck</strong></li>
-          <li>Generates a ready-to-use <strong>provider.tf</strong> with tuned settings based on live data</li>
-          <li>Volume-aware — recommendations differ for 100 vs. 10,000 resources</li>
-          <li>Includes <strong>parallelism, max_retries, backoff, request_timeout</strong> and more</li>
-        </ul>
-
-        <div class="callout" style="margin-top: 20px; font-style: normal; font-size: 14px;">
-          <strong style="color: var(--teal)">Key insight:</strong> Terraform's default parallelism of 10 is too aggressive for most Okta orgs. OTTO surfaces this before it causes a production incident.
-        </div>
-      </div>
-
-      <div style="display: flex; flex-direction: column; gap: 14px;">
-        <div class="card-teal" style="text-align: center;">
-          <div class="big-stat">30+</div>
-          <div class="big-stat-label">API endpoints probed</div>
-        </div>
-        <div class="card" style="flex: 1;">
-          <h3>Generated settings</h3>
-          <p style="font-family: monospace; font-size: 13px; line-height: 1.8; color: #00D4AA;">
-            max_retries = 10<br/>
-            backoff = true<br/>
-            min_wait_seconds = 1<br/>
-            max_wait_seconds = 30<br/>
-            request_timeout = 45<br/>
-            max_api_capacity = 90
+    <div class="grid-2" style="flex: 1; align-items: stretch;">
+      <div class="card" style="display: flex; flex-direction: column;">
+        <h3>Rate Limits</h3>
+        <p style="margin-bottom: 14px;">Live-probe 30+ endpoints. Find the bottleneck. Generate optimized provider.tf.</p>
+        <div class="card-teal" style="text-align: center; padding: 14px;">
+          <p style="font-family: monospace; font-size: 12px; line-height: 1.9; color: #00D4AA;">
+            max_retries = 10 · backoff = true<br/>
+            request_timeout = 45 · max_api_capacity = 90
           </p>
         </div>
+        <img src="config_example.png" alt="Config tab screenshot" style="margin-top: 14px; border-radius: 8px; width: 100%; border: 1px solid var(--border);" />
+      </div>
+
+      <div class="card" style="display: flex; flex-direction: column;">
+        <h3>Plan</h3>
+        <p style="margin-bottom: 14px;">Describe your use case in plain English. AI generates a complete Terraform project.</p>
+        <div class="card-teal" style="text-align: center; padding: 14px;">
+          <p style="font-family: monospace; font-size: 12px; line-height: 1.9; color: #00D4AA;">
+            Solution Builder · Workload Sizing<br/>
+            Provider version management
+          </p>
+        </div>
+        <img src="workload_example.png" alt="Workload tab screenshot" style="margin-top: 14px; border-radius: 8px; width: 100%; border: 1px solid var(--border);" />
       </div>
     </div>
   </section>
 
   <!-- ══════════════════════════════════════════════════
-       SLIDE 5 — PLAN TAB
+       SLIDE 5 — SYNC TAB (DEEP DIVE)
   ══════════════════════════════════════════════════ -->
   <section class="slide" id="s5">
     <div class="slide-header">
-      <div class="tag">Plan Tab</div>
-      <h2>From idea to deployable Terraform in minutes</h2>
-      <p>Five sub-tools that take you from "I want to manage Okta with Terraform" to a production-ready project.</p>
-    </div>
-
-    <div class="grid-3" style="margin-top: 20px;">
-      <div class="card">
-        <div class="icon">🤖</div>
-        <h3>Solution Builder</h3>
-        <p>Describe your use case in plain English. AI generates complete <code style="color: var(--teal)">provider.tf</code>, <code style="color: var(--teal)">resources.tf</code>, <code style="color: var(--teal)">variables.tf</code> + import blocks.</p>
-      </div>
-      <div class="card">
-        <div class="icon">📊</div>
-        <h3>Workload Sizing</h3>
-        <p>Select resource types, input counts, and get a runtime estimate before you ever run a plan.</p>
-      </div>
-      <div class="card">
-        <div class="icon">⚙️</div>
-        <h3>Config Comparison</h3>
-        <p>Side-by-side view of Terraform provider defaults vs. OTTO's recommendations — see exactly what changes and why.</p>
-      </div>
-      <div class="card">
-        <div class="icon">📦</div>
-        <h3>Export Project</h3>
-        <p>Download a complete, ready-to-run Terraform project scaffold with all generated files.</p>
-      </div>
-      <div class="card">
-        <div class="icon">🎯</div>
-        <h3>Target Planner</h3>
-        <p>Input a desired run duration — OTTO tells you if your current rate limits can support it and what limit increases you'd need.</p>
-      </div>
-      <div class="card-teal">
-        <div class="icon">✅</div>
-        <h3>Provider versions</h3>
-        <p>Download, cache, and pin specific Okta provider versions. OTTO manages the binary so you don't have to.</p>
-      </div>
-    </div>
-  </section>
-
-  <!-- ══════════════════════════════════════════════════
-       SLIDE 6 — SYNC TAB (DEEP DIVE)
-  ══════════════════════════════════════════════════ -->
-  <section class="slide" id="s6">
-    <div class="slide-header">
-      <div class="tag">Sync Tab — Deep Dive</div>
-      <h2>Cross-environment promotion, fully automated</h2>
-      <p>The hardest Okta Terraform problem: promoting config from dev → staging → production without breaking everything.</p>
+      <div class="tag">Sync Tab</div>
+      <h2>Cross-org promotion, fully automated</h2>
+      <p>Connect source + target → Compare → Convert → Apply. Let me show you.</p>
     </div>
 
     <div class="pipeline">
       <div class="pipe-step">
         <div class="num">01</div>
         <div class="label">Connect</div>
-        <div class="desc">Source org (dev) + Target org (prod) — live API or .tf/.tfstate upload</div>
+        <div class="desc">Both orgs via API</div>
       </div>
       <div class="pipe-step">
         <div class="num">02</div>
         <div class="label">Discover</div>
-        <div class="desc">30+ resource types enumerated via live API</div>
+        <div class="desc">30+ resource types</div>
       </div>
       <div class="pipe-step">
         <div class="num">03</div>
         <div class="label">Diff</div>
-        <div class="desc">Field-level view — changed, missing, same</div>
+        <div class="desc">Field-level comparison</div>
       </div>
       <div class="pipe-step">
         <div class="num">04</div>
         <div class="label">Convert</div>
-        <div class="desc">AI resolves all IDs, generates import blocks</div>
+        <div class="desc">AI rewrites IDs + imports</div>
       </div>
       <div class="pipe-step">
         <div class="num">05</div>
         <div class="label">Apply</div>
-        <div class="desc">init → plan → review → apply inside the app</div>
+        <div class="desc">terraform apply in-app</div>
       </div>
     </div>
 
-    <div class="grid-3" style="margin-top: 20px;">
-      <div class="card">
-        <h3>Two input modes</h3>
-        <p><strong style="color: var(--text)">Live Org</strong> — connect directly via API token<br/><br/>
-        <strong style="color: var(--text)">File Upload</strong> — use existing .tf + .tfstate for offline comparison</p>
-      </div>
-      <div class="card">
-        <h3>Smart capabilities</h3>
-        <p>Bi-directional swap, selective sync, 3-level hierarchy resolution (auth server → policy → rule), rollback bundles</p>
-      </div>
-      <div class="card-teal">
-        <h3>30+ resource types</h3>
-        <p>Users, Groups, Apps, Auth Servers, Policies, Network Zones, IdPs, Authenticators, Event Hooks, Custom Roles, and more</p>
-      </div>
+    <div class="callout" style="margin-top: 28px; text-align: center; font-size: 18px;">
+      ↓ Live demo ↓
     </div>
   </section>
 
   <!-- ══════════════════════════════════════════════════
-       SLIDE 7 — DEBUG TAB
+       SLIDE 6 — DEBUG TAB
   ══════════════════════════════════════════════════ -->
-  <section class="slide" id="s7">
+  <section class="slide" id="s6">
     <div class="slide-header">
       <div class="tag">Debug Tab</div>
-      <h2>When Terraform fails, find the answer fast</h2>
-      <p>Two AI-powered tools that turn cryptic errors and dense log files into actionable fixes.</p>
+      <h2>When runs fail, get the answer instantly</h2>
     </div>
 
     <div class="grid-2" style="margin-top: 24px;">
-      <div>
-        <div class="card" style="height: 100%;">
-          <div class="icon">🔴</div>
-          <h3>Error Decoder</h3>
-          <p style="margin-bottom: 16px;">Paste any Okta API error or Terraform failure message. OTTO returns:</p>
-          <ul style="margin-top: 0;">
-            <li>Plain-English explanation of what went wrong</li>
-            <li>Root cause analysis powered by Claude</li>
-            <li>Specific config or API changes to fix it</li>
-            <li>Links to relevant Okta documentation</li>
-          </ul>
-        </div>
+      <div class="card">
+        <h3>Error Decoder</h3>
+        <p>Paste any Okta API error → AI-powered explanation + exact fix.</p>
       </div>
-      <div>
-        <div class="card" style="height: 100%;">
-          <div class="icon">📋</div>
-          <h3>TF_LOG Analyzer</h3>
-          <p style="margin-bottom: 16px;">Upload a <code style="color: var(--teal)">TF_LOG=DEBUG</code> output file. OTTO:</p>
-          <ul style="margin-top: 0;">
-            <li>Extracts per-endpoint request stats and rate-limit hits</li>
-            <li>Detects schema validation errors (even with no HTTP requests)</li>
-            <li>Shows error frequency by endpoint</li>
-            <li>AI root cause with actionable provider config recommendations</li>
-          </ul>
-        </div>
+      <div class="card">
+        <h3>TF_LOG Analyzer</h3>
+        <p>Upload debug output → per-endpoint stats, rate-limit hits, root cause analysis.</p>
       </div>
     </div>
 
-    <div class="callout">
-      No more manually searching through 50,000 lines of debug output. OTTO finds the signal in the noise.
+    <div class="callout" style="margin-top: 24px;">
+      No more searching through 50,000 lines of debug output.
     </div>
   </section>
 
   <!-- ══════════════════════════════════════════════════
-       SLIDE 8 — THE IMPACT
+       SLIDE 7 — IMPACT + NEXT STEPS
+  ══════════════════════════════════════════════════ -->
+  <section class="slide" id="s7">
+    <div class="slide-header">
+      <div class="tag">Impact + Next Steps</div>
+      <h2>Hours → Minutes, and where we're headed</h2>
+    </div>
+
+    <div class="grid-2" style="flex: 1;">
+      <div>
+        <div class="compare">
+          <div class="compare-col before">
+            <h4>❌ Before OTTO</h4>
+            <ul>
+              <li>Manual ID substitution between orgs</li>
+              <li>Rate limit errors mid-run, no warning</li>
+              <li>Debugging raw TF_LOG output</li>
+              <li>No visibility before apply</li>
+              <li>Hours to set up a new environment</li>
+            </ul>
+          </div>
+          <div class="compare-col after">
+            <h4>✅ After OTTO</h4>
+            <ul>
+              <li>AI-automated ID resolution</li>
+              <li>Pre-run rate limit probing</li>
+              <li>AI root cause analysis in seconds</li>
+              <li>Field-level diff + in-app plan review</li>
+              <li>Minutes from source to production</li>
+            </ul>
+          </div>
+        </div>
+        <div class="badges" style="margin-top: 16px;">
+          <div class="badge highlight">30+ resource types</div>
+          <div class="badge highlight">30+ endpoints probed</div>
+          <div class="badge">rollback support</div>
+        </div>
+      </div>
+
+      <div style="display: flex; flex-direction: column; gap: 12px;">
+        <div class="card">
+          <h3>Multi-LLM Support</h3>
+          <p>OpenAI, Azure OpenAI, Bedrock — teams bring their own enterprise-approved LLM.</p>
+        </div>
+        <div class="card">
+          <h3>SSO Integration</h3>
+          <p>Company SSO via SAML/OIDC with MFA enforcement and audit trail.</p>
+        </div>
+        <div class="card-teal">
+          <h3>Okta for AI Agents</h3>
+          <p>OTTO gets its own non-human identity — scoped delegation, full audit trail, least-privilege via OAuth.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ══════════════════════════════════════════════════
+       SLIDE 8 — CLOSE
   ══════════════════════════════════════════════════ -->
   <section class="slide" id="s8">
-    <div class="slide-header">
-      <div class="tag">The Impact</div>
-      <h2>Hours of manual work → Minutes, automated</h2>
-    </div>
-
-    <div class="compare">
-      <div class="compare-col before">
-        <h4>❌ Before OTTO</h4>
-        <ul>
-          <li>Manual ID substitution between orgs</li>
-          <li>Terraform rate limit errors mid-run with no warning</li>
-          <li>Debugging with raw TF_LOG=DEBUG output</li>
-          <li>Writing provider config from memory or docs</li>
-          <li>No visibility into what changes before apply</li>
-          <li>Static Super Admin API token with no audit trail</li>
-          <li>Hours to set up a new environment</li>
-        </ul>
-      </div>
-      <div class="compare-col after">
-        <h4>✅ After OTTO</h4>
-        <ul>
-          <li>AI-automated ID resolution across orgs</li>
-          <li>Pre-run rate limit probing — know before you run</li>
-          <li>AI root cause analysis in seconds</li>
-          <li>Optimized config generated from live API data</li>
-          <li>Field-level diff + in-app plan review before apply</li>
-          <li>Scoped, delegated credentials (roadmap)</li>
-          <li>Minutes from source to applied in production</li>
-        </ul>
-      </div>
-    </div>
-
-    <div class="badges" style="margin-top: 20px;">
-      <div class="badge highlight">30+ resource types</div>
-      <div class="badge highlight">30+ endpoints probed</div>
-      <div class="badge">dev → staging → prod</div>
-      <div class="badge">org migrations</div>
-      <div class="badge">disaster recovery</div>
-      <div class="badge">works offline (file mode)</div>
-      <div class="badge">rollback support</div>
-    </div>
-  </section>
-
-  <!-- ══════════════════════════════════════════════════
-       SLIDE 9 — NEXT STEPS
-  ══════════════════════════════════════════════════ -->
-  <section class="slide" id="s9">
-    <div class="slide-header">
-      <div class="tag">Next Steps</div>
-      <h2>Where OTTO goes from here</h2>
-    </div>
-
-    <div class="grid-3">
-      <div class="card">
-        <div class="icon">🧠</div>
-        <h3>Multi-LLM Support</h3>
-        <p>Extend AI features beyond Claude to support <strong style="color: var(--text)">OpenAI, Azure OpenAI, and other providers</strong>. Teams bring their own enterprise-approved LLM — no lock-in.</p>
-        <div class="badges" style="margin-top: 14px;">
-          <div class="badge">OpenAI</div>
-          <div class="badge">Azure OpenAI</div>
-          <div class="badge">Bedrock</div>
-        </div>
-      </div>
-
-      <div class="card">
-        <div class="icon">🔐</div>
-        <h3>SSO Integration</h3>
-        <p>Authenticate into OTTO using <strong style="color: var(--text)">company SSO via SAML/OIDC</strong>. Enterprise-ready access control, user provisioning, and audit trail without managing individual API tokens.</p>
-        <div class="badges" style="margin-top: 14px;">
-          <div class="badge">SAML</div>
-          <div class="badge">OIDC</div>
-          <div class="badge">MFA enforced</div>
-        </div>
-      </div>
-
-      <div class="ai-agent-box">
-        <div class="icon">🤖</div>
-        <h3>Okta for AI Agents</h3>
-        <p style="font-size: 13px; color: #9099b0; line-height: 1.6; margin-bottom: 12px;">Today OTTO uses a static Super Admin token. With Okta's AI Agent identity platform:</p>
-        <div class="step-list">
-          <div class="step-item">
-            <div class="step-num" style="background: rgba(79,125,255,0.15); border-color: rgba(79,125,255,0.3); color: var(--accent);">1</div>
-            <div class="step-text"><strong>Agent Identity</strong> — OTTO gets its own non-human identity in your org</div>
-          </div>
-          <div class="step-item">
-            <div class="step-num" style="background: rgba(79,125,255,0.15); border-color: rgba(79,125,255,0.3); color: var(--accent);">2</div>
-            <div class="step-text"><strong>Scoped delegation</strong> — OAuth tokens scoped to only the permissions needed (least-privilege)</div>
-          </div>
-          <div class="step-item">
-            <div class="step-num" style="background: rgba(79,125,255,0.15); border-color: rgba(79,125,255,0.3); color: var(--accent);">3</div>
-            <div class="step-text"><strong>Full audit trail</strong> — every AI action logged against the agent identity, not a generic token</div>
-          </div>
-          <div class="step-item">
-            <div class="step-num" style="background: rgba(79,125,255,0.15); border-color: rgba(79,125,255,0.3); color: var(--accent);">4</div>
-            <div class="step-text"><strong>XAA protocol</strong> — act on behalf of users via OAuth without credential sharing</div>
-          </div>
-        </div>
-      </div>
-    </div>
-  </section>
-
-  <!-- ══════════════════════════════════════════════════
-       SLIDE 10 — CLOSE
-  ══════════════════════════════════════════════════ -->
-  <section class="slide" id="s10">
     <div style="display: flex; flex-direction: column; justify-content: center; height: 100%; gap: 32px;">
 
       <div class="otto-logo" style="justify-content: center;">
