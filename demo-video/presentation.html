@@ -387,44 +387,45 @@
   <!-- ══════════════════════════════════════════════════
        SLIDE 5 — SYNC TAB (DEEP DIVE)
   ══════════════════════════════════════════════════ -->
-  <section class="slide" id="s5">
-    <div class="slide-header">
-      <div class="tag">Sync Tab</div>
-      <h2>Cross-org promotion, fully automated</h2>
-      <p>Connect source + target → Compare → Convert → Apply. Let me show you.</p>
+  <section class="slide" id="s5" style="padding: 32px 56px;">
+    <div style="display: flex; align-items: center; gap: 24px; margin-bottom: 14px; flex-shrink: 0;">
+      <div class="tag" style="margin-bottom: 0;">Sync Tab</div>
+      <h2 style="font-size: 26px; margin: 0;">Cross-org promotion, fully automated</h2>
     </div>
 
-    <div class="pipeline">
-      <div class="pipe-step">
+    <div class="pipeline" style="margin-top: 0; flex-shrink: 0;">
+      <div class="pipe-step" style="padding: 10px 12px;">
         <div class="num">01</div>
         <div class="label">Connect</div>
         <div class="desc">Both orgs via API</div>
       </div>
-      <div class="pipe-step">
+      <div class="pipe-step" style="padding: 10px 12px;">
         <div class="num">02</div>
         <div class="label">Discover</div>
         <div class="desc">30+ resource types</div>
       </div>
-      <div class="pipe-step">
+      <div class="pipe-step" style="padding: 10px 12px;">
         <div class="num">03</div>
         <div class="label">Diff</div>
         <div class="desc">Field-level comparison</div>
       </div>
-      <div class="pipe-step">
+      <div class="pipe-step" style="padding: 10px 12px;">
         <div class="num">04</div>
         <div class="label">Convert</div>
         <div class="desc">AI rewrites IDs + imports</div>
       </div>
-      <div class="pipe-step">
+      <div class="pipe-step" style="padding: 10px 12px;">
         <div class="num">05</div>
         <div class="label">Apply</div>
         <div class="desc">terraform apply in-app</div>
       </div>
     </div>
 
-    <div class="callout" style="margin-top: 28px; text-align: center; font-size: 18px;">
-      ↓ Live demo ↓
-    </div>
+    <video id="sync-video" src="Sync.mp4" controls muted
+      style="margin-top: 14px; width: 100%; flex: 1; min-height: 0;
+             border-radius: 12px; border: 1px solid var(--border);
+             object-fit: contain; background: #000;">
+    </video>
   </section>
 
   <!-- ══════════════════════════════════════════════════
@@ -570,11 +571,20 @@
   const total  = slides.length;
   let   cur    = 0;
 
-  const bar     = document.getElementById('progress-bar');
-  const counter = document.getElementById('counter');
+  const bar       = document.getElementById('progress-bar');
+  const counter   = document.getElementById('counter');
+  const syncVideo = document.getElementById('sync-video');
+  const SYNC_IDX  = 4; // slide 5 is index 4 (0-based)
 
   function goTo(idx) {
     if (idx < 0 || idx >= total) return;
+
+    // Pause + reset video when leaving slide 5
+    if (cur === SYNC_IDX && idx !== SYNC_IDX) {
+      syncVideo.pause();
+      syncVideo.currentTime = 0;
+    }
+
     slides[cur].classList.remove('active');
     slides[cur].classList.add('exit');
     setTimeout(() => slides[cur > idx ? cur : cur].classList.remove('exit'), 500);
@@ -585,6 +595,12 @@
 
     bar.style.width = ((cur + 1) / total * 100) + '%';
     counter.textContent = (cur + 1) + ' / ' + total;
+
+    // Autoplay video when entering slide 5
+    if (cur === SYNC_IDX) {
+      syncVideo.currentTime = 0;
+      syncVideo.play().catch(() => {});
+    }
   }
 
   // Init
