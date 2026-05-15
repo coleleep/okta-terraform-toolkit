@@ -78,6 +78,7 @@ export async function parseLogFile(filePath: string): Promise<LogAnalysis> {
     let currentStatus: number | null = null;
     let currentEndpoint: string | null = null;
     let currentTimestamp: string | null = null;
+    const terraformErrors: string[] = [];
 
     // Error tracking
     const errorsByStatus: Record<number, number> = {};
@@ -236,6 +237,15 @@ export async function parseLogFile(filePath: string): Promise<LogAnalysis> {
         }
       }
 
+      // Terraform/provider-level errors (independent of HTTP context)
+      if (line.includes('[ERROR]')) {
+        const errorContent = line.replace(/^.*\[ERROR\]\s*/, '').trim();
+        if (errorContent) terraformErrors.push(errorContent);
+      } else if (!currentEndpoint && line.includes('Error:')) {
+        const errMatch = line.match(/Error:\s*(.+)/);
+        if (errMatch) terraformErrors.push(errMatch[1].trim());
+      }
+
       // Deadline exceeded
       if (line.includes('context deadline exceeded')) {
         deadlineExceeded++;
@@ -274,7 +284,7 @@ export async function parseLogFile(filePath: string): Promise<LogAnalysis> {
       const issues = detectIssues(
         detectedConfig, rateLimited, totalRequests, deadlineExceeded,
         rateLimitExhausted, Math.round(totalBackoffMs / 1000), endpoints,
-        errorsByStatus, errorDetails
+        errorsByStatus, errorDetails, terraformErrors
       );
 
       resolve({
@@ -293,6 +303,7 @@ export async function parseLogFile(filePath: string): Promise<LogAnalysis> {
         issues,
         errorsByStatus,
         errorDetails,
+        terraformErrors: terraformErrors.length > 0 ? terraformErrors : undefined,
       });
     });
 
@@ -311,8 +322,28 @@ function detectIssues(
   endpoints: LogEndpointStats[],
   errorsByStatus: Record<number, number>,
   errorDetails: LogErrorDetail[],
+  terraformErrors: string[],
 ): LogIssue[] {
   const issues: LogIssue[] = [];
+
+  // Terraform/provider-level errors (outside HTTP context)
+  if (terraformErrors.length > 0) {
+    const uniqueErrors = [...new Set(terraformErrors)];
+    const isValidationFailure = uniqueErrors.some(e =>
+      e.includes('Unsupported argument') || e.includes('Unsupported block') ||
+      e.includes('Missing required argument') || e.includes('Invalid reference') ||
+      e.includes('Unsupported attribute')
+    );
+    const severity = totalRequests === 0 ? 'critical' : 'warning';
+    issues.push({
+      severity,
+      title: `${uniqueErrors.length} Terraform error${uniqueErrors.length > 1 ? 's' : ''} detected${isValidationFailure ? ' (validation failed)' : ''}`,
+      detail: uniqueErrors.slice(0, 5).join('\n'),
+      recommendation: isValidationFailure
+        ? 'The configuration has schema errors — likely a provider version mismatch. Check that all resource arguments are supported in your installed provider version. Run "terraform providers" to verify.'
+        : 'Review the errors above. These occurred at the Terraform/provider level, not at the Okta API level.',
+    });
+  }
 
   // Critical: deadline exceeded with capacity throttling
   if (deadlineExceeded > 0) {
@@ -473,7 +504,7 @@ function detectIssues(
 
   // Info: clean run
   const totalNonRateLimitErrors = Object.entries(errorsByStatus).filter(([code]) => parseInt(code) !== 429).reduce((sum, [, count]) => sum + count, 0);
-  if (rateLimited === 0 && deadlineExceeded === 0 && totalNonRateLimitErrors === 0 && totalRequests > 0) {
+  if (rateLimited === 0 && deadlineExceeded === 0 && totalNonRateLimitErrors === 0 && terraformErrors.length === 0 && totalRequests > 0) {
     issues.push({
       severity: 'info',
       title: 'Clean run — no issues detected',

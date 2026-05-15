@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useStore } from '../hooks/useStore';
 import ProbeProgress from '../components/ProbeProgress';
 import RateLimitTable from '../components/RateLimitTable';
@@ -8,7 +8,7 @@ import DebugSection from '../components/DebugSection';
 import LearnSection from '../components/LearnSection';
 import SyncSection from '../components/SyncSection';
 import SettingsModal from '../components/SettingsModal';
-import { SUPPORTED_VERSIONS, ProviderVersion } from '../../shared/versions';
+import { SUPPORTED_VERSIONS } from '../../shared/versions';
 
 type Section = 'rate-limits' | 'plan' | 'sync' | 'debug' | 'learn';
 
@@ -71,7 +71,20 @@ export default function DashboardPage() {
 
   const [activeSection, setActiveSection] = useState<Section>('rate-limits');
   const [showSettings, setShowSettings] = useState(false);
+  const [availableVersions, setAvailableVersions] = useState<string[]>([...SUPPORTED_VERSIONS]);
   const hasWorkload = selectedResources.length > 0 && resourceCounts.length > 0;
+
+  useEffect(() => {
+    window.oktaTerraform.listProviderVersions().then((r: any) => {
+      if (r?.success && r.data?.length > 0) {
+        const versions: string[] = r.data.map((v: { version: string }) => v.version);
+        setAvailableVersions(versions);
+        if (!versions.includes(providerVersion)) {
+          setProviderVersion(versions[0]);
+        }
+      }
+    }).catch(() => { /* keep fallback */ });
+  }, []);
 
   return (
     <div className="h-screen flex flex-col bg-surface-0">
@@ -97,10 +110,10 @@ export default function DashboardPage() {
           </span>
           <select
             value={providerVersion}
-            onChange={(e) => setProviderVersion(e.target.value as ProviderVersion)}
+            onChange={(e) => setProviderVersion(e.target.value)}
             className="text-xs bg-surface-3 text-text-secondary border border-border rounded px-2.5 py-1 cursor-pointer hover:border-border-hover font-mono"
           >
-            {SUPPORTED_VERSIONS.map(v => (
+            {availableVersions.map(v => (
               <option key={v} value={v}>v{v}</option>
             ))}
           </select>
@@ -191,10 +204,10 @@ export default function DashboardPage() {
             <ProbeProgress progress={probeProgress} />
           )}
 
-          {activeSection === 'plan' && <PlanSection />}
-          {activeSection === 'sync' && <SyncSection />}
-          {activeSection === 'debug' && <DebugSection />}
-          {activeSection === 'learn' && <LearnSection />}
+          <div className={activeSection === 'plan' ? '' : 'hidden'}><PlanSection /></div>
+          <div className={activeSection === 'sync' ? '' : 'hidden'}><SyncSection /></div>
+          <div className={activeSection === 'debug' ? '' : 'hidden'}><DebugSection /></div>
+          <div className={activeSection === 'learn' ? '' : 'hidden'}><LearnSection /></div>
 
           {activeSection === 'rate-limits' && probeResult && !probing && (
             <div className="space-y-6">

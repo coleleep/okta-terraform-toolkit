@@ -198,6 +198,7 @@ export interface LogAnalysis {
   // Error breakdown
   errorsByStatus: Record<number, number>;  // e.g., { 401: 5, 403: 12, 404: 3 }
   errorDetails: LogErrorDetail[];          // individual captured errors
+  terraformErrors?: string[];              // provider/validation errors outside HTTP context
 }
 
 export interface LogErrorDetail {
@@ -234,4 +235,69 @@ export interface ClaudeInterpretation {
   rootCause: string;
   topFix: string;
   configChanges?: Partial<TerraformProviderConfig>;
+}
+
+// Source org connection
+export interface SourceConnectionStatus {
+  connected: boolean;
+  orgUrl?: string;
+  error?: string;
+}
+
+// Pipeline stage tracking
+export type SyncStage = 'idle' | 'discover' | 'match' | 'convert' | 'export' | 'done' | 'error';
+
+export interface AmbiguousResource {
+  resourceAddress: string;  // e.g., "okta_group.engineering"
+  candidates: string[];     // candidate IDs in target org
+}
+
+export interface SyncPipelineState {
+  stage: SyncStage;
+  discoveredCount: number;
+  matchedCount: number;
+  ambiguousResources: AmbiguousResource[];
+  convertedCount: number;
+  error?: string;
+}
+
+// Logger
+export type LogLevel = 'debug' | 'info' | 'warn' | 'error';
+
+// ── Org Diff ───────────────────────────────────────────────
+export interface FieldDiff {
+  field: string;
+  sourceValue: unknown;
+  targetValue: unknown;
+}
+
+export interface ResourceDiff {
+  sourceAddress: string;   // e.g. "okta_group.engineering"
+  sourceType: string;      // e.g. "okta_group"
+  sourceName: string;      // human-readable display name
+  status: 'same' | 'changed' | 'missing' | 'ambiguous';
+  candidates?: string[];   // populated for 'ambiguous' status
+  fieldDiffs: FieldDiff[]; // empty when status is 'same', 'missing', or 'ambiguous'
+  allSourceAttrs?: Record<string, unknown>; // raw API response for TF generation
+}
+
+export interface DiffResult {
+  changed: number;
+  missing: number;
+  same: number;
+  ambiguous: number;
+  diffs: ResourceDiff[];
+}
+
+export interface CompareParams {
+  sourceTypes: string[];
+  reversed?: boolean;
+}
+
+export interface RollbackManifest {
+  timestamp: string;
+  targetOrgUrl: string;
+  providerVersion: string;
+  exactProviderVersion?: string;
+  mode: 'tf-state';
 }

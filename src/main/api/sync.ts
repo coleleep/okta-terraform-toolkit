@@ -1,6 +1,7 @@
 import { AxiosInstance } from 'axios';
 import { getClient } from './auth';
 import { SUB_RESOURCE_SYNC_CONFIG } from '../../shared/constants';
+import { FieldDiff, ResourceDiff, DiffResult } from '../../shared/types';
 
 interface OktaListResponse {
   id: string;
@@ -170,8 +171,8 @@ const RESOURCE_LIST_ENDPOINTS: Record<string, string> = {
   okta_behavior: '/api/v1/behaviors',
 };
 
-export async function discoverTargetResources(resourceTypes: string[]): Promise<TargetResource[]> {
-  const client = getClient();
+export async function discoverTargetResources(resourceTypes: string[], clientOverride?: AxiosInstance): Promise<TargetResource[]> {
+  const client = clientOverride ?? getClient();
   const results: TargetResource[] = [];
   const discoveredEndpoints = new Set<string>();
 
@@ -201,6 +202,65 @@ export async function discoverTargetResources(resourceTypes: string[]): Promise<
       }
     } catch {
       // Skip types we can't access
+    }
+  }
+
+  return results;
+}
+
+// ── Source org resource discovery (live source org path) ───────────────────
+
+export async function discoverSourceResources(
+  client: AxiosInstance,
+  typeFilter?: string[],
+): Promise<StateResource[]> {
+  const results: StateResource[] = [];
+  const discoveredEndpoints = new Set<string>();
+
+  for (const [type, endpoint] of Object.entries(RESOURCE_LIST_ENDPOINTS)) {
+    // Skip sub-resource types — they require parent context
+    if (SUB_RESOURCE_SYNC_CONFIG[type]) continue;
+
+    // Skip types not in the optional filter
+    if (typeFilter && !typeFilter.includes(type)) continue;
+
+    // Deduplicate endpoints (many okta_app_* types share /api/v1/apps)
+    if (discoveredEndpoints.has(endpoint)) continue;
+    discoveredEndpoints.add(endpoint);
+
+    try {
+      const items = await fetchAllPages(client, endpoint);
+      const usedNames = new Set<string>();
+
+      for (const item of items) {
+        const displayName = String(
+          item.label ||
+          item.name ||
+          item.title ||
+          (item.profile as { name?: string } | undefined)?.name ||
+          (item.profile as { login?: string } | undefined)?.login ||
+          item.id,
+        );
+        const safeName = displayName
+          .replace(/[^a-z0-9_]/gi, '_')
+          .toLowerCase()
+          .replace(/^[^a-z_]/, '_$&');  // ensure starts with letter/underscore
+
+        // Append Okta ID to disambiguate resources with identical display names
+        const finalName = usedNames.has(safeName) ? `${safeName}_${String(item.id)}` : safeName;
+        usedNames.add(finalName);
+
+        results.push({
+          type,
+          address: `${type}.${finalName}`,
+          name: finalName,
+          oktaId: String(item.id),
+          displayName,
+          attributes: item as Record<string, unknown>,
+        });
+      }
+    } catch {
+      // Skip inaccessible resource types (permissions, not found, etc.)
     }
   }
 
@@ -350,6 +410,7 @@ export interface ResourceMatch {
   level: number;                   // 0 = top-level, 1 = child, 2 = grandchild
   parentSourceId?: string | null;
   parentTargetId?: string | null;
+  candidates?: string[];           // populated when multiple name matches exist (ambiguous)
 }
 
 export function matchResources(
@@ -396,6 +457,7 @@ export function matchResources(
         targetName: `${nameMatches.length} matches found`,
         status: 'ambiguous',
         level: 0,
+        candidates: nameMatches.map(c => c.oktaId),
       });
     } else {
       matches.push({
@@ -479,6 +541,7 @@ function matchSubResources(
         level,
         parentSourceId: source.parentId,
         parentTargetId: targetParentId,
+        candidates: nameMatches.map(c => c.oktaId),
       });
     } else {
       matches.push({
@@ -602,5 +665,211 @@ export function buildSyncSummary(matches: ResourceMatch[]): SyncSummary {
     subResourceCount: matches.filter(m => m.level > 0).length,
     byType,
     matches,
+  };
+}
+
+// ── Org Diff ───────────────────────────────────────────────
+
+const DIFF_SKIP_FIELDS = new Set([
+  'id', 'created', 'lastUpdated', 'lastMembershipUpdated',
+  '_links', '_embedded', 'objectClass',
+]);
+
+function normalizeValue(value: unknown): string {
+  if (value === null || value === undefined) return 'null';
+  if (Array.isArray(value)) return JSON.stringify([...(value as unknown[])].sort());
+  if (typeof value === 'string') return value.trim();
+  return JSON.stringify(value);
+}
+
+export function diffAttributes(
+  source: Record<string, unknown>,
+  target: Record<string, unknown>,
+): FieldDiff[] {
+  const diffs: FieldDiff[] = [];
+  for (const field of Object.keys(source)) {
+    if (DIFF_SKIP_FIELDS.has(field)) continue;
+    const sourceNorm = normalizeValue(source[field]);
+    const targetNorm = normalizeValue(target[field]);
+    if (sourceNorm !== targetNorm) {
+      diffs.push({ field, sourceValue: source[field], targetValue: target[field] ?? null });
+    }
+  }
+  return diffs;
+}
+
+export function parseTfAttributesFromFiles(
+  tfFiles: Record<string, string>,
+): Record<string, Record<string, unknown>> {
+  const result: Record<string, Record<string, unknown>> = {};
+  for (const content of Object.values(tfFiles)) {
+    // Match top-level resource blocks (handles single-level nested braces)
+    const blockRegex = /resource\s+"([^"]+)"\s+"([^"]+)"\s+\{([^{}]*(?:\{[^{}]*\}[^{}]*)*)\}/gs;
+    let blockMatch: RegExpExecArray | null;
+    while ((blockMatch = blockRegex.exec(content)) !== null) {
+      const resourceType = blockMatch[1];
+      const resourceName = blockMatch[2];
+      const address = `${resourceType}.${resourceName}`;
+      const body = blockMatch[3];
+      const attrs: Record<string, unknown> = {};
+      // Extract leaf assignments: key = "string" | number | bool
+      const attrRegex = /^\s*(\w+)\s*=\s*(?:"([^"]*)"|([\d.]+)|(true|false))/gm;
+      let attrMatch: RegExpExecArray | null;
+      while ((attrMatch = attrRegex.exec(body)) !== null) {
+        const key = attrMatch[1];
+        if (attrMatch[2] !== undefined) {
+          attrs[key] = attrMatch[2];
+        } else if (attrMatch[3] !== undefined) {
+          attrs[key] = parseFloat(attrMatch[3]);
+        } else if (attrMatch[4] !== undefined) {
+          attrs[key] = attrMatch[4] === 'true';
+        }
+      }
+      result[address] = attrs;
+    }
+  }
+  return result;
+}
+
+// Build API base path map from the existing RESOURCE_LIST_ENDPOINTS (strip query params)
+const API_PATH_MAP: Record<string, string> = Object.fromEntries(
+  Object.entries(RESOURCE_LIST_ENDPOINTS).map(([type, endpoint]) => [
+    type, endpoint.split('?')[0],
+  ]),
+);
+
+const BATCH_SIZE = 10;
+const BATCH_DELAY_MS = 100;
+
+export async function fetchAttributeDiff(
+  matches: ResourceMatch[],
+  sourceClient: AxiosInstance | null,
+  targetClient: AxiosInstance,
+  tfParsedAttributes: Record<string, Record<string, unknown>>,
+): Promise<DiffResult> {
+  // Only diff top-level resources in v1
+  const topLevel = matches.filter(m => m.level === 0);
+  const diffs: ResourceDiff[] = new Array(topLevel.length);
+
+  for (let b = 0; b < topLevel.length; b += BATCH_SIZE) {
+    const batch = topLevel.slice(b, b + BATCH_SIZE).map((m, batchIdx) => ({
+      m,
+      i: b + batchIdx,
+    }));
+
+    await Promise.allSettled(
+      batch.map(async ({ m, i }) => {
+        if (m.status === 'missing') {
+          let allSourceAttrs: Record<string, unknown> | undefined;
+          if (sourceClient) {
+            const apiPath = API_PATH_MAP[m.sourceType];
+            if (apiPath) {
+              try {
+                const resp = await sourceClient.get<Record<string, unknown>>(`${apiPath}/${m.sourceId}`);
+                allSourceAttrs = resp.data;
+              } catch { /* skip — best effort */ }
+            }
+          }
+          diffs[i] = {
+            sourceAddress: m.sourceAddress,
+            sourceType: m.sourceType,
+            sourceName: m.sourceName,
+            status: 'missing',
+            fieldDiffs: [],
+            allSourceAttrs,
+          };
+          return;
+        }
+
+        if (m.status === 'ambiguous') {
+          diffs[i] = {
+            sourceAddress: m.sourceAddress,
+            sourceType: m.sourceType,
+            sourceName: m.sourceName,
+            status: 'ambiguous',
+            candidates: m.candidates ?? [],
+            fieldDiffs: [],
+          };
+          return;
+        }
+
+        // status === 'matched'
+        const apiPath = API_PATH_MAP[m.sourceType];
+        if (!apiPath || !m.targetId) {
+          // Unknown type or no target ID — treat as same to avoid false positives
+          diffs[i] = {
+            sourceAddress: m.sourceAddress,
+            sourceType: m.sourceType,
+            sourceName: m.sourceName,
+            status: 'same',
+            fieldDiffs: [],
+          };
+          return;
+        }
+
+        let sourceAttrs: Record<string, unknown>;
+        try {
+          if (sourceClient) {
+            const resp = await sourceClient.get<Record<string, unknown>>(
+              `${apiPath}/${m.sourceId}`,
+            );
+            sourceAttrs = resp.data;
+          } else {
+            sourceAttrs = tfParsedAttributes[m.sourceAddress] ?? {};
+          }
+        } catch (err: unknown) {
+          const message = err instanceof Error ? err.message : String(err);
+          diffs[i] = {
+            sourceAddress: m.sourceAddress,
+            sourceType: m.sourceType,
+            sourceName: m.sourceName,
+            status: 'changed',
+            fieldDiffs: [{ field: '_fetchError', sourceValue: null, targetValue: message }],
+          };
+          return;
+        }
+
+        let targetAttrs: Record<string, unknown>;
+        try {
+          const resp = await targetClient.get<Record<string, unknown>>(
+            `${apiPath}/${m.targetId}`,
+          );
+          targetAttrs = resp.data;
+        } catch (err: unknown) {
+          const message = err instanceof Error ? err.message : String(err);
+          diffs[i] = {
+            sourceAddress: m.sourceAddress,
+            sourceType: m.sourceType,
+            sourceName: m.sourceName,
+            status: 'changed',
+            fieldDiffs: [{ field: '_fetchError', sourceValue: null, targetValue: message }],
+          };
+          return;
+        }
+
+        const fieldDiffs = diffAttributes(sourceAttrs, targetAttrs);
+        diffs[i] = {
+          sourceAddress: m.sourceAddress,
+          sourceType: m.sourceType,
+          sourceName: m.sourceName,
+          status: fieldDiffs.length === 0 ? 'same' : 'changed',
+          fieldDiffs,
+          allSourceAttrs: sourceAttrs,
+        };
+      }),
+    );
+
+    if (b + BATCH_SIZE < topLevel.length) {
+      await new Promise(r => setTimeout(r, BATCH_DELAY_MS));
+    }
+  }
+
+  const finalDiffs = diffs.filter(Boolean);
+  return {
+    changed: finalDiffs.filter(d => d.status === 'changed').length,
+    missing: finalDiffs.filter(d => d.status === 'missing').length,
+    same: finalDiffs.filter(d => d.status === 'same').length,
+    ambiguous: finalDiffs.filter(d => d.status === 'ambiguous').length,
+    diffs: finalDiffs,
   };
 }

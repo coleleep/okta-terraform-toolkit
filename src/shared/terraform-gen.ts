@@ -1,5 +1,5 @@
-import { TerraformProviderConfig } from './types';
-import { ProviderVersion, getVersionConstraint } from './versions';
+import { TerraformProviderConfig, DiffResult } from './types';
+import { getVersionConstraint } from './versions';
 
 export function getOrgInfo(orgUrl: string) {
   const orgName = new URL(orgUrl).hostname.split('.')[0];
@@ -9,14 +9,17 @@ export function getOrgInfo(orgUrl: string) {
   return { orgName, baseUrl };
 }
 
-export function generateVersionsTf(providerVersion: ProviderVersion): string {
+export function generateVersionsTf(providerVersion: string, exactProviderVersion?: string): string {
+  const versionConstraint = exactProviderVersion
+    ? `= ${exactProviderVersion}`
+    : getVersionConstraint(providerVersion);
   return `terraform {
   required_version = ">= 1.5.0"
 
   required_providers {
     okta = {
       source  = "okta/okta"
-      version = "${getVersionConstraint(providerVersion)}"
+      version = "${versionConstraint}"
     }
   }
 }
@@ -92,4 +95,214 @@ ${rateLimitBlock}
 
 # Run with: terraform apply -parallelism=${config.parallelism}
 `;
+}
+
+function escapeTfString(s: string): string {
+  return s
+    .replace(/\\/g, '\\\\')
+    .replace(/"/g, '\\"')
+    .replace(/\n/g, '\\n')
+    .replace(/\r/g, '\\r')
+    .replace(/\t/g, '\\t')
+    .replace(/\$\{/g, '$${');
+}
+
+const TF_API_SKIP = new Set([
+  'id', 'created', 'lastUpdated', 'lastMembershipUpdated', 'statusChanged',
+  'passwordChanged', 'activated', 'lastLogin', '_links', '_embedded',
+  'objectClass', 'credentials', 'syncState', 'transitioning',
+  'system', 'default', 'lastUpdated', 'lastSync', 'lastEnrollment',
+  'profile', 'source', 'type',
+]);
+
+// Fields that are computed/read-only — never set in HCL
+const TF_COMPUTED_PATTERNS = [
+  /Date$/, /At$/, /^_/, /Changed$/, /^last[A-Z]/,
+];
+
+// API field names that don't follow simple camelCase → snake_case conversion
+const TF_FIELD_RENAMES: Record<string, string> = {
+  proxyType: 'dynamic_proxy_type',
+  dynamicLocations: 'dynamic_locations',
+  issuerMode: 'issuer_mode',
+  grantTypeWhitelist: 'grant_type_whitelist',
+  groupWhitelist: 'group_whitelist',
+  userWhitelist: 'user_whitelist',
+  scopeWhitelist: 'scope_whitelist',
+  sessionLifetimeMinutes: 'session_lifetime_minutes',
+  accessTokenLifetimeMinutes: 'access_token_lifetime_minutes',
+  refreshTokenLifetimeMinutes: 'refresh_token_lifetime_minutes',
+  refreshTokenWindowMinutes: 'refresh_token_window_minutes',
+  inlineHookId: 'inline_hook_id',
+  signOnMode: 'sign_on_mode',
+  tokenEndpointAuthMethod: 'token_endpoint_auth_method',
+  autoKeyRotation: 'auto_key_rotation',
+  clientBasicSecret: 'client_basic_secret',
+  consentMethod: 'consent_method',
+  issuerUrl: 'issuer_url',
+  orgName: 'org_name',
+  baseUrl: 'base_url',
+  apiToken: 'api_token',
+};
+
+function camelToSnake(str: string): string {
+  return str.replace(/[A-Z]/g, letter => `_${letter.toLowerCase()}`);
+}
+
+function isComputedField(key: string): boolean {
+  return TF_COMPUTED_PATTERNS.some(p => p.test(key));
+}
+
+// Maps raw Okta API response fields to terraform-compatible attribute key/value pairs.
+function extractTfAttrs(type: string, rawAttrs: Record<string, unknown>): Record<string, unknown> {
+  if (type === 'okta_user') {
+    const profile = (rawAttrs.profile as Record<string, unknown>) ?? {};
+    const result: Record<string, unknown> = {};
+    const mapping: Record<string, string> = {
+      login: 'login', firstName: 'first_name', lastName: 'last_name', email: 'email',
+      mobilePhone: 'mobile_phone', secondEmail: 'second_email', displayName: 'display_name',
+      nickName: 'nick_name', profileUrl: 'profile_url', preferredLanguage: 'preferred_language',
+      locale: 'locale', timezone: 'timezone', userType: 'user_type',
+      employeeNumber: 'employee_number', costCenter: 'cost_center', organization: 'organization',
+      division: 'division', department: 'department', managerId: 'manager_id', manager: 'manager',
+      title: 'title', honorificPrefix: 'honorific_prefix', honorificSuffix: 'honorific_suffix',
+      primaryPhone: 'primary_phone', streetAddress: 'street_address', city: 'city',
+      state: 'state', zipCode: 'zip_code', countryCode: 'country_code', postalAddress: 'postal_address',
+    };
+    for (const [apiKey, tfKey] of Object.entries(mapping)) {
+      if (profile[apiKey] != null) result[tfKey] = profile[apiKey];
+    }
+    return result;
+  }
+
+  if (type === 'okta_group') {
+    const profile = (rawAttrs.profile as Record<string, unknown>) ?? {};
+    const result: Record<string, unknown> = {};
+    if (profile.name != null) result.name = profile.name;
+    if (profile.description != null) result.description = profile.description;
+    return result;
+  }
+
+  if (type === 'okta_network_zone') {
+    // Skip system/default zones — they can't be modified via Terraform
+    const zoneName = (rawAttrs.name as string) ?? '';
+    if (rawAttrs.system === true || /^(BlockedIpZone|LegacyIpZone|DefaultExemptIpZone|DefaultEnhancedDynamicZone)$/i.test(zoneName)) {
+      return { __skip: true };
+    }
+    const result: Record<string, unknown> = {};
+    if (rawAttrs.name != null) result.name = rawAttrs.name;
+    if (rawAttrs.type != null) result.type = rawAttrs.type;
+    if (rawAttrs.status != null) result.status = rawAttrs.status;
+    if (rawAttrs.usage != null) result.usage = rawAttrs.usage;
+    // gateways/proxies/asns come as {include:[], exclude:[]} from API — TF expects flat string arrays
+    const gateways = rawAttrs.gateways as { include?: { value?: string }[] } | undefined;
+    if (gateways?.include?.length) result.gateways = gateways.include.map(g => g.value ?? g).filter(Boolean);
+    const proxies = rawAttrs.proxies as { include?: { value?: string }[] } | undefined;
+    if (proxies?.include?.length) result.proxies = proxies.include.map(p => p.value ?? p).filter(Boolean);
+    const asns = rawAttrs.asns as { include?: string[] } | string[] | undefined;
+    if (Array.isArray(asns)) {
+      if (asns.length > 0) result.asns = asns;
+    } else if (asns?.include?.length) {
+      result.asns = asns.include;
+    }
+    const dynamicLocations = rawAttrs.locations as { include?: unknown[] } | undefined;
+    if (dynamicLocations?.include?.length) result.dynamic_locations = dynamicLocations.include;
+    if (rawAttrs.proxyType != null) result.dynamic_proxy_type = rawAttrs.proxyType;
+    return result;
+  }
+
+  if (type === 'okta_auth_server') {
+    const result: Record<string, unknown> = {};
+    if (rawAttrs.name != null) result.name = rawAttrs.name;
+    if (rawAttrs.description != null) result.description = rawAttrs.description;
+    if (rawAttrs.audiences != null) result.audiences = rawAttrs.audiences;
+    if (rawAttrs.issuerMode != null) result.issuer_mode = rawAttrs.issuerMode;
+    if (rawAttrs.status != null) result.status = rawAttrs.status;
+    return result;
+  }
+
+  // Default: top-level scalar fields and simple arrays, with camelCase → snake_case conversion
+  const result: Record<string, unknown> = {};
+  for (const [k, v] of Object.entries(rawAttrs)) {
+    if (TF_API_SKIP.has(k)) continue;
+    if (k.startsWith('_')) continue;
+    if (isComputedField(k)) continue;
+    if (typeof v === 'object' && v !== null && !Array.isArray(v)) continue;
+
+    const tfKey = TF_FIELD_RENAMES[k] ?? camelToSnake(k);
+
+    if (typeof v === 'string' || typeof v === 'number' || typeof v === 'boolean') {
+      result[tfKey] = v;
+    } else if (Array.isArray(v) && v.length > 0 && v.every(item => typeof item === 'string')) {
+      result[tfKey] = v;
+    }
+  }
+  return result;
+}
+
+// Minimal interface so renderer can use this without importing main-process modules
+interface TfGeneratorMatch {
+  sourceAddress: string;
+  sourceType: string;
+}
+
+export function generateTfFromMatches(
+  matches: TfGeneratorMatch[],
+  diff: DiffResult,
+  selectedAddresses: Set<string>,
+): Record<string, string> {
+  const selected = matches.filter(m => selectedAddresses.has(m.sourceAddress));
+  if (selected.length === 0) return {};
+
+  const byType = new Map<string, TfGeneratorMatch[]>();
+  for (const m of selected) {
+    const arr = byType.get(m.sourceType) ?? [];
+    arr.push(m);
+    byType.set(m.sourceType, arr);
+  }
+
+  const diffMap = new Map(diff.diffs.map(d => [d.sourceAddress, d]));
+  const files: Record<string, string> = {};
+
+  for (const [type, typeMatches] of byType) {
+    const blocks: string[] = [];
+
+    for (const m of typeMatches) {
+      const rd = diffMap.get(m.sourceAddress);
+      const resourceName = m.sourceAddress.includes('.')
+        ? m.sourceAddress.split('.').slice(1).join('.')
+        : m.sourceAddress;
+
+      let attrLines: string[];
+
+      if (rd?.allSourceAttrs) {
+        // Use raw API source attrs with type-aware extraction (handles profile flattening etc.)
+        const tfAttrs = extractTfAttrs(type, rd.allSourceAttrs);
+        if ('__skip' in tfAttrs) continue;
+        attrLines = Object.entries(tfAttrs)
+          .filter(([k, v]) => v !== null && v !== undefined && k !== '__skip')
+          .map(([k, v]) => {
+            const val = typeof v === 'string' ? `"${escapeTfString(v)}"` : JSON.stringify(v);
+            return `  ${k.padEnd(12)}= ${val}`;
+          });
+      } else {
+        // Fallback: use fieldDiffs (state-file flow where API attrs aren't available)
+        attrLines = (rd?.fieldDiffs ?? [])
+          .filter(fd => fd.sourceValue !== null && fd.sourceValue !== undefined)
+          .map(fd => {
+            const val = typeof fd.sourceValue === 'string'
+              ? `"${escapeTfString(fd.sourceValue)}"`
+              : JSON.stringify(fd.sourceValue);
+            return `  ${fd.field.padEnd(12)}= ${val}`;
+          });
+      }
+
+      const body = attrLines.length > 0 ? `\n${attrLines.join('\n')}\n` : '';
+      blocks.push(`# Source: ${m.sourceAddress}\nresource "${type}" "${resourceName}" {${body}}`);
+    }
+
+    files[`${type}.tf`] = blocks.join('\n\n');
+  }
+
+  return files;
 }

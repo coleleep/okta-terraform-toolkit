@@ -6,7 +6,7 @@ import {
   PreventionOptions, DEFAULT_PREVENTION_OPTIONS, TerraformAuthMethod,
   CustomWorkloadEntry,
 } from '../../shared/types';
-import { ProviderVersion, DEFAULT_VERSION } from '../../shared/versions';
+import { DEFAULT_VERSION } from '../../shared/versions';
 import { RESOURCE_TYPES } from '../../shared/constants';
 import type { OktaTerraformAPI } from '../../preload';
 
@@ -62,8 +62,8 @@ interface AppState {
   analyzeTarget: () => Promise<void>;
 
   // Provider version
-  providerVersion: ProviderVersion;
-  setProviderVersion: (version: ProviderVersion) => void;
+  providerVersion: string;
+  setProviderVersion: (version: string) => void;
 
   // File operations
   saveTfFile: (content: string) => Promise<string | null>;

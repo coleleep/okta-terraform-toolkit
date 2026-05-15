@@ -212,7 +212,7 @@ export default function LogAnalyzer() {
                   </span>
                   <div>
                     <p className={`text-xs font-medium ${colors.title}`}>{issue.title}</p>
-                    <p className={`text-xs ${colors.text} mt-0.5`}>{issue.detail}</p>
+                    <p className={`text-xs ${colors.text} mt-0.5 whitespace-pre-wrap`}>{issue.detail}</p>
                     <p className={`text-xs font-medium ${colors.title} mt-1`}>→ {issue.recommendation}</p>
                   </div>
                 </div>

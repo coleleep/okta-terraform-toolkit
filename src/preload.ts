@@ -69,12 +69,21 @@ const api = {
     ipcRenderer.invoke('sync:analyze', { tfFiles, stateContent }),
   syncConvert: (tfContent: string, matches: unknown[], targetOrgUrl: string) =>
     ipcRenderer.invoke('sync:convert', { tfContent, matches, targetOrgUrl }),
+  stageTfFiles: (tfFiles: Record<string, string>, stateContent?: string) =>
+    ipcRenderer.invoke('sync:stage-files', { tfFiles, stateContent }),
   syncDeepProbe: (terraformTypes: string[]) =>
     ipcRenderer.invoke('sync:deep-probe', { terraformTypes }),
+  syncCompare: (sourceTypes: string[], reversed?: boolean) =>
+    ipcRenderer.invoke('sync:compare', { sourceTypes, reversed }),
   onSyncDeepProbeProgress: (callback: (progress: { phase: string; detail: string; completed?: number; total?: number }) => void) => {
     const handler = (_event: unknown, progress: { phase: string; detail: string; completed?: number; total?: number }) => callback(progress);
     ipcRenderer.on('sync:deep-probe-progress', handler);
     return () => ipcRenderer.removeListener('sync:deep-probe-progress', handler);
+  },
+  onSyncCompareProgress: (callback: (progress: { phase: string; detail: string }) => void) => {
+    const handler = (_event: unknown, progress: { phase: string; detail: string }) => callback(progress);
+    ipcRenderer.on('sync:compare-progress', handler);
+    return () => ipcRenderer.removeListener('sync:compare-progress', handler);
   },
 
   // File operations
@@ -82,6 +91,58 @@ const api = {
     ipcRenderer.invoke('file:save-tf', { content }),
   saveProjectDir: (files: Record<string, string>) =>
     ipcRenderer.invoke('file:save-project', { files }),
+
+  // Source org connection
+  connectSource: (orgUrl: string, token: string) =>
+    ipcRenderer.invoke('source:connect', { orgUrl, token }),
+  disconnectSource: () =>
+    ipcRenderer.invoke('source:disconnect'),
+  getSourceStatus: () =>
+    ipcRenderer.invoke('source:status'),
+
+  // Logger settings
+  setLogLevel: (level: string) =>
+    ipcRenderer.invoke('settings:set-log-level', level),
+  getLogLevel: () =>
+    ipcRenderer.invoke('settings:get-log-level'),
+  openLogFolder: () =>
+    ipcRenderer.invoke('settings:open-log-folder'),
+
+  // Terraform in-app runner
+  terraformRun: (dir: string, args: string[], swapped?: boolean) =>
+    ipcRenderer.invoke('terraform:run', { dir, args, swapped }),
+  terraformCancel: () =>
+    ipcRenderer.invoke('terraform:cancel'),
+  onTerraformLine: (callback: (line: string) => void) => {
+    const handler = (_event: unknown, line: string) => callback(line);
+    ipcRenderer.on('terraform:line', handler);
+    return () => ipcRenderer.removeListener('terraform:line', handler);
+  },
+
+  // Okta provider version management
+  listProviderVersions: () =>
+    ipcRenderer.invoke('provider:list-versions'),
+  downloadProviderVersion: (version: string) =>
+    ipcRenderer.invoke('provider:download-version', { version }),
+  onProviderDownloadProgress: (callback: (progress: { version: string; percent: number }) => void) => {
+    const handler = (_event: unknown, progress: { version: string; percent: number }) => callback(progress);
+    ipcRenderer.on('provider:download-progress', handler);
+    return () => ipcRenderer.removeListener('provider:download-progress', handler);
+  },
+  getSelectedProviderVersion: () =>
+    ipcRenderer.invoke('provider:get-selected'),
+  setSelectedProviderVersion: (version: string) =>
+    ipcRenderer.invoke('provider:set-selected', { version }),
+
+  // Rollback
+  saveRollback: (exportedDir: string, targetOrgUrl: string, providerVersion: string, exactProviderVersion?: string) =>
+    ipcRenderer.invoke('rollback:save-tf', { exportedDir, targetOrgUrl, providerVersion, exactProviderVersion }),
+  checkRollback: () =>
+    ipcRenderer.invoke('rollback:check'),
+  prepareRollback: () =>
+    ipcRenderer.invoke('rollback:prepare'),
+  clearRollback: () =>
+    ipcRenderer.invoke('rollback:clear'),
 };
 
 contextBridge.exposeInMainWorld('oktaTerraform', api);

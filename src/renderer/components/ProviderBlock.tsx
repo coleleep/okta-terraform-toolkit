@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { TerraformProviderConfig, ManagedResourceType } from '../../shared/types';
 import { TERRAFORM_RESOURCE_MAPPINGS } from '../../shared/constants';
 import { getRecommendations } from '../../shared/scopes';
-import { ProviderVersion, getAdditionsForVersion } from '../../shared/versions';
+import { getAdditionsForVersion } from '../../shared/versions';
 import { getOrgInfo, generateVersionsTf, generateVariablesTf, generateProviderTf } from '../../shared/terraform-gen';
 import { useStore } from '../hooks/useStore';
 
@@ -560,7 +560,7 @@ data "okta_auth_server" "default" {
 `,
 };
 
-function generateResourcesTf(selectedResources: ManagedResourceType[], providerVersion: ProviderVersion): string | null {
+function generateResourcesTf(selectedResources: ManagedResourceType[], providerVersion: string): string | null {
   if (selectedResources.length === 0) return null;
 
   const sections: string[] = [

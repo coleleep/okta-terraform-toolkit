@@ -7,10 +7,11 @@ let currentConfig: ConnectionConfig | null = null;
 export async function connect(config: ConnectionConfig): Promise<void> {
   currentConfig = config;
 
+  const cleanToken = config.token.trim().replace(/^SSWS\s+/i, '');
   httpClient = axios.create({
     baseURL: config.orgUrl,
     headers: {
-      Authorization: `SSWS ${config.token}`,
+      Authorization: `SSWS ${cleanToken}`,
       Accept: 'application/json',
       'Content-Type': 'application/json',
     },

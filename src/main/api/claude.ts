@@ -484,7 +484,7 @@ export async function convertConfig(
 
   const response = await client.messages.create({
     model: 'claude-4-6-sonnet',
-    max_tokens: 8192,
+    max_tokens: 32768,
     system: `You are an expert at converting Terraform configurations between Okta orgs.
 
 Given:

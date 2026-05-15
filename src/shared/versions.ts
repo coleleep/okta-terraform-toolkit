@@ -28,9 +28,9 @@ export function isAvailableIn(sinceVersion: string, selectedVersion: string): bo
  * Get the Terraform version constraint for a provider version.
  * e.g., '6.8.0' → '~> 6.8', '6.6.1' → '~> 6.6'
  */
-export function getVersionConstraint(version: ProviderVersion): string {
+export function getVersionConstraint(version: string): string {
   const parts = version.split('.');
-  return `~> ${parts[0]}.${parts[1]}`;
+  return `~> ${parts[0]}.${parts[1]}.0`;
 }
 
 /**
@@ -238,7 +238,7 @@ export const VERSION_ATTRIBUTE_NOTES: Record<ProviderVersion, string[]> = {
  * Get all version additions applicable for a given version (cumulative).
  * For v6.8.0, returns additions from 6.7.0 + 6.8.0.
  */
-export function getAdditionsForVersion(version: ProviderVersion): { type: string; config: string }[] {
+export function getAdditionsForVersion(version: string): { type: string; config: string }[] {
   const additions: { type: string; config: string }[] = [];
   for (const v of SUPPORTED_VERSIONS) {
     if (compareVersions(v, version) <= 0 && v !== '6.6.1') {
@@ -251,7 +251,7 @@ export function getAdditionsForVersion(version: ProviderVersion): { type: string
 /**
  * Get all attribute notes applicable for a given version (cumulative).
  */
-export function getAttributeNotesForVersion(version: ProviderVersion): string[] {
+export function getAttributeNotesForVersion(version: string): string[] {
   const notes: string[] = [];
   for (const v of SUPPORTED_VERSIONS) {
     if (compareVersions(v, version) <= 0) {
