@@ -58,7 +58,7 @@ export const TERRAFORM_DEFAULTS: TerraformProviderConfig = {
   max_wait_seconds: 300,
   request_timeout: 0,
   max_api_capacity: 100,
-  parallelism: 1,
+  parallelism: 10,
 };
 
 export const PROBE_TIMEOUT_MS = 10000;
