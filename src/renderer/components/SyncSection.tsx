@@ -313,6 +313,9 @@ export default function SyncSection() {
     setResolvedCandidates({});
     setDiff(null);
     setExportedDir(null);
+    setTfStage('idle');
+    setTfLines([]);
+    setTfError(null);
 
     if (mode === 'tf-files') {
       setStage('discover');
@@ -494,7 +497,11 @@ export default function SyncSection() {
 
   const handleSetMode = (newMode: 'compare' | 'tf-files') => {
     setModeState(newMode);
-    // Each mode maintains independent pipeline state — no reset on tab switch.
+    // Reset shared TF runner state so switching tabs never shows stale results.
+    setTfStage('idle');
+    setTfLines([]);
+    setTfError(null);
+    setExportedDir(null);
   };
 
   const handleExport = async () => {
