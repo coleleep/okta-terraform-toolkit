@@ -65,7 +65,7 @@ Produces production-ready Terraform files:
 
 ## Supported Provider Versions
 
-6.6.1 through 6.10.0 (default). Version-specific resource additions and attribute changes are tracked automatically.
+6.6.1 through 6.11.0 (default). Version-specific resource additions and attribute changes are tracked automatically.
 
 ## Getting Started
 
@@ -184,7 +184,7 @@ Configuration is stored locally in Electron's app data directory and never trans
 - Auth Servers (policies, scopes, claims, rules)
 - Policies (sign-on, password, MFA, enrollment, IdP discovery)
 - Network Zones, Trusted Origins, Domains
-- Identity Providers, Authenticators
+- Identity Providers, Identity Sources, Authenticators
 - Event Hooks, Inline Hooks, Log Streams
 - Custom Roles, Profile Mappings, Brands
 

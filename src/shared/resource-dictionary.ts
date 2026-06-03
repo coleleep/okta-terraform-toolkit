@@ -201,6 +201,26 @@ export const RESOURCE_DICTIONARY: ResourceDictionaryEntry[] = [
   { terraformResource: 'okta_request_setting_resource', description: 'Resource-level access request settings', parentType: 'governance', parentLabel: 'Governance' },
   { terraformResource: 'okta_request_v2', description: 'Access request (v2 API)', parentType: 'governance', parentLabel: 'Governance' },
   { terraformResource: 'okta_end_user_my_requests', description: 'End-user self-service access requests', parentType: 'governance', parentLabel: 'Governance' },
+
+  // ─── Identity Sources ───
+  {
+    terraformResource: 'okta_identity_source',
+    description: 'Manage an identity source resource for profile sourcing',
+    parentType: 'identitySources',
+    parentLabel: 'Identity Sources',
+    sinceVersion: '6.11.0',
+    primaryEndpoint: '/api/v1/identity-sources',
+    endpointLabel: 'Identity Sources',
+  },
+  {
+    terraformResource: 'okta_identity_source',
+    description: 'Look up an identity source data source',
+    parentType: 'identitySources',
+    parentLabel: 'Identity Sources',
+    sinceVersion: '6.11.0',
+    primaryEndpoint: '/api/v1/identity-sources',
+    endpointLabel: 'Identity Sources',
+  },
 ];
 
 /**

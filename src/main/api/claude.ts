@@ -143,7 +143,7 @@ export async function interpretLog(analysis: LogAnalysis): Promise<ClaudeInterpr
   const scopeContext = buildScopeContext();
 
   const response = await client.messages.create({
-    model: 'claude-4-6-sonnet',
+    model: 'claude-sonnet-4-6',
     max_tokens: 1024,
     system: `${LOG_SYSTEM_PROMPT}\n\n${scopeContext}`,
     messages: [{
@@ -194,7 +194,7 @@ export async function buildWorkload(description: string): Promise<CustomWorkload
   const client = getClient();
 
   const response = await client.messages.create({
-    model: 'claude-4-6-sonnet',
+    model: 'claude-sonnet-4-6',
     max_tokens: 1024,
     system: WORKLOAD_SYSTEM_PROMPT,
     messages: [{
@@ -279,7 +279,7 @@ export async function decodeError(errorText: string): Promise<ErrorDecoderResult
   const client = getClient();
 
   const response = await client.messages.create({
-    model: 'claude-4-6-sonnet',
+    model: 'claude-sonnet-4-6',
     max_tokens: 1024,
     system: ERROR_DECODER_PROMPT,
     messages: [{
@@ -368,7 +368,7 @@ export async function generateSolution(description: string, providerVersion: str
   const client = getClient();
 
   const response = await client.messages.create({
-    model: 'claude-4-6-sonnet',
+    model: 'claude-sonnet-4-6',
     max_tokens: 8192,
     system: SOLUTION_SYSTEM_PROMPT,
     messages: [{
@@ -483,7 +483,7 @@ export async function convertConfig(
   const matchContext = matchLines.join('\n');
 
   const response = await client.messages.create({
-    model: 'claude-4-6-sonnet',
+    model: 'claude-sonnet-4-6',
     max_tokens: 32768,
     system: `You are an expert at converting Terraform configurations between Okta orgs.
 

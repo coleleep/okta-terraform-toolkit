@@ -1,6 +1,6 @@
-export const SUPPORTED_VERSIONS = ['6.6.1', '6.7.0', '6.8.0', '6.9.0', '6.10.0'] as const;
+export const SUPPORTED_VERSIONS = ['6.6.1', '6.7.0', '6.8.0', '6.9.0', '6.10.0', '6.11.0'] as const;
 export type ProviderVersion = (typeof SUPPORTED_VERSIONS)[number];
-export const DEFAULT_VERSION: ProviderVersion = '6.10.0';
+export const DEFAULT_VERSION: ProviderVersion = '6.11.0';
 
 /**
  * Compare two semver strings. Returns -1 if a < b, 0 if equal, 1 if a > b.
@@ -202,6 +202,77 @@ export const VERSION_RESOURCE_ADDITIONS: Record<ProviderVersion, { type: string;
 `,
     },
   ],
+
+  '6.11.0': [
+    {
+      type: 'identitySources',
+      config: `
+# Identity source resource (v6.11.0+)
+# resource "okta_identity_source" "example" {
+#   name = "My Identity Source"
+#   type = "SAML2"
+#   # protocol and policy blocks depend on source type
+# }
+#
+# Data source: look up an existing identity source
+# data "okta_identity_source" "example" {
+#   id = "<identity_source_id>"
+# }
+`,
+    },
+    {
+      type: 'policies',
+      config: `
+# Breached password protection on password policy (v6.11.0+)
+# resource "okta_policy_password" "example" {
+#   name   = "Password Policy"
+#   status = "ACTIVE"
+#   password_breached_action = "WARN"  # NONE, WARN, or BLOCK
+# }
+`,
+    },
+    {
+      type: 'authenticators',
+      config: `
+# WebAuthn custom AAGUID support (v6.11.0+)
+# resource "okta_authenticator" "webauthn" {
+#   key    = "webauthn"
+#   name   = "WebAuthn"
+#   status = "ACTIVE"
+#   settings = jsonencode({
+#     userVerification = "PREFERRED"
+#     aaguidGroups     = [
+#       {
+#         name    = "YubiKey"
+#         aaguids = ["fa2b99dc-9e39-4257-8f92-4a30d23c4118"]
+#       }
+#     ]
+#   })
+# }
+`,
+    },
+    {
+      type: 'applications',
+      config: `
+# Push group with AD destination support (v6.11.0+)
+# resource "okta_push_group" "ad_example" {
+#   app_id         = okta_app_auto_login.ad_app.id
+#   group_id       = okta_group.example.id
+#   group_push_rule = "SAME_NAME"
+#   # AD apps can now be used as push destinations
+# }
+
+# App sign-on policy rule: option to stay signed in (v6.11.0+)
+# resource "okta_app_signon_policy_rule" "example" {
+#   policy_id                 = okta_app_signon_policy.example.id
+#   name                      = "Default Rule"
+#   factor_mode               = "1FA"
+#   type                      = "ASSURANCE"
+#   stay_signed_in_consent    = "ALLOWED"  # ALLOWED, REQUIRED, or DENIED (v6.11.0+)
+# }
+`,
+    },
+  ],
 };
 
 /**
@@ -231,6 +302,16 @@ export const VERSION_ATTRIBUTE_NOTES: Record<ProviderVersion, string[]> = {
     'okta_request_condition: 409 conflict on update fix',
     'okta_request_condition: resource_id change now triggers replacement',
     'okta_app_signon_policy_rules: LINUX/OTHER os_expression consistency fix',
+  ],
+  '6.11.0': [
+    'okta_policy_password: password_breached_action attribute added (NONE, WARN, BLOCK)',
+    'okta_authenticator: authenticator methods and WebAuthn custom AAGUID (aaguidGroups) support added',
+    'okta_push_group: AD group push destination support added',
+    'okta_app_signon_policy_rule: stay_signed_in_consent attribute added',
+    'okta_policy_rule_sign_on: identity_provider argument changed to TypeSet (may require state migration)',
+    'okta_user: computed timestamp fields added',
+    'okta_profile_mapping: terraform import support added',
+    'okta_network_zone: diff suppression added (reduces false plan diffs)',
   ],
 };
 

@@ -68,7 +68,7 @@ export const STATUS_OK_THRESHOLD = 0.5;
 export const STATUS_WARNING_THRESHOLD = 0.1;
 
 // Resource type definitions for selection & counting
-// Covers all major resource categories in Okta Terraform Provider v6.6.1
+// Covers all major resource categories in Okta Terraform Provider v6.11.0
 export interface ResourceTypeDef {
   type: ManagedResourceType;
   label: string;
@@ -106,6 +106,7 @@ export const RESOURCE_TYPES: ResourceTypeDef[] = [
   { type: 'realms', label: 'Realms', countEndpoint: '/api/v1/realms?limit=1', probeLabel: 'Realms', category: 'advanced' },
   { type: 'features', label: 'Features', countEndpoint: '/api/v1/features?limit=1', probeLabel: 'Features', category: 'advanced' },
   { type: 'pushProviders', label: 'Push Providers', countEndpoint: '/api/v1/push-providers?limit=1', probeLabel: 'Push Providers', category: 'advanced' },
+  { type: 'identitySources', label: 'Identity Sources', countEndpoint: '/api/v1/identity-sources?limit=1', probeLabel: 'Identity Sources', category: 'advanced' },
   // Org settings
   { type: 'orgSettings', label: 'Org Settings', countEndpoint: '/api/v1/org', probeLabel: 'Org Settings', category: 'org' },
   // Governance (requires OIG license)

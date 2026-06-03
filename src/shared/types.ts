@@ -94,7 +94,8 @@ export type ManagedResourceType =
   | 'features'
   | 'pushProviders'
   | 'orgSettings'
-  | 'governance';
+  | 'governance'
+  | 'identitySources';
 
 export type OperationType = 'import' | 'create' | 'update' | 'full_lifecycle';
 
