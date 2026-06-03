@@ -558,6 +558,22 @@ data "okta_auth_server" "default" {
 #   description = "Request access to resources"
 # }
 `,
+  identitySources: `# ─── Identity Sources ───
+# Identity sources allow Okta to source user profiles from external systems (v6.11.0+)
+
+# Data source: look up an existing identity source
+# data "okta_identity_source" "example" {
+#   id = "<identity_source_id>"
+# }
+
+# Resource: manage an identity source
+# resource "okta_identity_source" "example" {
+#   name = "My Identity Source"
+#   type = "SAML2"
+#   # protocol and policy settings vary by source type
+#   # See: https://registry.terraform.io/providers/okta/okta/latest/docs/resources/identity_source
+# }
+`,
 };
 
 function generateResourcesTf(selectedResources: ManagedResourceType[], providerVersion: string): string | null {
