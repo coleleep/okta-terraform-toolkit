@@ -79,3 +79,32 @@ describe('v6.12.0 attribute notes', () => {
     expect(notes.some((n) => n.includes('keep_me_signed_in'))).toBe(true);
   });
 });
+
+describe('v6.12.0 data source entries', () => {
+  it('has okta_signon_policy_rule data source with sinceVersion 6.12.0', () => {
+    const entry = RESOURCE_DICTIONARY.find(
+      (r) => r.terraformResource === 'okta_signon_policy_rule' && r.description.toLowerCase().includes('data source'),
+    );
+    expect(entry).toBeDefined();
+    expect(entry!.parentType).toBe('policies');
+    expect(entry!.sinceVersion).toBe('6.12.0');
+  });
+
+  it('has okta_auth_server_policy_rule data source with sinceVersion 6.12.0', () => {
+    const entry = RESOURCE_DICTIONARY.find(
+      (r) => r.terraformResource === 'okta_auth_server_policy_rule' && r.description.toLowerCase().includes('data source'),
+    );
+    expect(entry).toBeDefined();
+    expect(entry!.parentType).toBe('authServers');
+    expect(entry!.sinceVersion).toBe('6.12.0');
+  });
+
+  it('has okta_assignees_users data source with sinceVersion 6.12.0', () => {
+    const entry = RESOURCE_DICTIONARY.find(
+      (r) => r.terraformResource === 'okta_assignees_users',
+    );
+    expect(entry).toBeDefined();
+    expect(entry!.parentType).toBe('users');
+    expect(entry!.sinceVersion).toBe('6.12.0');
+  });
+});
