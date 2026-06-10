@@ -362,7 +362,18 @@ export const VERSION_ATTRIBUTE_NOTES: Record<ProviderVersion, string[]> = {
     'okta_profile_mapping: terraform import support added',
     'okta_network_zone: diff suppression added (reduces false plan diffs)',
   ],
-  '6.12.0': [],
+  '6.12.0': [
+    'okta_app_oauth: backchannel_custom_authenticator_id attribute added (CIBA support)',
+    'okta_app_signon_policy_rules: keep_me_signed_in attribute added',
+    'New data source: okta_signon_policy_rule (read sign-on policy rules)',
+    'New data source: okta_auth_server_policy_rule (read auth server policy rules)',
+    'New data source: okta_assignees_users (list users assignable to a resource)',
+    'Provider: 429 retries deferred to SDK for DPoP requests (improved rate-limit handling for DPoP-bound traffic)',
+    'okta_idp_saml/social/oidc: nil pointer fix when accountLink.filter.groups is null',
+    'okta_authenticator: WebAuthn update validation error fixed',
+    'okta_policy_password: groups_included field is now respected',
+    'okta_app_signon_policy_rules: now works in orgs without Risk Scoring enabled',
+  ],
 };
 
 /**

@@ -57,3 +57,25 @@ describe('v6.12.0 resource additions', () => {
     expect(additions.some((a) => a.config.includes('backchannel_custom_authenticator_id'))).toBe(true);
   });
 });
+
+describe('v6.12.0 attribute notes', () => {
+  it('has VERSION_ATTRIBUTE_NOTES entry for 6.12.0', () => {
+    expect(VERSION_ATTRIBUTE_NOTES['6.12.0']).toBeDefined();
+    expect(VERSION_ATTRIBUTE_NOTES['6.12.0'].length).toBeGreaterThan(0);
+  });
+
+  it('mentions DPoP rate limit deferral in 6.12.0 notes', () => {
+    const notes = VERSION_ATTRIBUTE_NOTES['6.12.0'];
+    expect(notes.some((n) => /DPoP/i.test(n))).toBe(true);
+  });
+
+  it('mentions backchannel_custom_authenticator_id in 6.12.0 notes', () => {
+    const notes = VERSION_ATTRIBUTE_NOTES['6.12.0'];
+    expect(notes.some((n) => n.includes('backchannel_custom_authenticator_id'))).toBe(true);
+  });
+
+  it('mentions keep_me_signed_in in 6.12.0 notes', () => {
+    const notes = VERSION_ATTRIBUTE_NOTES['6.12.0'];
+    expect(notes.some((n) => n.includes('keep_me_signed_in'))).toBe(true);
+  });
+});
