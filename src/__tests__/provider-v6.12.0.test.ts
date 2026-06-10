@@ -25,3 +25,35 @@ describe('v6.12.0 version registration', () => {
     expect(isAvailableIn('6.12.0', '6.11.0')).toBe(false);
   });
 });
+
+describe('v6.12.0 resource additions', () => {
+  it('has VERSION_RESOURCE_ADDITIONS entry for 6.12.0', () => {
+    expect(VERSION_RESOURCE_ADDITIONS['6.12.0']).toBeDefined();
+    expect(VERSION_RESOURCE_ADDITIONS['6.12.0'].length).toBeGreaterThan(0);
+  });
+
+  it('has applications addition for 6.12.0 (CIBA + keep_me_signed_in)', () => {
+    const apps = VERSION_RESOURCE_ADDITIONS['6.12.0'].find((a) => a.type === 'applications');
+    expect(apps).toBeDefined();
+    expect(apps!.config).toMatch(/backchannel_custom_authenticator_id/);
+    expect(apps!.config).toMatch(/keep_me_signed_in/);
+  });
+
+  it('has policies addition for 6.12.0 (new policy rule data sources)', () => {
+    const policies = VERSION_RESOURCE_ADDITIONS['6.12.0'].find((a) => a.type === 'policies');
+    expect(policies).toBeDefined();
+    expect(policies!.config).toMatch(/okta_signon_policy_rule/);
+    expect(policies!.config).toMatch(/okta_auth_server_policy_rule/);
+  });
+
+  it('has users addition for 6.12.0 (assignees data source)', () => {
+    const users = VERSION_RESOURCE_ADDITIONS['6.12.0'].find((a) => a.type === 'users');
+    expect(users).toBeDefined();
+    expect(users!.config).toMatch(/okta_assignees_users/);
+  });
+
+  it('getAdditionsForVersion includes 6.12.0 additions when version is 6.12.0', () => {
+    const additions = getAdditionsForVersion('6.12.0');
+    expect(additions.some((a) => a.config.includes('backchannel_custom_authenticator_id'))).toBe(true);
+  });
+});

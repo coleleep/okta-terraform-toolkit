@@ -274,7 +274,54 @@ export const VERSION_RESOURCE_ADDITIONS: Record<ProviderVersion, { type: string;
     },
   ],
 
-  '6.12.0': [],
+  '6.12.0': [
+    {
+      type: 'applications',
+      config: `
+# CIBA backchannel authenticator support (v6.12.0+)
+# resource "okta_app_oauth" "ciba_app" {
+#   label                                 = "CIBA App"
+#   type                                  = "service"
+#   grant_types                           = ["urn:openid:params:grant-type:ciba"]
+#   backchannel_custom_authenticator_id   = okta_authenticator.custom.id
+# }
+
+# Stay-signed-in option on app sign-on policy rule (v6.12.0+)
+# resource "okta_app_signon_policy_rules" "example" {
+#   policy_id          = okta_app_signon_policy.example.id
+#   name               = "Default Rule"
+#   keep_me_signed_in  = true   # Allow users to stay signed in (v6.12.0+)
+# }
+`,
+    },
+    {
+      type: 'policies',
+      config: `
+# New data source: read existing sign-on policy rule by ID (v6.12.0+)
+# data "okta_signon_policy_rule" "existing" {
+#   policy_id = "<policy_id>"
+#   id        = "<rule_id>"
+# }
+
+# New data source: read existing auth server policy rule by ID (v6.12.0+)
+# data "okta_auth_server_policy_rule" "existing" {
+#   auth_server_id = "<auth_server_id>"
+#   policy_id      = "<policy_id>"
+#   id             = "<rule_id>"
+# }
+`,
+    },
+    {
+      type: 'users',
+      config: `
+# New data source: list users assignable to a resource (v6.12.0+)
+# data "okta_assignees_users" "candidates" {
+#   resource_id   = "<resource_id>"
+#   resource_type = "APP"
+# }
+`,
+    },
+  ],
 };
 
 /**
