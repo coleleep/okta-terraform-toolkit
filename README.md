@@ -65,7 +65,7 @@ Produces production-ready Terraform files:
 
 ## Supported Provider Versions
 
-6.6.1 through 6.11.0 (default). Version-specific resource additions and attribute changes are tracked automatically.
+6.6.1 through 6.12.0 (default). Version-specific resource additions and attribute changes are tracked automatically.
 
 ## Getting Started
 

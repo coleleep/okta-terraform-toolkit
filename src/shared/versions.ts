@@ -1,6 +1,6 @@
-export const SUPPORTED_VERSIONS = ['6.6.1', '6.7.0', '6.8.0', '6.9.0', '6.10.0', '6.11.0'] as const;
+export const SUPPORTED_VERSIONS = ['6.6.1', '6.7.0', '6.8.0', '6.9.0', '6.10.0', '6.11.0', '6.12.0'] as const;
 export type ProviderVersion = (typeof SUPPORTED_VERSIONS)[number];
-export const DEFAULT_VERSION: ProviderVersion = '6.11.0';
+export const DEFAULT_VERSION: ProviderVersion = '6.12.0';
 
 /**
  * Compare two semver strings. Returns -1 if a < b, 0 if equal, 1 if a > b.
@@ -273,6 +273,55 @@ export const VERSION_RESOURCE_ADDITIONS: Record<ProviderVersion, { type: string;
 `,
     },
   ],
+
+  '6.12.0': [
+    {
+      type: 'applications',
+      config: `
+# CIBA backchannel authenticator support (v6.12.0+)
+# resource "okta_app_oauth" "ciba_app" {
+#   label                                 = "CIBA App"
+#   type                                  = "service"
+#   grant_types                           = ["urn:openid:params:grant-type:ciba"]
+#   backchannel_custom_authenticator_id   = okta_authenticator.custom.id
+# }
+
+# Stay-signed-in option on app sign-on policy rule (v6.12.0+)
+# resource "okta_app_signon_policy_rules" "example" {
+#   policy_id          = okta_app_signon_policy.example.id
+#   name               = "Default Rule"
+#   keep_me_signed_in  = true   # Allow users to stay signed in (v6.12.0+)
+# }
+`,
+    },
+    {
+      type: 'policies',
+      config: `
+# New data source: read existing sign-on policy rule by ID (v6.12.0+)
+# data "okta_signon_policy_rule" "existing" {
+#   policy_id = "<policy_id>"
+#   id        = "<rule_id>"
+# }
+
+# New data source: read existing auth server policy rule by ID (v6.12.0+)
+# data "okta_auth_server_policy_rule" "existing" {
+#   auth_server_id = "<auth_server_id>"
+#   policy_id      = "<policy_id>"
+#   id             = "<rule_id>"
+# }
+`,
+    },
+    {
+      type: 'users',
+      config: `
+# New data source: list users assignable to a resource (v6.12.0+)
+# data "okta_assignees_users" "candidates" {
+#   resource_id   = "<resource_id>"
+#   resource_type = "APP"
+# }
+`,
+    },
+  ],
 };
 
 /**
@@ -312,6 +361,18 @@ export const VERSION_ATTRIBUTE_NOTES: Record<ProviderVersion, string[]> = {
     'okta_user: computed timestamp fields added',
     'okta_profile_mapping: terraform import support added',
     'okta_network_zone: diff suppression added (reduces false plan diffs)',
+  ],
+  '6.12.0': [
+    'okta_app_oauth: backchannel_custom_authenticator_id attribute added (CIBA support)',
+    'okta_app_signon_policy_rules: keep_me_signed_in attribute added',
+    'New data source: okta_signon_policy_rule (read sign-on policy rules)',
+    'New data source: okta_auth_server_policy_rule (read auth server policy rules)',
+    'New data source: okta_assignees_users (list users assignable to a resource)',
+    'Provider: 429 retries deferred to SDK for DPoP requests (improved rate-limit handling for DPoP-bound traffic)',
+    'okta_idp_saml/social/oidc: nil pointer fix when accountLink.filter.groups is null',
+    'okta_authenticator: WebAuthn update validation error fixed',
+    'okta_policy_password: groups_included field is now respected',
+    'okta_app_signon_policy_rules: now works in orgs without Risk Scoring enabled',
   ],
 };
 

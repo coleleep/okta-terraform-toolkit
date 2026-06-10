@@ -221,6 +221,35 @@ export const RESOURCE_DICTIONARY: ResourceDictionaryEntry[] = [
     primaryEndpoint: '/api/v1/identity-sources',
     endpointLabel: 'Identity Sources',
   },
+
+  // ─── v6.12.0 data sources ───
+  {
+    terraformResource: 'okta_signon_policy_rule',
+    description: 'Look up an existing sign-on policy rule data source',
+    parentType: 'policies',
+    parentLabel: 'Policies',
+    sinceVersion: '6.12.0',
+    primaryEndpoint: '/api/v1/policies',
+    endpointLabel: 'Policies',
+  },
+  {
+    terraformResource: 'okta_auth_server_policy_rule',
+    description: 'Look up an existing auth server policy rule data source',
+    parentType: 'authServers',
+    parentLabel: 'Auth Servers',
+    sinceVersion: '6.12.0',
+    primaryEndpoint: '/api/v1/authorizationServers',
+    endpointLabel: 'Auth Servers',
+  },
+  {
+    terraformResource: 'okta_assignees_users',
+    description: 'List users assignable to a resource data source',
+    parentType: 'users',
+    parentLabel: 'Users',
+    sinceVersion: '6.12.0',
+    primaryEndpoint: '/api/v1/users',
+    endpointLabel: 'Users',
+  },
 ];
 
 /**
