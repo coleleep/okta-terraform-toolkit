@@ -14,8 +14,8 @@ describe('v6.11.0 version registration', () => {
     expect(SUPPORTED_VERSIONS).toContain('6.11.0');
   });
 
-  it('sets DEFAULT_VERSION to 6.11.0', () => {
-    expect(DEFAULT_VERSION).toBe('6.11.0');
+  it('6.11.0 remains in SUPPORTED_VERSIONS after newer releases', () => {
+    expect(SUPPORTED_VERSIONS).toContain('6.11.0');
   });
 
   it('has VERSION_RESOURCE_ADDITIONS entry for 6.11.0', () => {
