@@ -1,6 +1,6 @@
-export const SUPPORTED_VERSIONS = ['6.6.1', '6.7.0', '6.8.0', '6.9.0', '6.10.0', '6.11.0'] as const;
+export const SUPPORTED_VERSIONS = ['6.6.1', '6.7.0', '6.8.0', '6.9.0', '6.10.0', '6.11.0', '6.12.0'] as const;
 export type ProviderVersion = (typeof SUPPORTED_VERSIONS)[number];
-export const DEFAULT_VERSION: ProviderVersion = '6.11.0';
+export const DEFAULT_VERSION: ProviderVersion = '6.12.0';
 
 /**
  * Compare two semver strings. Returns -1 if a < b, 0 if equal, 1 if a > b.
@@ -273,6 +273,8 @@ export const VERSION_RESOURCE_ADDITIONS: Record<ProviderVersion, { type: string;
 `,
     },
   ],
+
+  '6.12.0': [],
 };
 
 /**
@@ -313,6 +315,7 @@ export const VERSION_ATTRIBUTE_NOTES: Record<ProviderVersion, string[]> = {
     'okta_profile_mapping: terraform import support added',
     'okta_network_zone: diff suppression added (reduces false plan diffs)',
   ],
+  '6.12.0': [],
 };
 
 /**
