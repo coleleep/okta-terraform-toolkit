@@ -2,8 +2,9 @@ process.env.NODE_TLS_REJECT_UNAUTHORIZED = '0';
 
 import Anthropic from '@anthropic-ai/sdk';
 import { app } from 'electron';
+import { homedir } from 'os';
 import { join } from 'path';
-import { readFileSync, writeFileSync, existsSync } from 'fs';
+import { readFileSync, writeFileSync, existsSync, unlinkSync } from 'fs';
 import { LogAnalysis, ClaudeInterpretation, CustomWorkloadEntry } from '../../shared/types';
 import { RESOURCE_DICTIONARY } from '../../shared/resource-dictionary';
 import { SCOPE_REQUIREMENTS, API_KEY_ONLY_ENDPOINTS } from '../../shared/scopes';
@@ -11,27 +12,67 @@ import { SUPPORTED_VERSIONS } from '../../shared/versions';
 
 // --- Claude Configuration Management ---
 
+export type ClaudeKeySource = 'ocm' | 'static';
+
 interface ClaudeConfig {
   apiKey: string;
   baseUrl?: string;
+  source?: ClaudeKeySource;
 }
 
 const CONFIG_FILE = 'claude-config.json';
 const LEGACY_KEY_FILE = 'claude-key.json';
+const LITELLM_BASE_URL = 'https://llm.atko.ai';
 
 function getConfigPath(): string {
   return join(app.getPath('userData'), CONFIG_FILE);
 }
 
+function getOcmKeyPath(): string {
+  return join(homedir(), '.config', 'ocm', 'litellm_key');
+}
+
+function readOcmKey(): string | null {
+  const ocmPath = getOcmKeyPath();
+  if (!existsSync(ocmPath)) return null;
+  try {
+    const raw = readFileSync(ocmPath, 'utf-8').trim();
+    return raw.length > 0 ? raw : null;
+  } catch {
+    return null;
+  }
+}
+
+export function getOcmStatus(): { fileExists: boolean; path: string } {
+  const ocmPath = getOcmKeyPath();
+  return { fileExists: existsSync(ocmPath), path: ocmPath };
+}
+
 export function getClaudeConfig(): ClaudeConfig | null {
+  // 1. Explicit static override saved through the UI wins (dev/troubleshooting path).
   const configPath = getConfigPath();
   if (existsSync(configPath)) {
     try {
       const data = JSON.parse(readFileSync(configPath, 'utf-8'));
-      if (data.apiKey) return data;
+      if (data.apiKey && data.source === 'static') {
+        return { apiKey: data.apiKey, baseUrl: data.baseUrl, source: 'static' };
+      }
     } catch { /* fall through */ }
   }
-  // Backward compat: read old claude-key.json
+
+  // 2. OCM-managed LiteLLM key — the default for internal Okta use.
+  const ocmKey = readOcmKey();
+  if (ocmKey) {
+    return { apiKey: ocmKey, baseUrl: LITELLM_BASE_URL, source: 'ocm' };
+  }
+
+  // 3. Legacy unmarked claude-config.json (pre-source field) and claude-key.json.
+  if (existsSync(configPath)) {
+    try {
+      const data = JSON.parse(readFileSync(configPath, 'utf-8'));
+      if (data.apiKey) return { apiKey: data.apiKey, baseUrl: data.baseUrl };
+    } catch { /* fall through */ }
+  }
   const legacyPath = join(app.getPath('userData'), LEGACY_KEY_FILE);
   if (existsSync(legacyPath)) {
     try {
@@ -39,19 +80,26 @@ export function getClaudeConfig(): ClaudeConfig | null {
       if (data.apiKey) return { apiKey: data.apiKey };
     } catch { /* fall through */ }
   }
+
+  // 4. Env var fallback (CI / dev).
   const envKey = process.env.CLAUDE_API_KEY;
   if (envKey) return { apiKey: envKey, baseUrl: process.env.CLAUDE_BASE_URL };
+
   return null;
 }
 
-export function setClaudeConfig(config: ClaudeConfig): void {
-  writeFileSync(getConfigPath(), JSON.stringify(config), 'utf-8');
+export function setClaudeConfig(config: { apiKey: string; baseUrl?: string }): void {
+  const payload: ClaudeConfig = {
+    apiKey: config.apiKey,
+    baseUrl: config.baseUrl,
+    source: 'static',
+  };
+  writeFileSync(getConfigPath(), JSON.stringify(payload), 'utf-8');
 }
 
 export function removeClaudeConfig(): void {
   const configPath = getConfigPath();
   if (existsSync(configPath)) {
-    const { unlinkSync } = require('fs');
     unlinkSync(configPath);
   }
 }
@@ -67,7 +115,11 @@ export function setApiKey(key: string): void {
 
 function getClient(): Anthropic {
   const config = getClaudeConfig();
-  if (!config?.apiKey) throw new Error('No Claude API key configured. Set your key in Settings.');
+  if (!config?.apiKey) {
+    throw new Error(
+      'No Claude API key found. Run `ocm install --helpers litellm` to bootstrap an OCM-managed key, or set a static key under Advanced settings.'
+    );
+  }
   return new Anthropic({
     apiKey: config.apiKey,
     timeout: 120000,

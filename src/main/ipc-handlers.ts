@@ -11,7 +11,7 @@ import { countResources } from './api/resource-counter';
 import { analyzeTargetRuntime } from './api/target-analyzer';
 import { probeSubResourceEndpoint } from './api/deep-probe';
 import { parseLogFile } from './api/log-parser';
-import { interpretLog, buildWorkload, decodeError, generateSolution, convertConfig, getApiKey, setApiKey, getClaudeConfig, setClaudeConfig, removeClaudeConfig } from './api/claude';
+import { interpretLog, buildWorkload, decodeError, generateSolution, convertConfig, getApiKey, setApiKey, getClaudeConfig, setClaudeConfig, removeClaudeConfig, getOcmStatus } from './api/claude';
 import { convertConfigDeterministic } from './api/sync-convert';
 import { parseStateFile, syncWithSubResources, buildSyncSummary, discoverSourceResources, discoverTargetResources, matchResources, fetchAttributeDiff, parseTfAttributesFromFiles } from './api/sync';
 import { logger, setLevel, getLevel } from './logger';
@@ -270,8 +270,17 @@ export function registerIpcHandlers() {
 
   ipcMain.handle('claude:get-config', () => {
     const config = getClaudeConfig();
-    if (!config) return { success: true, data: null };
-    return { success: true, data: { hasKey: true, baseUrl: config.baseUrl || '' } };
+    const ocm = getOcmStatus();
+    if (!config) return { success: true, data: { hasKey: false, ocm } };
+    return {
+      success: true,
+      data: {
+        hasKey: true,
+        baseUrl: config.baseUrl || '',
+        source: config.source ?? 'static',
+        ocm,
+      },
+    };
   });
 
   ipcMain.handle('claude:set-config', async (_event, config: { apiKey: string; baseUrl?: string }) => {
