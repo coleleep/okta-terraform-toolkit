@@ -12,3 +12,6 @@ dist/
 
 # Local agent working files (specs, plans)
 docs/superpowers/
+
+# Git worktrees
+.worktrees/
