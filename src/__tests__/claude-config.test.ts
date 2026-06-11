@@ -127,6 +127,30 @@ describe('setClaudeConfig', () => {
 });
 
 describe('removeClaudeConfig', () => {
+  it('clears legacy claude-key.json so OCM key is revealed', () => {
+    writeLegacyKey('sk-legacy');
+    writeOcmKey('sk-ocm');
+    const mod = load();
+
+    expect(mod.getClaudeConfig()?.source).toBe('ocm');
+
+    mod.removeClaudeConfig();
+
+    // legacy file should also be gone — nothing left to return except OCM
+    expect(mod.getClaudeConfig()).toEqual({
+      apiKey: 'sk-ocm',
+      baseUrl: 'https://llm.atko.ai',
+      source: 'ocm',
+    });
+  });
+
+  it('with no OCM key, removing legacy config returns null', () => {
+    writeLegacyKey('sk-legacy');
+    const mod = load();
+    mod.removeClaudeConfig();
+    expect(mod.getClaudeConfig()).toBeNull();
+  });
+
   it('clears static override and reveals OCM key on next read', () => {
     const mod = load();
     mod.setClaudeConfig({ apiKey: 'sk-user-set' });

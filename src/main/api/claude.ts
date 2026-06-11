@@ -102,6 +102,10 @@ export function removeClaudeConfig(): void {
   if (existsSync(configPath)) {
     unlinkSync(configPath);
   }
+  const legacyPath = join(app.getPath('userData'), LEGACY_KEY_FILE);
+  if (existsSync(legacyPath)) {
+    unlinkSync(legacyPath);
+  }
 }
 
 export function getApiKey(): string | null {
