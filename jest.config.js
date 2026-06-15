@@ -1,8 +1,7 @@
 module.exports = {
   preset: 'ts-jest',
   testEnvironment: 'node',
-  testMatch: ['**/src/__tests__/**/*.test.ts'],
-  testPathIgnorePatterns: ['/node_modules/', '/.worktrees/'],
+  testMatch: ['<rootDir>/src/__tests__/**/*.test.ts'],
   moduleFileExtensions: ['ts', 'tsx', 'js'],
   transform: {
     '^.+\\.tsx?$': ['ts-jest', { tsconfig: 'tsconfig.json' }],

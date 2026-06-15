@@ -73,9 +73,15 @@ export default function LogAnalyzer() {
     return (
       <div>
         <h1 className="text-lg font-bold text-okta-navy mb-2">TF_LOG Analyzer</h1>
-        <p className="text-xs text-gray-500 mb-6">
+        <p className="text-xs text-gray-500 mb-4">
           Load a Terraform debug log (<code className="bg-gray-100 px-1 rounded">TF_LOG=DEBUG</code>) to analyze rate limit behavior, identify bottlenecks, and get optimization recommendations.
         </p>
+        <div className="flex items-start gap-2.5 bg-amber-950/20 border border-amber-600/30 rounded-lg px-3.5 py-3 mb-5">
+          <span className="text-amber-400 text-sm mt-0.5 shrink-0">⚠</span>
+          <p className="text-[11px] text-amber-300/80 leading-relaxed">
+            <span className="font-semibold text-amber-400">No PII.</span> Debug logs may contain SSWS tokens, Bearer tokens, org URLs, and user IDs. Remove sensitive data before uploading. Log contents are sent to the AI for analysis.
+          </p>
+        </div>
         <button
           onClick={handleOpen}
           className="w-full py-12 border-2 border-dashed border-gray-300 rounded-xl hover:border-okta-blue hover:bg-blue-50/30 transition-colors cursor-pointer"

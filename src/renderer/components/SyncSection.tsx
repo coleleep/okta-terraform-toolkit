@@ -146,6 +146,7 @@ export default function SyncSection() {
   const [rollbackLines, setRollbackLines] = useState<string[]>([]);
   const [rollbackError, setRollbackError] = useState<string | null>(null);
   const [showRollback, setShowRollback] = useState(false);
+  const [warningsCollapsed, setWarningsCollapsed] = useState(false);
   const rollbackOutputRef = useRef<HTMLDivElement>(null);
 
   const hasTfFiles = Object.keys(tfFiles).length > 0;
@@ -1314,8 +1315,22 @@ export default function SyncSection() {
           </div>
 
           {converted.warnings.length > 0 && (
-            <div className="text-[11px] text-amber-400 space-y-0.5">
-              {converted.warnings.map((w, i) => <div key={i}>⚠ {w}</div>)}
+            <div>
+              <button
+                type="button"
+                onClick={() => setWarningsCollapsed(c => !c)}
+                className="flex items-center gap-1.5 text-[11px] text-amber-400 hover:text-amber-300 mb-1"
+              >
+                <svg width="10" height="10" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.8" className={`transition-transform ${warningsCollapsed ? '' : 'rotate-90'}`}>
+                  <path d="M4 2l4 4-4 4" />
+                </svg>
+                ⚠ {converted.warnings.length} warning{converted.warnings.length !== 1 ? 's' : ''}
+              </button>
+              {!warningsCollapsed && (
+                <div className="text-[11px] text-amber-400/80 space-y-0.5 pl-4">
+                  {converted.warnings.map((w, i) => <div key={i}>{w}</div>)}
+                </div>
+              )}
             </div>
           )}
 
