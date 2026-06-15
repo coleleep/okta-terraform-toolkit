@@ -32,10 +32,11 @@ function getConfigPath(): string {
 
 function runOcmAuth(): string | null {
   try {
-    const result = spawnSync('ocm', ['auth', 'litellm', '--quiet'], {
+    const result = spawnSync('ocm', ['auth', 'litellm'], {
       encoding: 'utf-8',
       timeout: 5000,
       env: { ...process.env, PATH: OCM_PATH },
+      stdio: ['ignore', 'pipe', 'ignore'],
     });
     if (result.status !== 0 || !result.stdout) return null;
     const token = result.stdout.trim();
