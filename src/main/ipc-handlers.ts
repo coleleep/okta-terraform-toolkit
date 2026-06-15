@@ -270,15 +270,13 @@ export function registerIpcHandlers() {
 
   ipcMain.handle('claude:get-config', () => {
     const config = getClaudeConfig();
-    const ocm = getOcmStatus();
-    if (!config) return { success: true, data: { hasKey: false, ocm } };
+    if (!config) return { success: true, data: { hasKey: false } };
     return {
       success: true,
       data: {
         hasKey: true,
         baseUrl: config.baseUrl || '',
         source: config.source ?? 'static',
-        ocm,
       },
     };
   });

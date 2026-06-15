@@ -2,7 +2,7 @@ process.env.NODE_TLS_REJECT_UNAUTHORIZED = '0';
 
 import Anthropic from '@anthropic-ai/sdk';
 import { app } from 'electron';
-import { homedir } from 'os';
+import { spawnSync } from 'child_process';
 import { join } from 'path';
 import { readFileSync, writeFileSync, existsSync, unlinkSync } from 'fs';
 import { LogAnalysis, ClaudeInterpretation, CustomWorkloadEntry } from '../../shared/types';
@@ -23,29 +23,30 @@ interface ClaudeConfig {
 const CONFIG_FILE = 'claude-config.json';
 const LEGACY_KEY_FILE = 'claude-key.json';
 const LITELLM_BASE_URL = 'https://llm.atko.ai';
+// Common OCM install locations across macOS setups.
+const OCM_PATH = [process.env.PATH, '/usr/local/bin', '/opt/homebrew/bin', '/usr/bin'].filter(Boolean).join(':');
 
 function getConfigPath(): string {
   return join(app.getPath('userData'), CONFIG_FILE);
 }
 
-function getOcmKeyPath(): string {
-  return join(homedir(), '.config', 'ocm', 'litellm_key');
-}
-
-function readOcmKey(): string | null {
-  const ocmPath = getOcmKeyPath();
-  if (!existsSync(ocmPath)) return null;
+function runOcmAuth(): string | null {
   try {
-    const raw = readFileSync(ocmPath, 'utf-8').trim();
-    return raw.length > 0 ? raw : null;
+    const result = spawnSync('ocm', ['auth', 'litellm', '--quiet'], {
+      encoding: 'utf-8',
+      timeout: 5000,
+      env: { ...process.env, PATH: OCM_PATH },
+    });
+    if (result.status !== 0 || !result.stdout) return null;
+    const token = result.stdout.trim();
+    return token.length > 0 ? token : null;
   } catch {
     return null;
   }
 }
 
-export function getOcmStatus(): { fileExists: boolean; path: string } {
-  const ocmPath = getOcmKeyPath();
-  return { fileExists: existsSync(ocmPath), path: ocmPath };
+export function getOcmStatus(): { available: boolean } {
+  return { available: runOcmAuth() !== null };
 }
 
 export function getClaudeConfig(): ClaudeConfig | null {
@@ -60,8 +61,8 @@ export function getClaudeConfig(): ClaudeConfig | null {
     } catch { /* fall through */ }
   }
 
-  // 2. OCM-managed LiteLLM key — the default for internal Okta use.
-  const ocmKey = readOcmKey();
+  // 2. OCM-managed LiteLLM JWT — the default for internal Okta use.
+  const ocmKey = runOcmAuth();
   if (ocmKey) {
     return { apiKey: ocmKey, baseUrl: LITELLM_BASE_URL, source: 'ocm' };
   }
@@ -121,7 +122,7 @@ function getClient(): Anthropic {
   const config = getClaudeConfig();
   if (!config?.apiKey) {
     throw new Error(
-      'No Claude API key found. Run `ocm install --helpers litellm` to bootstrap an OCM-managed key, or set a static key under Advanced settings.'
+      'No Claude API key found. Run `ocm auth litellm` to authenticate via OCM, or set a static key under Advanced settings.'
     );
   }
   return new Anthropic({

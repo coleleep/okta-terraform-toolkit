@@ -165,7 +165,7 @@ export default function SettingsModal({ onClose }: Props) {
           <span className="text-sm text-text-secondary">No AI key configured</span>
         </div>
         <div className="text-xs text-text-muted leading-relaxed">
-          Run <code className="font-mono bg-surface-3 px-1.5 py-0.5 rounded text-text-secondary">ocm install --helpers litellm</code> in your terminal, then click Reload — or open Advanced settings to configure a static key.
+          Run <code className="font-mono bg-surface-3 px-1.5 py-0.5 rounded text-text-secondary">ocm auth litellm</code> in your terminal, then click Reload — or open Advanced settings to configure a static key.
         </div>
         <button type="button" onClick={refreshConfig} className="text-xs text-accent-teal hover:underline" disabled={saving}>
           Reload

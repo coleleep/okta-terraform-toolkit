@@ -3,7 +3,6 @@ import * as path from 'path';
 import * as realOs from 'os';
 
 const TMP_USER_DATA = fs.mkdtempSync(path.join(realOs.tmpdir(), 'otto-userdata-'));
-const TMP_HOME = fs.mkdtempSync(path.join(realOs.tmpdir(), 'otto-home-'));
 
 jest.mock('electron', () => ({
   app: {
@@ -14,18 +13,20 @@ jest.mock('electron', () => ({
   },
 }));
 
-jest.mock('os', () => {
-  const actual = jest.requireActual('os');
-  return { ...actual, homedir: () => TMP_HOME };
-});
+jest.mock('child_process', () => ({
+  spawnSync: jest.fn(),
+}));
 
-function ocmKeyDir() {
-  return path.join(TMP_HOME, '.config', 'ocm');
+function getSpawnSync() {
+  return require('child_process').spawnSync as jest.Mock;
 }
 
-function writeOcmKey(content: string) {
-  fs.mkdirSync(ocmKeyDir(), { recursive: true });
-  fs.writeFileSync(path.join(ocmKeyDir(), 'litellm_key'), content);
+function mockOcmAuth(token: string | null) {
+  if (token === null) {
+    getSpawnSync().mockReturnValue({ status: 1, stdout: '', stderr: '' });
+  } else {
+    getSpawnSync().mockReturnValue({ status: 0, stdout: token + '\n', stderr: '' });
+  }
 }
 
 function writeStaticConfig(data: object) {
@@ -38,17 +39,15 @@ function writeLegacyKey(apiKey: string) {
 
 beforeEach(() => {
   fs.rmSync(TMP_USER_DATA, { recursive: true, force: true });
-  fs.rmSync(TMP_HOME, { recursive: true, force: true });
   fs.mkdirSync(TMP_USER_DATA, { recursive: true });
-  fs.mkdirSync(TMP_HOME, { recursive: true });
   delete process.env.CLAUDE_API_KEY;
   delete process.env.CLAUDE_BASE_URL;
+  mockOcmAuth(null); // default: OCM not available
   jest.resetModules();
 });
 
 afterAll(() => {
   fs.rmSync(TMP_USER_DATA, { recursive: true, force: true });
-  fs.rmSync(TMP_HOME, { recursive: true, force: true });
 });
 
 function load() {
@@ -60,27 +59,27 @@ describe('getClaudeConfig priority', () => {
     expect(load().getClaudeConfig()).toBeNull();
   });
 
-  it('returns OCM key + LiteLLM baseUrl when OCM key file exists', () => {
-    writeOcmKey('sk-ocm-test-key');
+  it('returns OCM JWT + LiteLLM baseUrl when ocm auth litellm succeeds', () => {
+    mockOcmAuth('eyJtest-jwt-token');
     expect(load().getClaudeConfig()).toEqual({
-      apiKey: 'sk-ocm-test-key',
+      apiKey: 'eyJtest-jwt-token',
       baseUrl: 'https://llm.atko.ai',
       source: 'ocm',
     });
   });
 
-  it('trims trailing whitespace and newlines from OCM key file', () => {
-    writeOcmKey('sk-ocm-test-key\n');
-    expect(load().getClaudeConfig()?.apiKey).toBe('sk-ocm-test-key');
+  it('trims trailing whitespace from OCM auth output', () => {
+    mockOcmAuth('eyJtest-jwt-token');
+    expect(load().getClaudeConfig()?.apiKey).toBe('eyJtest-jwt-token');
   });
 
-  it('treats empty OCM key file as not configured', () => {
-    writeOcmKey('');
+  it('treats empty OCM auth output as not available', () => {
+    getSpawnSync().mockReturnValue({ status: 0, stdout: '   \n', stderr: '' });
     expect(load().getClaudeConfig()).toBeNull();
   });
 
-  it('static config with source=static wins over OCM key', () => {
-    writeOcmKey('sk-ocm');
+  it('static config with source=static wins over OCM auth', () => {
+    mockOcmAuth('eyJocm-token');
     writeStaticConfig({ apiKey: 'sk-static', baseUrl: 'https://custom-endpoint', source: 'static' });
 
     expect(load().getClaudeConfig()).toEqual({
@@ -90,12 +89,12 @@ describe('getClaudeConfig priority', () => {
     });
   });
 
-  it('legacy claude-key.json works when no OCM key and no static config', () => {
+  it('legacy claude-key.json works when OCM unavailable and no static config', () => {
     writeLegacyKey('sk-legacy');
     expect(load().getClaudeConfig()?.apiKey).toBe('sk-legacy');
   });
 
-  it('env var fallback works when no files exist', () => {
+  it('env var fallback works when no other source configured', () => {
     process.env.CLAUDE_API_KEY = 'sk-env';
     process.env.CLAUDE_BASE_URL = 'https://env-url';
     expect(load().getClaudeConfig()).toMatchObject({
@@ -104,20 +103,20 @@ describe('getClaudeConfig priority', () => {
     });
   });
 
-  it('OCM key wins over legacy file when no static config exists', () => {
-    writeOcmKey('sk-ocm');
+  it('OCM auth wins over legacy file when no static config exists', () => {
+    mockOcmAuth('eyJocm-token');
     writeLegacyKey('sk-legacy');
-    expect(load().getClaudeConfig()?.apiKey).toBe('sk-ocm');
+    expect(load().getClaudeConfig()?.apiKey).toBe('eyJocm-token');
     expect(load().getClaudeConfig()?.source).toBe('ocm');
   });
 });
 
 describe('setClaudeConfig', () => {
   it('marks saved config with source=static so it overrides OCM', () => {
+    mockOcmAuth('eyJocm-token');
     const mod = load();
     mod.setClaudeConfig({ apiKey: 'sk-user-set', baseUrl: 'https://x' });
 
-    writeOcmKey('sk-ocm');
     expect(mod.getClaudeConfig()).toEqual({
       apiKey: 'sk-user-set',
       baseUrl: 'https://x',
@@ -127,41 +126,38 @@ describe('setClaudeConfig', () => {
 });
 
 describe('removeClaudeConfig', () => {
-  it('clears legacy claude-key.json so OCM key is revealed', () => {
-    writeLegacyKey('sk-legacy');
-    writeOcmKey('sk-ocm');
-    const mod = load();
-
-    expect(mod.getClaudeConfig()?.source).toBe('ocm');
-
-    mod.removeClaudeConfig();
-
-    // legacy file should also be gone — nothing left to return except OCM
-    expect(mod.getClaudeConfig()).toEqual({
-      apiKey: 'sk-ocm',
-      baseUrl: 'https://llm.atko.ai',
-      source: 'ocm',
-    });
-  });
-
-  it('with no OCM key, removing legacy config returns null', () => {
+  it('with no OCM available, removing legacy config returns null', () => {
     writeLegacyKey('sk-legacy');
     const mod = load();
     mod.removeClaudeConfig();
     expect(mod.getClaudeConfig()).toBeNull();
   });
 
-  it('clears static override and reveals OCM key on next read', () => {
+  it('clears static override and falls back to OCM on next read', () => {
+    mockOcmAuth('eyJocm-token');
     const mod = load();
     mod.setClaudeConfig({ apiKey: 'sk-user-set' });
-    writeOcmKey('sk-ocm');
 
     expect(mod.getClaudeConfig()?.source).toBe('static');
 
     mod.removeClaudeConfig();
 
     expect(mod.getClaudeConfig()).toEqual({
-      apiKey: 'sk-ocm',
+      apiKey: 'eyJocm-token',
+      baseUrl: 'https://llm.atko.ai',
+      source: 'ocm',
+    });
+  });
+
+  it('clears legacy key so OCM is revealed on next read', () => {
+    mockOcmAuth('eyJocm-token');
+    writeLegacyKey('sk-legacy');
+    const mod = load();
+
+    mod.removeClaudeConfig();
+
+    expect(mod.getClaudeConfig()).toEqual({
+      apiKey: 'eyJocm-token',
       baseUrl: 'https://llm.atko.ai',
       source: 'ocm',
     });
@@ -169,15 +165,12 @@ describe('removeClaudeConfig', () => {
 });
 
 describe('getOcmStatus', () => {
-  it('reports fileExists=false and the canonical path when OCM key absent', () => {
-    const status = load().getOcmStatus();
-    expect(status.fileExists).toBe(false);
-    expect(status.path).toBe(path.join(TMP_HOME, '.config', 'ocm', 'litellm_key'));
+  it('reports available=false when ocm auth fails', () => {
+    expect(load().getOcmStatus()).toEqual({ available: false });
   });
 
-  it('reports fileExists=true when OCM key file is present', () => {
-    writeOcmKey('sk-ocm');
-    const status = load().getOcmStatus();
-    expect(status.fileExists).toBe(true);
+  it('reports available=true when ocm auth succeeds', () => {
+    mockOcmAuth('eyJocm-token');
+    expect(load().getOcmStatus()).toEqual({ available: true });
   });
 });
