@@ -9,7 +9,7 @@ export default function ConnectOrgModal({ onClose }: Props) {
   const { connecting, connection, connect } = useStore();
   const [orgUrl, setOrgUrl] = useState('');
   const [token, setToken] = useState('');
-  const [submitError, setSubmitError] = useState<string | null>(connection.error ?? null);
+  const [submitError, setSubmitError] = useState<string | null>(null);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -34,8 +34,9 @@ export default function ConnectOrgModal({ onClose }: Props) {
           <h2 className="text-sm font-semibold text-text-primary">Connect to Org</h2>
           <button
             type="button"
-            onClick={onClose}
-            className="text-text-muted hover:text-text-secondary"
+            onClick={connecting ? undefined : onClose}
+            disabled={connecting}
+            className="text-text-muted hover:text-text-secondary disabled:opacity-40"
             aria-label="Close"
           >
             <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.5">

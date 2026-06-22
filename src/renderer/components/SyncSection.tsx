@@ -1060,7 +1060,7 @@ export default function SyncSection() {
                 {connection.connected ? (
                   <span className="text-xs text-green-400">✓ {connection.orgUrl}</span>
                 ) : (
-                  <span className="text-xs text-text-muted">Connect an org in the Connection panel above</span>
+                  <span className="text-xs text-text-muted">Connect to an org using the Connect Org button in the header.</span>
                 )}
               </div>
             );
