@@ -11,7 +11,7 @@ import CustomWorkload from './CustomWorkload';
 export default function ResourceSelector() {
   const {
     selectedResources, resourceCounts, counting, countingLabel,
-    operation, probeResult, providerVersion, customWorkloads,
+    operation, probeResult, providerVersion, customWorkloads, connection,
     toggleResource, setOperation, setManagedCount, fetchCounts, clearSelection,
   } = useStore();
 
@@ -164,7 +164,8 @@ export default function ResourceSelector() {
       <div className="flex items-center gap-3">
         <button
           onClick={fetchCounts}
-          disabled={!hasAnyWorkload || counting}
+          disabled={!hasAnyWorkload || counting || !connection.connected}
+          title={!connection.connected ? 'Connect to an org first' : undefined}
           className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
         >
           {counting
