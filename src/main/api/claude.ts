@@ -9,6 +9,7 @@ import { LogAnalysis, ClaudeInterpretation, CustomWorkloadEntry } from '../../sh
 import { RESOURCE_DICTIONARY } from '../../shared/resource-dictionary';
 import { SCOPE_REQUIREMENTS, API_KEY_ONLY_ENDPOINTS } from '../../shared/scopes';
 import { SUPPORTED_VERSIONS } from '../../shared/versions';
+import { redact } from './redact';
 
 // --- Claude Configuration Management ---
 
@@ -200,13 +201,14 @@ export async function interpretLog(analysis: LogAnalysis): Promise<ClaudeInterpr
   const client = getClient();
   const scopeContext = buildScopeContext();
 
+  const cleanAnalysis = redact(JSON.stringify(analysis, null, 2));
   const response = await client.messages.create({
     model: 'claude-sonnet-4-6',
     max_tokens: 1024,
     system: `${LOG_SYSTEM_PROMPT}\n\n${scopeContext}`,
     messages: [{
       role: 'user',
-      content: `Analyze this Terraform run:\n\n${JSON.stringify(analysis, null, 2)}\n\nRespond with the JSON object only.`,
+      content: `Analyze this Terraform run:\n\n${cleanAnalysis}\n\nRespond with the JSON object only.`,
     }],
   });
 
@@ -257,7 +259,7 @@ export async function buildWorkload(description: string): Promise<CustomWorkload
     system: WORKLOAD_SYSTEM_PROMPT,
     messages: [{
       role: 'user',
-      content: description,
+      content: redact(description),
     }],
     tool_choice: { type: 'any' },
     tools: [{
@@ -342,7 +344,7 @@ export async function decodeError(errorText: string): Promise<ErrorDecoderResult
     system: ERROR_DECODER_PROMPT,
     messages: [{
       role: 'user',
-      content: `Decode this Terraform/Okta error:\n\n${errorText}\n\nRespond with the JSON object only.`,
+      content: `Decode this Terraform/Okta error:\n\n${redact(errorText)}\n\nRespond with the JSON object only.`,
     }],
   });
 
@@ -431,7 +433,7 @@ export async function generateSolution(description: string, providerVersion: str
     system: SOLUTION_SYSTEM_PROMPT,
     messages: [{
       role: 'user',
-      content: `Provider version: ${providerVersion}\n\nUser request: ${description}`,
+      content: `Provider version: ${providerVersion}\n\nUser request: ${redact(description)}`,
     }],
     tool_choice: { type: 'any' },
     tools: [{
@@ -539,6 +541,9 @@ export async function convertConfig(
     }
   }
   const matchContext = matchLines.join('\n');
+  const cleanTfContent = redact(tfContent);
+  const cleanTargetOrgUrl = redact(targetOrgUrl);
+  const cleanMatchContext = redact(matchContext);
 
   const response = await client.messages.create({
     model: 'claude-sonnet-4-6',
@@ -649,7 +654,7 @@ resource "okta_auth_server_policy" "policy_2" {
 }`,
     messages: [{
       role: 'user',
-      content: `Target org: ${targetOrgUrl}\n\nResource mapping:\n${matchContext}\n\nOriginal .tf configuration:\n${tfContent}`,
+      content: `Target org: ${cleanTargetOrgUrl}\n\nResource mapping:\n${cleanMatchContext}\n\nOriginal .tf configuration:\n${cleanTfContent}`,
     }],
     tool_choice: { type: 'any' },
     tools: [{
