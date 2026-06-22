@@ -9,9 +9,11 @@ export default function ConnectOrgModal({ onClose }: Props) {
   const { connecting, connection, connect } = useStore();
   const [orgUrl, setOrgUrl] = useState('');
   const [token, setToken] = useState('');
+  const [submitError, setSubmitError] = useState<string | null>(null);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setSubmitError(null);
     let url = orgUrl.trim();
     if (!url.startsWith('https://') && !url.startsWith('http://')) {
       url = `https://${url}`;
@@ -19,17 +21,19 @@ export default function ConnectOrgModal({ onClose }: Props) {
     url = url.replace(/\/+$/, '');
     const success = await connect({ orgUrl: url, authMethod: 'token', token: token.trim() });
     if (success) onClose();
+    else setSubmitError(connection.error ?? 'Connection failed');
   };
 
   const isValid = orgUrl.trim().length > 0 && token.trim().length > 0;
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center">
-      <div className="absolute inset-0 bg-black/60" onClick={onClose} />
+      <div className="absolute inset-0 bg-black/60" onClick={connecting ? undefined : onClose} />
       <div className="relative bg-surface-1 border border-border rounded-xl w-full max-w-md mx-4 p-6">
         <div className="flex items-center justify-between mb-5">
           <h2 className="text-sm font-semibold text-text-primary">Connect to Org</h2>
           <button
+            type="button"
             onClick={onClose}
             className="text-text-muted hover:text-text-secondary"
             aria-label="Close"
@@ -75,9 +79,9 @@ export default function ConnectOrgModal({ onClose }: Props) {
             </p>
           </div>
 
-          {connection.error && (
+          {(submitError || connection.error) && (
             <div className="bg-accent-red/10 border border-accent-red/30 rounded-lg p-3 text-sm text-accent-red">
-              {connection.error}
+              {submitError || connection.error}
             </div>
           )}
 
