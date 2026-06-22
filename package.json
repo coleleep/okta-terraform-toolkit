@@ -1,6 +1,6 @@
 {
   "name": "okta-terraform-toolkit",
-  "version": "0.1.0",
+  "version": "1.0.0",
   "description": "Rate limit optimizer for the Okta Terraform provider",
   "main": "dist/main/index.js",
   "scripts": {
