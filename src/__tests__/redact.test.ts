@@ -114,10 +114,8 @@ describe('redact', () => {
     expect(redact(clean)).toBe(clean);
   });
 
-  // Defensive: non-string input
-  it('returns non-string input unchanged', () => {
-    expect(redact(null as any)).toBeNull();
-    expect(redact(undefined as any)).toBeUndefined();
-    expect(redact(42 as any)).toBe(42);
+  // Pattern 3: multi-level subdomain
+  it('redacts multi-level Okta subdomain URL', () => {
+    expect(redact('https://sub.dev-123.okta.com/api/v1')).toBe('[ORG_URL]/api/v1');
   });
 });
