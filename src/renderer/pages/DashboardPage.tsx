@@ -8,6 +8,7 @@ import DebugSection from '../components/DebugSection';
 import LearnSection from '../components/LearnSection';
 import SyncSection from '../components/SyncSection';
 import SettingsModal from '../components/SettingsModal';
+import ConnectOrgModal from '../components/ConnectOrgModal';
 import { SUPPORTED_VERSIONS } from '../../shared/versions';
 
 type Section = 'rate-limits' | 'plan' | 'sync' | 'debug' | 'learn';
@@ -63,14 +64,15 @@ const NAV_ITEMS: { id: Section; label: string }[] = [
 
 export default function DashboardPage() {
   const {
-    connection, probing, probeProgress, probeResult, recommendation,
+    connection, connecting, probing, probeProgress, probeResult, recommendation,
     selectedResources, resourceCounts,
     providerVersion, setProviderVersion,
     startProbe, disconnect,
   } = useStore();
 
-  const [activeSection, setActiveSection] = useState<Section>('rate-limits');
+  const [activeSection, setActiveSection] = useState<Section>('debug');
   const [showSettings, setShowSettings] = useState(false);
+  const [showConnect, setShowConnect] = useState(false);
   const [availableVersions, setAvailableVersions] = useState<string[]>([...SUPPORTED_VERSIONS]);
   const hasWorkload = selectedResources.length > 0 && resourceCounts.length > 0;
 
@@ -105,9 +107,11 @@ export default function DashboardPage() {
             <span className="text-text-primary font-bold text-sm tracking-[0.15em]">OTTO</span>
           </div>
           <div className="h-4 w-px bg-border" />
-          <span className="text-text-muted text-xs font-mono bg-surface-3 px-2.5 py-1 rounded">
-            {connection.orgUrl}
-          </span>
+          {connection.connected && (
+            <span className="text-text-muted text-xs font-mono bg-surface-3 px-2.5 py-1 rounded">
+              {connection.orgUrl}
+            </span>
+          )}
           <select
             value={providerVersion}
             onChange={(e) => setProviderVersion(e.target.value)}
@@ -129,19 +133,31 @@ export default function DashboardPage() {
               <path d="M13.5 8a5.5 5.5 0 01-.3 1.8l1.3.8-.9 1.5-1.4-.5a5.5 5.5 0 01-1.5 1l.1 1.5h-1.8l.1-1.5a5.5 5.5 0 01-1.5-1l-1.4.5-.9-1.5 1.3-.8A5.5 5.5 0 012.5 8a5.5 5.5 0 01.3-1.8l-1.3-.8.9-1.5 1.4.5a5.5 5.5 0 011.5-1L5.2 1.9H7l-.1 1.5a5.5 5.5 0 011.5 1l1.4-.5.9 1.5-1.3.8A5.5 5.5 0 0113.5 8z" />
             </svg>
           </button>
-          <button
-            onClick={startProbe}
-            disabled={probing}
-            className="px-3.5 py-1.5 text-xs font-medium bg-accent-teal/15 text-accent-teal hover:bg-accent-teal/25 disabled:opacity-40 rounded-lg transition-colors"
-          >
-            {probing ? 'Scanning...' : 'Re-scan'}
-          </button>
-          <button
-            onClick={disconnect}
-            className="px-3.5 py-1.5 text-xs font-medium text-text-muted hover:text-text-secondary bg-surface-3 hover:bg-surface-4 rounded-lg transition-colors"
-          >
-            Disconnect
-          </button>
+          {connection.connected ? (
+            <>
+              <button
+                onClick={startProbe}
+                disabled={probing}
+                className="px-3.5 py-1.5 text-xs font-medium bg-accent-teal/15 text-accent-teal hover:bg-accent-teal/25 disabled:opacity-40 rounded-lg transition-colors"
+              >
+                {probing ? 'Scanning...' : 'Re-scan'}
+              </button>
+              <button
+                onClick={disconnect}
+                className="px-3.5 py-1.5 text-xs font-medium text-text-muted hover:text-text-secondary bg-surface-3 hover:bg-surface-4 rounded-lg transition-colors"
+              >
+                Disconnect
+              </button>
+            </>
+          ) : (
+            <button
+              onClick={() => setShowConnect(true)}
+              disabled={connecting}
+              className="px-3.5 py-1.5 text-xs font-medium bg-accent-teal text-surface-0 hover:bg-accent-teal/90 disabled:opacity-40 rounded-lg transition-colors"
+            >
+              {connecting ? 'Connecting...' : 'Connect Org'}
+            </button>
+          )}
         </div>
       </header>
 
@@ -229,14 +245,27 @@ export default function DashboardPage() {
           )}
 
           {activeSection === 'rate-limits' && !probeResult && !probing && (
-            <div className="bg-surface-2 rounded-xl border border-border p-8 text-center">
-              <p className="text-text-secondary">Click "Re-scan" to probe your org's rate limits.</p>
+            <div className="bg-surface-2 rounded-xl border border-border p-8 text-center space-y-3">
+              {connection.connected ? (
+                <p className="text-text-secondary">Click "Re-scan" to probe your org's rate limits.</p>
+              ) : (
+                <>
+                  <p className="text-text-secondary">Connect to an org to probe rate limits.</p>
+                  <button
+                    onClick={() => setShowConnect(true)}
+                    className="px-4 py-2 text-xs font-medium bg-accent-teal text-surface-0 hover:bg-accent-teal/90 rounded-lg transition-colors"
+                  >
+                    Connect Org
+                  </button>
+                </>
+              )}
             </div>
           )}
         </main>
       </div>
 
       {showSettings && <SettingsModal onClose={() => setShowSettings(false)} />}
+      {showConnect && <ConnectOrgModal onClose={() => setShowConnect(false)} />}
     </div>
   );
 }
