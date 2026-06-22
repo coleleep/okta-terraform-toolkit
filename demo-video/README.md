@@ -7,6 +7,7 @@ This folder contains the hackathon demo presentation and supporting assets for O
 | File | Description |
 |------|-------------|
 | `presentation.html` | Self-contained slide deck (8 slides, no build step needed) |
+| `presentation-dev-support.html` | Support-focused slide deck for Developer Support engineers |
 | `Sync.mp4` | Demo video embedded in slide 5 — autoplays when the slide opens |
 | `config_example.png` | Screenshot of the Config tab (provider recommendations) |
 | `workload_example.png` | Screenshot of the Plan/Workload tab (auth, sizing, runtime) |
