@@ -9,7 +9,7 @@ export default function ConnectOrgModal({ onClose }: Props) {
   const { connecting, connection, connect } = useStore();
   const [orgUrl, setOrgUrl] = useState('');
   const [token, setToken] = useState('');
-  const [submitError, setSubmitError] = useState<string | null>(null);
+  const [submitError, setSubmitError] = useState<string | null>(connection.error ?? null);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();

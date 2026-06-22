@@ -106,11 +106,13 @@ export default function DashboardPage() {
             </svg>
             <span className="text-text-primary font-bold text-sm tracking-[0.15em]">OTTO</span>
           </div>
-          <div className="h-4 w-px bg-border" />
           {connection.connected && (
-            <span className="text-text-muted text-xs font-mono bg-surface-3 px-2.5 py-1 rounded">
-              {connection.orgUrl}
-            </span>
+            <>
+              <div className="h-4 w-px bg-border" />
+              <span className="text-text-muted text-xs font-mono bg-surface-3 px-2.5 py-1 rounded">
+                {connection.orgUrl}
+              </span>
+            </>
           )}
           <select
             value={providerVersion}
