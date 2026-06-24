@@ -8,7 +8,6 @@ For the full feature reference, see **[docs/FEATURES.md](docs/FEATURES.md)**.
 
 - Node.js 18+
 - npm
-- OCM (`ocm auth litellm` for AI features)
 
 ## Install & Run
 
@@ -28,7 +27,22 @@ npm run dev
 
 ## AI Features
 
-Run `ocm auth litellm` in your terminal before using AI-powered features. OTTO picks up your OCM-managed key automatically — click **Reload** on the AI Configuration card if it shows red.
+AI-powered features require a configured key. Two options:
+
+**Option 1 — OCM (recommended for Okta employees on macOS):**
+
+```bash
+ocm auth litellm
+```
+
+OTTO picks up your OCM-managed key automatically. Click **Reload** on the AI Configuration card if it shows red. Tokens refresh silently — no action needed after the initial auth.
+
+**Option 2 — Static API key (Windows or non-OCM users):**
+
+1. Obtain an API key for a compatible LLM endpoint (e.g., a direct Anthropic API key or a LiteLLM proxy key)
+2. In OTTO, open **Settings** → **Advanced settings**
+3. Enter your API key and optionally a custom endpoint URL
+4. Click **Save static override**
 
 ## Production Build
 
