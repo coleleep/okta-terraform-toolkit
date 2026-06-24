@@ -143,12 +143,13 @@ The header updates to show your org URL once connected. Click **Disconnect** to 
 6. Select which resources to include using the checkboxes (selective sync).
 7. Click **Proceed to Convert** — OTTO generates HCL with target org IDs substituted.
 8. Review the generated HCL and import blocks.
-9. Click **Export Project Files**, then click **Run Terraform** to run `terraform init`, `plan`, and `apply` in-app, or export the files to run manually.
+9. Click **Export Project Files** to save the generated Terraform files to a directory.
+10. Click **Run Terraform** to run `terraform init`, `plan`, and `apply` in-app against the exported files, or navigate to the exported directory to run manually.
 
 **Steps — File Upload Mode**
 
 1. Navigate to the **Sync** tab.
-2. Click **Upload Source Files** and select your `.tf` and `.tfstate` files.
+2. Click **Upload Files** and select your `.tf` and `.tfstate` files.
 3. Continue from step 3 in the Live Org steps above.
 
 **Tips**
@@ -174,7 +175,7 @@ The header updates to show your org URL once connected. Click **Disconnect** to 
 ocm auth litellm
 ```
 
-Open OTTO, go to **Settings**, and click **Reload** on the AI Configuration card. It should show green. Tokens refresh automatically.
+Open OTTO, go to **Settings**, and click **Reload** next to the AI status indicator. It should show green. Tokens refresh automatically.
 
 **Option 2 — Static API key (Windows or non-OCM users):**
 
