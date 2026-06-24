@@ -164,6 +164,8 @@ The header updates to show your org URL once connected. Click **Disconnect** to 
 
 **What it's for** — AI-powered features throughout OTTO accelerate workload analysis, config conversion, log interpretation, and error diagnosis.
 
+**Before you start** — An AI API key or OCM token is required. See Setup below.
+
 ### Setup
 
 **Option 1 — OCM (recommended for Okta employees on macOS):**
