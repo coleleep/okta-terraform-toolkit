@@ -2,7 +2,8 @@
 
 A desktop tool for Okta Support Engineers and employees. OTTO probes your org's API rate limits, recommends Terraform provider settings, and provides AI-assisted cross-org state migration.
 
-For the full feature reference, see **[docs/FEATURES.md](docs/FEATURES.md)**.
+For the full feature reference, see **[docs/FEATURES.md](docs/FEATURES.md)**.  
+For step-by-step how-to guides, see **[docs/USAGE.md](docs/USAGE.md)**.
 
 ## Prerequisites
 
