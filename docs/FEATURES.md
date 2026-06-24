@@ -14,6 +14,8 @@ OTTO tests 50+ Okta API endpoints (including sub-resource paths) and classifies 
 
 **Deep probe capability:** Tests not just primary endpoints but also sub-resource paths (e.g., users → user roles, app → app users) to catch hidden bottlenecks.
 
+→ [How to use: Rate Limit Probing](USAGE.md#rate-limit-probing)
+
 ### Cross-Org Sync
 
 Replicate Terraform-managed Okta configurations between orgs (e.g., dev → staging → prod, org migration, environment parity).
@@ -43,9 +45,13 @@ Replicate Terraform-managed Okta configurations between orgs (e.g., dev → stag
 - Provider version management — download, cache, and pin specific Okta provider versions
 - System zone and computed field exclusion to prevent apply errors
 
+→ [How to use: Cross-Org Sync](USAGE.md#cross-org-sync)
+
 ### Target Runtime Planner
 
 Specify a desired Terraform run duration (e.g., 30 minutes) and OTTO identifies which endpoints are bottlenecks, whether the target is achievable, and what limit increases would be needed.
+
+→ [How to use: Target Runtime Planner](USAGE.md#target-runtime-planner)
 
 ### Debug & Log Analysis
 
@@ -57,6 +63,8 @@ Comprehensive diagnostic tools for troubleshooting Terraform runs:
 - **Okta API error decoder** — translates native Okta API errors into remediation suggestions
 - **Request profiling** — visualizes which endpoints consumed the most time and capacity
 
+→ [How to use: Debug & Log Analysis](USAGE.md#debug--log-analysis)
+
 ### Code Generation
 
 Produces production-ready Terraform files with best-practice configurations:
@@ -66,6 +74,8 @@ Produces production-ready Terraform files with best-practice configurations:
 - **`variables.tf`** — input variables for authentication (API token or OAuth client credentials) with secure defaults
 - **Import blocks** — pre-generated import statements for state migration with correct hierarchical IDs
 - **Type-aware field mapping** — automatic camelCase → snake_case conversion with schema validation
+
+→ [How to use: Code Generation](USAGE.md#code-generation)
 
 ## Supported Provider Versions
 
@@ -176,6 +186,8 @@ If you need to point OTTO at a different endpoint or use a custom API key (e.g.,
 3. Click **Save static override** — this takes precedence over OCM until you click **Use OCM key**
 
 **Note:** Using a static key bypasses OCM token refresh. Monitor key expiration manually.
+
+→ [How to use: AI Features](USAGE.md#ai-features)
 
 ## Resource Coverage
 
