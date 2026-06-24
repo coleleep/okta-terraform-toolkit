@@ -46,7 +46,7 @@ The header updates to show your org URL once connected. Click **Disconnect** to 
 
 **Steps — TF_LOG Analysis**
 
-1. Navigate to the **Debug** tab (the default tab on launch), then select the **TF_LOG Analyzer** sub-tab.
+1. Navigate to the **Debug** tab (the default section on launch). The **Error Decoder** sub-tab loads by default — click **TF_LOG Analyzer** to switch to log analysis.
 2. Click to select a log file and choose your debug log.
 3. Review the parsed breakdown: per-endpoint request counts, rate-limit hits, and errors detected.
 4. Click **Explain with AI** for a plain-English explanation and recommended fixes.
@@ -66,15 +66,15 @@ The header updates to show your org URL once connected. Click **Disconnect** to 
 
 ## Rate Limit Probing
 
-**What it's for** — Measure how much rate limit capacity your org has across Terraform-relevant API endpoints. A probe runs automatically when you connect an org. Use the Rate Limits tab to review results and re-run at any time.
+**What it's for** — Measure how much rate limit capacity your org has across Terraform-relevant API endpoints. Use the Rate Limits tab to run and review probe results at any time.
 
 **Before you start** — Connect to the target org (see [Connecting an Org](#connecting-an-org)).
 
 **Steps**
 
-1. Connect to an org — the probe runs automatically on connection.
-2. Navigate to the **Rate Limits** tab to see the results table. Endpoints are color-coded by remaining capacity.
-3. Click **Re-scan** in the top-right header to re-run the probe at any time.
+1. Navigate to the **Rate Limits** tab and click **Re-scan** in the top-right header to run the initial probe.
+2. Review the results table. Endpoints are color-coded by remaining capacity.
+3. Click **Re-scan** again at any time to re-run the probe.
 4. To configure workload details and get provider recommendations, navigate to the **Plan** tab and select the **Workload** sub-tab.
 
 **Tips**
@@ -103,6 +103,7 @@ The header updates to show your org URL once connected. Click **Disconnect** to 
 - Generated config reflects the current probe results. Re-scan before exporting if your workload has changed significantly.
 - The `variables.tf` uses secure defaults. Review the authentication method section before applying in a new environment.
 - For an AI-generated complete solution from a plain-English description, use the **Solution Builder** sub-tab in the **Plan** tab instead.
+- The `resources.tf` and `imports.tf` tabs only appear after configuring a workload in **Plan > Workload**.
 
 ---
 
@@ -116,7 +117,7 @@ The header updates to show your org URL once connected. Click **Disconnect** to 
 
 1. Navigate to the **Plan** tab, then select **Target Planner**.
 2. Select a preset duration or enter a custom value (in minutes).
-3. Ensure your workload is configured — go to the **Workload** sub-tab and run **Count & Optimize** if you haven't already.
+3. Ensure your workload is configured — go to the **Workload** sub-tab and run **Count & Optimize** (or **Optimize** if using only custom workloads) if you haven't already.
 4. Click **Analyze for [N] min target** where [N] is your chosen duration.
 5. Review the bottleneck report: which endpoints are limiting you and what rate limit increases would be needed to hit your target.
 
@@ -150,7 +151,13 @@ The header updates to show your org URL once connected. Click **Disconnect** to 
 
 1. Navigate to the **Sync** tab.
 2. Click **Upload Files** and select your `.tf` and `.tfstate` files.
-3. Continue from step 3 in the Live Org steps above.
+3. Click **Run Sync Pipeline** to start processing the uploaded files.
+4. Review the **Match & Diff** view — resources are matched by name against the target org with field-level differences shown.
+5. Select which resources to include using the checkboxes (selective sync).
+6. Click **Proceed to Convert** — OTTO generates HCL with target org IDs substituted.
+7. Review the generated HCL and import blocks.
+8. Click **Export Project Files** to save the generated Terraform files to a directory.
+9. Click **Run Terraform** to run `terraform init`, `plan`, and `apply` in-app against the exported files, or navigate to the exported directory to run manually.
 
 **Tips**
 
@@ -175,7 +182,7 @@ The header updates to show your org URL once connected. Click **Disconnect** to 
 ocm auth litellm
 ```
 
-Open OTTO, go to **Settings**, and click **Reload** next to the AI status indicator. It should show green. Tokens refresh automatically.
+Open OTTO, go to **Settings**, and click **Reload** in the AI Settings modal. It should show green. Tokens refresh automatically.
 
 **Option 2 — Static API key (Windows or non-OCM users):**
 
