@@ -20,18 +20,20 @@ A step-by-step guide for each OTTO feature. If you are new to OTTO, start with [
 
 **What it's for** — Required before running probes, generating code, or syncing resources. You can launch OTTO and use the Debug tab without connecting first.
 
+**Before you start** — Have your org URL and a Super Admin API token ready.
+
 **Steps**
 
 1. Click **Connect Org** in the top-right header.
 2. Enter your org URL (e.g., `https://dev-123456.okta.com`).
 3. Enter a Super Admin API token.
-4. Click **Connect**.
+4. Click **Connect & Analyze**.
 
 The header updates to show your org URL once connected. Click **Disconnect** to switch orgs.
 
 **Tips**
 
-- The URL accepts with or without the `https://` prefix — OTTO normalizes it.
+- The URL field accepts input with or without the `https://` prefix — OTTO normalizes it.
 - Your token must be set to **100% rate limit capacity** or probe results will be inaccurate. See [API Token Rate Limit Violation](https://support.okta.com/help/s/article/API-Token-Rate-Limit-Violation?language=en_US) for how to adjust this.
 
 ---
@@ -42,13 +44,17 @@ The header updates to show your org URL once connected. Click **Disconnect** to 
 
 **Before you start** — No org connection required. Have your `TF_LOG` output file ready, or an Okta error message to decode.
 
-**Steps**
+**Steps — TF_LOG Analysis**
 
-1. Navigate to the **Debug** tab (the default tab on launch).
-2. Click **Upload Log File** and select your debug log.
+1. Navigate to the **Debug** tab (the default tab on launch), then select the **TF_LOG Analyzer** sub-tab.
+2. Click to select a log file and choose your debug log.
 3. Review the parsed breakdown: per-endpoint request counts, rate-limit hits, and errors detected.
-4. Click **Interpret with AI** for a plain-English explanation and recommended fixes.
-5. For standalone Okta API errors (not Terraform logs), use the **Error Decoder** panel: paste the error text and click **Decode**.
+4. Click **Explain with AI** for a plain-English explanation and recommended fixes.
+
+**Steps — Error Decoder**
+
+1. Navigate to the **Debug** tab, then select the **Error Decoder** sub-tab (this is the default sub-tab on load).
+2. Paste an Okta API error message and click **Decode**.
 
 **Tips**
 
@@ -60,23 +66,22 @@ The header updates to show your org URL once connected. Click **Disconnect** to 
 
 ## Rate Limit Probing
 
-**What it's for** — Measure how much rate limit capacity your org has across Terraform-relevant API endpoints, then get provider configuration recommendations tailored to your workload scale.
+**What it's for** — Measure how much rate limit capacity your org has across Terraform-relevant API endpoints. A probe runs automatically when you connect an org. Use the Rate Limits tab to review results and re-run at any time.
 
 **Before you start** — Connect to the target org (see [Connecting an Org](#connecting-an-org)).
 
 **Steps**
 
-1. Navigate to the **Rate Limits** tab.
-2. Describe your Terraform workload in the text box (e.g., `2,000 users, 50 groups, OAuth apps with user assignments`), or click **AI Workload Builder** to parse a plain-English description into resource selections.
-3. Click **Count & Optimize** to start the probe.
-4. Review the results table — endpoints are color-coded by remaining capacity.
-5. Read the generated provider configuration recommendations below the table.
+1. Connect to an org — the probe runs automatically on connection.
+2. Navigate to the **Rate Limits** tab to see the results table. Endpoints are color-coded by remaining capacity.
+3. Click **Re-scan** in the top-right header to re-run the probe at any time.
+4. To configure workload details and get provider recommendations, navigate to the **Plan** tab and select the **Workload** sub-tab.
 
 **Tips**
 
-- Enable **Deep Probe** to also test sub-resource paths (e.g., app → app users). This catches bottlenecks a basic probe misses.
+- Re-scan after major Terraform runs — remaining capacity changes.
 - Probe during off-peak hours or when no Terraform runs are active for the most accurate baseline.
-- Re-probe after major Terraform runs — remaining capacity changes.
+- The sidebar summary shows your bottleneck endpoint and probe stats at a glance.
 
 ---
 
@@ -88,14 +93,16 @@ The header updates to show your org URL once connected. Click **Disconnect** to 
 
 **Steps**
 
-1. After a probe completes in the **Rate Limits** tab, click **Generate Config**.
-2. Review the generated files in the preview pane.
-3. Click **Copy** or **Download** for each file you need.
+1. Navigate to the **Plan** tab, then select the **Export** sub-tab.
+2. Review the generated files — tabs across the top of the code block let you switch between `provider.tf`, `versions.tf`, `variables.tf`, and any resource or import files.
+3. Click **Copy File** to copy the currently visible file to your clipboard, or **Save File** to save it to disk.
+4. Click **Export Full Project** to save all generated files to a directory at once.
 
 **Tips**
 
-- Generated config reflects the current probe results. Re-probe before regenerating if your workload has changed significantly.
+- Generated config reflects the current probe results. Re-scan before exporting if your workload has changed significantly.
 - The `variables.tf` uses secure defaults. Review the authentication method section before applying in a new environment.
+- For an AI-generated complete solution from a plain-English description, use the **Solution Builder** sub-tab in the **Plan** tab instead.
 
 ---
 
@@ -107,10 +114,10 @@ The header updates to show your org URL once connected. Click **Disconnect** to 
 
 **Steps**
 
-1. Navigate to the **Plan** tab.
-2. Enter your desired run duration (e.g., `30 minutes`).
-3. Describe your workload (resource types and approximate counts).
-4. Click **Analyze**.
+1. Navigate to the **Plan** tab, then select **Target Planner**.
+2. Select a preset duration or enter a custom value (in minutes).
+3. Ensure your workload is configured — go to the **Workload** sub-tab and run **Count & Optimize** if you haven't already.
+4. Click **Analyze for [N] min target** where [N] is your chosen duration.
 5. Review the bottleneck report: which endpoints are limiting you and what rate limit increases would be needed to hit your target.
 
 **Tips**
@@ -126,17 +133,17 @@ The header updates to show your org URL once connected. Click **Disconnect** to 
 
 **Before you start** — Connect to the target org. For live mode, have a Super Admin API token for the source org. For file upload mode, have the source `.tf` and `.tfstate` files.
 
-**Steps — Live Org Mode**
+**Steps — Live Org Mode (Org Comparison)**
 
-1. Navigate to the **Sync** tab.
-2. Click **Connect Source Org** and enter the source org URL and API token.
-3. Select the resource types to sync.
-4. Click **Discover** — OTTO enumerates resources from the source org.
+1. Navigate to the **Sync** tab and select **Org Comparison** mode.
+2. Enter the source org URL and API token, then click **Connect**.
+3. Select the resource types to compare.
+4. Click **Run Comparison** — OTTO enumerates and compares resources between both orgs.
 5. Review the **Match & Diff** view — resources are matched by name against the target org with field-level differences shown.
 6. Select which resources to include using the checkboxes (selective sync).
-7. Click **Convert** — OTTO generates HCL with target org IDs substituted.
+7. Click **Proceed to Convert** — OTTO generates HCL with target org IDs substituted.
 8. Review the generated HCL and import blocks.
-9. Click **Apply** to run `terraform init`, `plan`, and `apply` in-app, or export the files to run manually.
+9. Click **Export Project Files**, then click **Run Terraform** to run `terraform init`, `plan`, and `apply` in-app, or export the files to run manually.
 
 **Steps — File Upload Mode**
 
@@ -149,7 +156,7 @@ The header updates to show your org URL once connected. Click **Disconnect** to 
 - Always review the Terraform plan before applying — use the in-app plan output to verify what will change.
 - OTTO saves a rollback bundle before each apply. Use it under **Rollback** if you need to undo.
 - Deterministic convert mode handles most ID substitutions without an AI key. AI conversion adds intelligence for complex cross-resource mappings.
-- Use the **Flip** button to swap source and target and verify parity in both directions.
+- Use the **swap** button (⇅) between the org panels to swap source and target and verify parity in both directions.
 
 ---
 
@@ -169,7 +176,7 @@ Open OTTO, go to **Settings**, and click **Reload** on the AI Configuration card
 
 **Option 2 — Static API key (Windows or non-OCM users):**
 
-1. In OTTO, open **Settings** → **Advanced settings**
+1. In OTTO, open **Settings**, then expand **Advanced settings**
 2. Enter your API key and optionally a custom endpoint URL
 3. Click **Save static override**
 
@@ -177,8 +184,8 @@ Open OTTO, go to **Settings**, and click **Reload** on the AI Configuration card
 
 | Feature | Tab | What it does |
 |---------|-----|--------------|
-| AI Workload Builder | Rate Limits | Parses a plain-English workload description into resource selections |
-| Solution Builder | Rate Limits | Analyzes probe results and suggests volume-specific optimizations |
+| AI Workload Builder | Plan (Workload) | Parses a plain-English workload description into resource selections |
+| Solution Builder | Plan | Generates a complete Terraform solution from a plain-English workload description |
 | Log Interpretation | Debug | Explains a failed Terraform run and gives remediation steps |
 | Error Decoder | Debug | Translates Okta API errors into actionable fixes |
 | AI Config Conversion | Sync | Regenerates HCL for the target org with correct IDs and attribute mapping |
