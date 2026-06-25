@@ -1,6 +1,7 @@
 import { app, BrowserWindow } from 'electron';
 import * as path from 'path';
 import { registerIpcHandlers } from './ipc-handlers';
+import { warmUpOcmAuth } from './api/claude';
 
 // Suppress EPIPE errors on stdout/stderr (Electron pipe closes before process exits)
 process.stdout?.on?.('error', (err: NodeJS.ErrnoException) => { if (err.code !== 'EPIPE') throw err; });
@@ -32,6 +33,12 @@ function createWindow() {
   // if (process.env.NODE_ENV === 'development') {
   //   mainWindow.webContents.openDevTools();
   // }
+
+  mainWindow.webContents.once('did-finish-load', () => {
+    warmUpOcmAuth().then(available => {
+      mainWindow?.webContents.send('claude:ocm-status', { available });
+    });
+  });
 
   mainWindow.on('closed', () => {
     mainWindow = null;

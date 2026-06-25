@@ -15,3 +15,4 @@ docs/superpowers/
 
 # Git worktrees
 .worktrees/
+.claude/usage-log.txt

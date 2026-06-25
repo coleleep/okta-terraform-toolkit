@@ -74,7 +74,15 @@ export default function DashboardPage() {
   const [showSettings, setShowSettings] = useState(false);
   const [showConnect, setShowConnect] = useState(false);
   const [availableVersions, setAvailableVersions] = useState<string[]>([...SUPPORTED_VERSIONS]);
+  const [ocmUnavailable, setOcmUnavailable] = useState(false);
   const hasWorkload = selectedResources.length > 0 && resourceCounts.length > 0;
+
+  useEffect(() => {
+    const unsub = (window.oktaTerraform as any).onOcmStatus(({ available }: { available: boolean }) => {
+      if (!available) setOcmUnavailable(true);
+    });
+    return unsub;
+  }, []);
 
   useEffect(() => {
     window.oktaTerraform.listProviderVersions().then((r: any) => {
@@ -162,6 +170,20 @@ export default function DashboardPage() {
           )}
         </div>
       </header>
+
+      {ocmUnavailable && (
+        <div className="flex items-center gap-2.5 bg-accent-amber/10 border-b border-accent-amber/30 px-5 py-2 flex-shrink-0">
+          <span className="text-accent-amber text-xs shrink-0">⚠</span>
+          <p className="text-xs text-accent-amber/90 flex-1">
+            OCM token expired — AI features won't work. Run <code className="font-mono bg-accent-amber/15 px-1 rounded">ocm auth litellm</code> in your terminal, then relaunch OTTO.
+          </p>
+          <button
+            onClick={() => setOcmUnavailable(false)}
+            className="text-accent-amber/60 hover:text-accent-amber/90 text-xs ml-2 shrink-0"
+            aria-label="Dismiss"
+          >✕</button>
+        </div>
+      )}
 
       <div className="flex flex-1 overflow-hidden">
         {/* ── Sidebar ────────────────────────────────────── */}

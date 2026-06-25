@@ -134,6 +134,13 @@ const api = {
   setSelectedProviderVersion: (version: string) =>
     ipcRenderer.invoke('provider:set-selected', { version }),
 
+  // OCM status push from main (fired once after startup warm-up)
+  onOcmStatus: (callback: (status: { available: boolean }) => void) => {
+    const handler = (_event: unknown, status: { available: boolean }) => callback(status);
+    ipcRenderer.on('claude:ocm-status', handler);
+    return () => ipcRenderer.removeListener('claude:ocm-status', handler);
+  },
+
   // Rollback
   saveRollback: (exportedDir: string, targetOrgUrl: string, providerVersion: string, exactProviderVersion?: string, swapped?: boolean, importedAddresses?: string[]) =>
     ipcRenderer.invoke('rollback:save-tf', { exportedDir, targetOrgUrl, providerVersion, exactProviderVersion, swapped, importedAddresses }),

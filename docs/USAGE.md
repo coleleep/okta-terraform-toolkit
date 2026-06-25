@@ -182,7 +182,7 @@ The header updates to show your org URL once connected. Click **Disconnect** to 
 ocm auth litellm
 ```
 
-Open OTTO, go to **Settings**, and click **Reload** in the AI Settings modal. It should show green. Tokens refresh automatically.
+Open OTTO — it checks your OCM token on startup. If the token is valid, AI features work immediately. If it's expired, an amber banner appears at the top of the window; re-run `ocm auth litellm` in your terminal and relaunch OTTO to clear it.
 
 **Option 2 — Static API key (Windows or non-OCM users):**
 

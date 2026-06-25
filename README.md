@@ -36,7 +36,7 @@ AI-powered features require a configured key. Two options:
 ocm auth litellm
 ```
 
-OTTO picks up your OCM-managed key automatically. Click **Reload** on the AI Configuration card if it shows red. Tokens refresh silently — no action needed after the initial auth.
+OTTO picks up your OCM-managed key automatically. On startup, OTTO checks your OCM token in the background — if it's expired, an amber banner will appear prompting you to re-run `ocm auth litellm` and relaunch.
 
 **Option 2 — Static API key (Windows or non-OCM users):**
 

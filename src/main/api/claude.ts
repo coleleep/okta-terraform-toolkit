@@ -26,12 +26,18 @@ const LEGACY_KEY_FILE = 'claude-key.json';
 const LITELLM_BASE_URL = 'https://llm.atko.ai';
 // Common OCM install locations across macOS setups.
 const OCM_PATH = [process.env.PATH, '/usr/local/bin', '/opt/homebrew/bin', '/usr/bin'].filter(Boolean).join(':');
+const OCM_TOKEN_TTL_MS = 15 * 60 * 1000;
+
+let ocmTokenCache: { value: string; fetchedAt: number } | null = null;
 
 function getConfigPath(): string {
   return join(app.getPath('userData'), CONFIG_FILE);
 }
 
 function runOcmAuth(): string | null {
+  if (ocmTokenCache && Date.now() - ocmTokenCache.fetchedAt < OCM_TOKEN_TTL_MS) {
+    return ocmTokenCache.value;
+  }
   try {
     const result = spawnSync('ocm', ['auth', 'litellm'], {
       encoding: 'utf-8',
@@ -41,10 +47,18 @@ function runOcmAuth(): string | null {
     });
     if (result.status !== 0 || !result.stdout) return null;
     const token = result.stdout.trim();
-    return token.length > 0 ? token : null;
+    if (token.length > 0) {
+      ocmTokenCache = { value: token, fetchedAt: Date.now() };
+      return token;
+    }
+    return null;
   } catch {
     return null;
   }
+}
+
+export function warmUpOcmAuth(): Promise<boolean> {
+  return new Promise(resolve => setImmediate(() => resolve(runOcmAuth() !== null)));
 }
 
 export function getOcmStatus(): { available: boolean } {
