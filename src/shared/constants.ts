@@ -68,7 +68,7 @@ export const STATUS_OK_THRESHOLD = 0.5;
 export const STATUS_WARNING_THRESHOLD = 0.1;
 
 // Resource type definitions for selection & counting
-// Covers all major resource categories in Okta Terraform Provider v6.11.0
+// Covers all major resource categories in Okta Terraform Provider v6.12.0
 export interface ResourceTypeDef {
   type: ManagedResourceType;
   label: string;
@@ -444,12 +444,6 @@ export const SUB_RESOURCE_SYNC_CONFIG: Record<string, SubResourceSyncDef> = {
   },
   // ─── Policy rules (level 1 — children of global policies) ───
   okta_policy_rule_signon: {
-    parentTerraformType: 'okta_policy_signon',
-    parentIdField: 'policy_id',
-    listEndpoint: '/api/v1/policies/{parentId}/rules',
-    level: 1,
-  },
-  okta_policy_rule_sign_on: {
     parentTerraformType: 'okta_policy_signon',
     parentIdField: 'policy_id',
     listEndpoint: '/api/v1/policies/{parentId}/rules',
