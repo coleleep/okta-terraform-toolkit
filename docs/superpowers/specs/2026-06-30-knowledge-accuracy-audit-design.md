@@ -301,6 +301,39 @@ Brief table of resources that only work on OIE orgs (device assurance policies, 
 
 ---
 
+---
+
+## v6.13.0 Coverage Checklist
+
+The CHANGELOG for v6.13.0 has two feature items. Both must be reflected in OTTO:
+
+| CHANGELOG item | Status |
+|---|---|
+| `okta_iam_resource_set` data source | In resource-dictionary ✅ (prior task). **Still needed:** `VERSION_RESOURCE_ADDITIONS['6.13.0']` customRoles entry (see below) |
+| `okta_label`, `okta_resource_owner`, `okta_resource_owners_catalog_resource` | In resource-dictionary ✅. In VERSION_RESOURCE_ADDITIONS governance entry ✅ (Section 1). HCL examples ✅ |
+
+**Add to `VERSION_RESOURCE_ADDITIONS['6.13.0']`** alongside the existing governance entry:
+
+```typescript
+{
+  type: 'customRoles',
+  config: `
+# IAM resource set data source (v6.13.0+)
+# data "okta_iam_resource_set" "example" {
+#   id = "<resource_set_id>"
+# }
+`,
+},
+```
+
+**`VERSION_ATTRIBUTE_NOTES['6.13.0']`** already includes `'New data source: okta_iam_resource_set'` ✅ — no change needed there.
+
+**Version constraint generation** — `getVersionConstraint('6.13.0')` already produces `~> 6.13.0` ✅. No change needed.
+
+**Default version** — `DEFAULT_VERSION = '6.13.0'` already flows to `useStore` initial state ✅. No change needed.
+
+---
+
 ## What's Not Changing
 
 - `src/shared/constants.ts` — `SUB_RESOURCE_SYNC_CONFIG` already uses correct resource names from earlier fix
