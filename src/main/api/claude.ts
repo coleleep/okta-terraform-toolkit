@@ -585,7 +585,7 @@ Sub-resource handling:
   - If the config uses a hardcoded auth_server_id, replace it with a reference to the parent resource
 - For okta_auth_server_policy_rule:
   - Preserve or replace both auth_server_id and policy_id with parent resource references
-- For global policy rules (okta_policy_rule_sign_on, okta_policy_rule_password, okta_policy_rule_mfa, okta_policy_rule_profile_enrollment):
+- For global policy rules (okta_policy_rule_signon, okta_policy_rule_password, okta_policy_rule_mfa, okta_policy_rule_profile_enrollment):
   - Replace hardcoded policy_id with a reference to the parent policy resource
 - For app assignments (okta_app_user, okta_app_group_assignment, okta_app_group_assignments):
   - Replace hardcoded app_id with a reference to the parent app resource
@@ -600,7 +600,7 @@ Import ID formats for sub-resources:
 - okta_auth_server_scope: auth_server_id/scope_id
 - okta_auth_server_claim: auth_server_id/claim_id
 - okta_auth_server_policy_rule: auth_server_id/policy_id/rule_id
-- okta_policy_rule_sign_on: policy_id/rule_id
+- okta_policy_rule_signon: policy_id/rule_id
 - okta_policy_rule_password: policy_id/rule_id
 - okta_policy_rule_mfa: policy_id/rule_id
 - okta_policy_rule_profile_enrollment: policy_id/rule_id
