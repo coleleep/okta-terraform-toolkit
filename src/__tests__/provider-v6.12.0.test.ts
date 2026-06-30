@@ -56,6 +56,14 @@ describe('v6.12.0 resource additions', () => {
     const additions = getAdditionsForVersion('6.12.0');
     expect(additions.some((a) => a.config.includes('backchannel_custom_authenticator_id'))).toBe(true);
   });
+
+  it('keep_me_signed_in in 6.12.0 applications config is a block (not boolean)', () => {
+    const apps = VERSION_RESOURCE_ADDITIONS['6.12.0'].find((a) => a.type === 'applications');
+    expect(apps).toBeDefined();
+    expect(apps!.config).not.toMatch(/keep_me_signed_in\s*=\s*true/);
+    expect(apps!.config).toContain('keep_me_signed_in {');
+    expect(apps!.config).toContain('post_auth');
+  });
 });
 
 describe('v6.12.0 attribute notes', () => {
@@ -77,6 +85,13 @@ describe('v6.12.0 attribute notes', () => {
   it('mentions keep_me_signed_in in 6.12.0 notes', () => {
     const notes = VERSION_ATTRIBUTE_NOTES['6.12.0'];
     expect(notes.some((n) => n.includes('keep_me_signed_in'))).toBe(true);
+  });
+
+  it('keep_me_signed_in note describes block fields', () => {
+    const notes = VERSION_ATTRIBUTE_NOTES['6.12.0'];
+    const kmsiNote = notes.find((n) => n.includes('keep_me_signed_in'));
+    expect(kmsiNote).toBeDefined();
+    expect(kmsiNote).toMatch(/block|post_auth/);
   });
 });
 

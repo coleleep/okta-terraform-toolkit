@@ -86,3 +86,59 @@ describe('identity source resource dictionary entries', () => {
     expect(entry!.sinceVersion).toBe('6.11.0');
   });
 });
+
+describe('v6.11.0 correct attribute names in HCL templates', () => {
+  it('does NOT use stay_signed_in_consent in applications config', () => {
+    const apps = VERSION_RESOURCE_ADDITIONS['6.11.0'].find((a) => a.type === 'applications');
+    expect(apps).toBeDefined();
+    expect(apps!.config).not.toContain('stay_signed_in_consent');
+  });
+
+  it('uses keep_me_signed_in block in applications config', () => {
+    const apps = VERSION_RESOURCE_ADDITIONS['6.11.0'].find((a) => a.type === 'applications');
+    expect(apps).toBeDefined();
+    expect(apps!.config).toContain('keep_me_signed_in');
+    expect(apps!.config).toContain('post_auth');
+    expect(apps!.config).toContain('post_auth_prompt_frequency');
+  });
+
+  it('does NOT use password_breached_action in policies config', () => {
+    const policies = VERSION_RESOURCE_ADDITIONS['6.11.0'].find((a) => a.type === 'policies');
+    expect(policies).toBeDefined();
+    expect(policies!.config).not.toContain('password_breached_action');
+  });
+
+  it('uses correct breached password attributes in policies config', () => {
+    const policies = VERSION_RESOURCE_ADDITIONS['6.11.0'].find((a) => a.type === 'policies');
+    expect(policies).toBeDefined();
+    expect(policies!.config).toContain('breached_password_logout_enabled');
+    expect(policies!.config).toContain('breached_password_expire_after_days');
+  });
+
+  it('includes okta_authenticator_webauthn_custom_aaguid example in authenticators config', () => {
+    const auth = VERSION_RESOURCE_ADDITIONS['6.11.0'].find((a) => a.type === 'authenticators');
+    expect(auth).toBeDefined();
+    expect(auth!.config).toContain('okta_authenticator_webauthn_custom_aaguid');
+    expect(auth!.config).toContain('okta_authenticator_method_webauthn');
+  });
+
+  it('VERSION_ATTRIBUTE_NOTES does not contain stay_signed_in_consent', () => {
+    const notes = VERSION_ATTRIBUTE_NOTES['6.11.0'];
+    expect(notes.some((n) => n.includes('stay_signed_in_consent'))).toBe(false);
+  });
+
+  it('VERSION_ATTRIBUTE_NOTES does not contain password_breached_action', () => {
+    const notes = VERSION_ATTRIBUTE_NOTES['6.11.0'];
+    expect(notes.some((n) => n.includes('password_breached_action'))).toBe(false);
+  });
+
+  it('VERSION_ATTRIBUTE_NOTES mentions keep_me_signed_in', () => {
+    const notes = VERSION_ATTRIBUTE_NOTES['6.11.0'];
+    expect(notes.some((n) => n.includes('keep_me_signed_in'))).toBe(true);
+  });
+
+  it('VERSION_ATTRIBUTE_NOTES mentions breached_password_logout_enabled', () => {
+    const notes = VERSION_ATTRIBUTE_NOTES['6.11.0'];
+    expect(notes.some((n) => n.includes('breached_password_logout_enabled'))).toBe(true);
+  });
+});
