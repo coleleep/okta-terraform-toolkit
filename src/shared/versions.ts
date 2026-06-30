@@ -238,14 +238,16 @@ export const VERSION_RESOURCE_ADDITIONS: Record<ProviderVersion, { type: string;
 # resource "okta_policy_password" "example" {
 #   name   = "Password Policy"
 #   status = "ACTIVE"
-#   password_breached_action = "WARN"  # NONE, WARN, or BLOCK
+#   breached_password_logout_enabled        = true  # terminate sessions immediately on breach
+#   breached_password_expire_after_days     = 0      # 0 = immediate expiry; range 0–10
+#   breached_password_delegated_workflow_id = ""     # optional: Okta Workflow ID to trigger
 # }
 `,
     },
     {
       type: 'authenticators',
       config: `
-# WebAuthn custom AAGUID support (v6.11.0+)
+# WebAuthn authenticator with custom AAGUID groups (v6.11.0+)
 # resource "okta_authenticator" "webauthn" {
 #   key    = "webauthn"
 #   name   = "WebAuthn"
@@ -260,6 +262,21 @@ export const VERSION_RESOURCE_ADDITIONS: Record<ProviderVersion, { type: string;
 #     ]
 #   })
 # }
+#
+# Manage individual AAGUID allowlist entries (v6.11.0+)
+# resource "okta_authenticator_webauthn_custom_aaguid" "yubikey" {
+#   authenticator_id = okta_authenticator.webauthn.id
+#   aaguid           = "fa2b99dc-9e39-4257-8f92-4a30d23c4118"
+#   name             = "YubiKey 5"
+#   # Import: terraform import okta_authenticator_webauthn_custom_aaguid.yubikey <authenticator_id>/<aaguid>
+# }
+#
+# Configure WebAuthn authenticator method settings (v6.11.0+)
+# resource "okta_authenticator_method_webauthn" "example" {
+#   authenticator_id = okta_authenticator.webauthn.id
+#   status           = "ACTIVE"
+#   # Import: terraform import okta_authenticator_method_webauthn.example <authenticator_id>
+# }
 `,
     },
     {
@@ -267,19 +284,23 @@ export const VERSION_RESOURCE_ADDITIONS: Record<ProviderVersion, { type: string;
       config: `
 # Push group with AD destination support (v6.11.0+)
 # resource "okta_push_group" "ad_example" {
-#   app_id         = okta_app_auto_login.ad_app.id
-#   group_id       = okta_group.example.id
+#   app_id          = okta_app_auto_login.ad_app.id
+#   group_id        = okta_group.example.id
 #   group_push_rule = "SAME_NAME"
 #   # AD apps can now be used as push destinations
 # }
 
-# App sign-on policy rule: option to stay signed in (v6.11.0+)
+# App sign-on policy rule: keep me signed in (v6.11.0+)
 # resource "okta_app_signon_policy_rule" "example" {
-#   policy_id                 = okta_app_signon_policy.example.id
-#   name                      = "Default Rule"
-#   factor_mode               = "1FA"
-#   type                      = "ASSURANCE"
-#   stay_signed_in_consent    = "ALLOWED"  # ALLOWED, REQUIRED, or DENIED (v6.11.0+)
+#   policy_id   = okta_app_signon_policy.example.id
+#   name        = "Default Rule"
+#   factor_mode = "1FA"
+#   type        = "ASSURANCE"
+#
+#   keep_me_signed_in {
+#     post_auth                  = "ALLOWED"   # ALLOWED or NOT_ALLOWED
+#     post_auth_prompt_frequency = "P30D"       # ISO 8601 duration (e.g. P7D, P30D)
+#   }
 # }
 `,
     },
@@ -297,11 +318,15 @@ export const VERSION_RESOURCE_ADDITIONS: Record<ProviderVersion, { type: string;
 #   backchannel_custom_authenticator_id   = okta_authenticator.custom.id
 # }
 
-# Stay-signed-in option on app sign-on policy rule (v6.12.0+)
+# Stay-signed-in option on app sign-on policy rules (v6.12.0+)
 # resource "okta_app_signon_policy_rules" "example" {
-#   policy_id          = okta_app_signon_policy.example.id
-#   name               = "Default Rule"
-#   keep_me_signed_in  = true   # Allow users to stay signed in (v6.12.0+)
+#   policy_id = okta_app_signon_policy.example.id
+#   name      = "Default Rule"
+#
+#   keep_me_signed_in {
+#     post_auth                  = "ALLOWED"   # ALLOWED or NOT_ALLOWED
+#     post_auth_prompt_frequency = "P30D"       # ISO 8601 duration (e.g. P7D, P30D)
+#   }
 # }
 `,
     },
@@ -335,6 +360,21 @@ export const VERSION_RESOURCE_ADDITIONS: Record<ProviderVersion, { type: string;
   ],
 
   '6.13.0': [
+    {
+      type: 'customRoles',
+      config: `
+# IAM resource set data source (v6.13.0+)
+# data "okta_iam_resource_set" "example" {
+#   id = "<resource_set_id>"
+# }
+# # Use in resource set assignment:
+# resource "okta_resource_set" "example" {
+#   label       = "My Resource Set"
+#   description = "Custom role scope"
+#   resources   = ["https://<org>.okta.com/api/v1/apps"]
+# }
+`,
+    },
     {
       type: 'governance',
       config: `
@@ -388,10 +428,10 @@ export const VERSION_ATTRIBUTE_NOTES: Record<ProviderVersion, string[]> = {
     'okta_app_signon_policy_rules: LINUX/OTHER os_expression consistency fix',
   ],
   '6.11.0': [
-    'okta_policy_password: password_breached_action attribute added (NONE, WARN, BLOCK)',
+    'okta_policy_password: breached_password_logout_enabled, breached_password_expire_after_days, breached_password_delegated_workflow_id attributes added (breach detection)',
     'okta_authenticator: authenticator methods and WebAuthn custom AAGUID (aaguidGroups) support added',
     'okta_push_group: AD group push destination support added',
-    'okta_app_signon_policy_rule: stay_signed_in_consent attribute added',
+    'okta_app_signon_policy_rule: keep_me_signed_in block added (post_auth: ALLOWED|NOT_ALLOWED, post_auth_prompt_frequency: ISO 8601 duration)',
     'okta_policy_rule_signon: identity_provider argument changed to TypeSet (may require state migration)',
     'New resource: okta_authenticator_webauthn_custom_aaguid (WebAuthn custom AAGUID management)',
     'New resource: okta_authenticator_method_webauthn (WebAuthn authenticator method settings)',
@@ -402,7 +442,7 @@ export const VERSION_ATTRIBUTE_NOTES: Record<ProviderVersion, string[]> = {
   ],
   '6.12.0': [
     'okta_app_oauth: backchannel_custom_authenticator_id attribute added (CIBA support)',
-    'okta_app_signon_policy_rules: keep_me_signed_in attribute added',
+    'okta_app_signon_policy_rules: keep_me_signed_in block added (post_auth: ALLOWED|NOT_ALLOWED, post_auth_prompt_frequency: ISO 8601 duration)',
     'New data source: okta_app_sign_on_policy_rule (read app sign-on policy rules)',
     'New data source: okta_authorization_servers_policies_rule (read auth server policy rules)',
     'New data source: okta_iam_assignees_user (list users assignable to a resource)',
