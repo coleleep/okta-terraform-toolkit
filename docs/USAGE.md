@@ -59,6 +59,7 @@ The header updates to show your org URL once connected. Click **Disconnect** to 
 **Tips**
 
 - To generate a `TF_LOG` file: `TF_LOG=DEBUG terraform apply 2>&1 | tee terraform-debug.log`
+- Always use `TF_LOG=DEBUG` (not `INFO`) — at DEBUG level, Okta returns `X-Rate-Limit-Limit` headers in every response. OTTO extracts these for org-specific rate limit analysis. With `INFO` logs, the AI falls back to probe data or documented defaults.
 - AI interpretation requires a configured AI key — see [AI Features](#ai-features).
 - The Error Decoder works without an org connection and without an AI key for common errors.
 

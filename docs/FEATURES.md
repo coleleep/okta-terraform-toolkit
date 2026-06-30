@@ -59,7 +59,7 @@ Comprehensive diagnostic tools for troubleshooting Terraform runs:
 
 - **TF_LOG parsing** — extracts per-endpoint request stats, rate-limit hits, and error breakdowns from `TF_LOG=DEBUG` output
 - **Validation error detection** — identifies provider/schema mismatches even when no HTTP requests were made
-- **AI-powered root cause analysis** — explains failures with actionable config fix recommendations
+- **AI-powered root cause analysis** — explains failures with actionable config fix recommendations, using org-specific rate limits from the log's `X-Rate-Limit-Limit` headers when present (falls back to probe data or documented defaults)
 - **Okta API error decoder** — translates native Okta API errors into remediation suggestions
 - **Request profiling** — visualizes which endpoints consumed the most time and capacity
 
@@ -79,7 +79,7 @@ Produces production-ready Terraform files with best-practice configurations:
 
 ## Supported Provider Versions
 
-6.6.1 through 6.12.0 (default). Version-specific resource additions and attribute changes are tracked automatically.
+6.6.1 through 6.13.0 (default). Version-specific resource additions and attribute changes are tracked automatically.
 
 ## Architecture
 
@@ -126,7 +126,8 @@ src/
 │   │   ├── SolutionBuilder.tsx       # AI-powered config recommendations
 │   │   ├── AuthRecommendations.tsx   # Auth strategy selection
 │   │   ├── BestPractices.tsx         # Best practice guidelines
-│   │   ├── LearnSection.tsx          # Educational resources
+│   │   ├── ResourceLimitations.tsx   # Resource import/destroy/OIE limitations reference
+│   │   ├── LearnSection.tsx          # Learn tab container (Best Practices + Resource Limitations)
 │   │   ├── SettingsModal.tsx         # App preferences & AI config
 │   │   ├── ContextualTip.tsx         # Inline help tooltips
 │   │   ├── CustomWorkload.tsx        # User workload input
@@ -200,6 +201,8 @@ If you need to point OTTO at a different endpoint or use a custom API key (e.g.,
 - Identity Providers, Identity Sources, Authenticators
 - Event Hooks, Inline Hooks, Log Streams
 - Custom Roles, Profile Mappings, Brands
+- Governance (campaigns, entitlements, labels, resource owners, access requests)
+- Identity Sources, Authenticators (including WebAuthn custom AAGUID management)
 
 ## Testing
 
