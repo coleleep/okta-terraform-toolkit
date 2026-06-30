@@ -102,3 +102,13 @@ describe('versions.ts accuracy', () => {
     expect(SUPPORTED_VERSIONS).toContain('6.13.0');
   });
 });
+
+describe('scopes.ts accuracy', () => {
+  test('identitySources has a scope requirement entry', () => {
+    const { SCOPE_REQUIREMENTS } = require('../shared/scopes');
+    const hasIdentitySources = SCOPE_REQUIREMENTS.some(
+      (s: { resourceType: string }) => s.resourceType === 'identitySources'
+    );
+    expect(hasIdentitySources).toBe(true);
+  });
+});

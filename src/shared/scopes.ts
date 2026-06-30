@@ -46,6 +46,7 @@ export const SCOPE_REQUIREMENTS: ScopeRequirement[] = [
   { resourceType: 'realms', readScope: 'okta.realms.read', manageScope: 'okta.realms.manage', adminRole: 'Super Admin', customRoleSupported: true, customRolePermission: 'okta.realms.manage' },
   { resourceType: 'features', readScope: 'okta.features.read', manageScope: 'okta.features.manage', adminRole: 'Super Admin', customRoleSupported: false, notes: 'Feature flags require Super Admin' },
   { resourceType: 'pushProviders', readScope: 'okta.pushProviders.read', manageScope: 'okta.pushProviders.manage', adminRole: 'Super Admin', customRoleSupported: false },
+  { resourceType: 'identitySources', readScope: 'okta.identitySources.read', manageScope: 'okta.identitySources.manage', adminRole: 'Super Admin', customRoleSupported: false, notes: 'Identity source management requires Super Admin' },
 
   // Org settings
   { resourceType: 'orgSettings', readScope: 'okta.orgs.read', manageScope: 'okta.orgs.manage', adminRole: 'Super Admin', customRoleSupported: false, notes: 'Org settings require Super Admin' },
