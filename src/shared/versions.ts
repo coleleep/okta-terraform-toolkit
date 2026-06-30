@@ -1,6 +1,6 @@
-export const SUPPORTED_VERSIONS = ['6.6.1', '6.7.0', '6.8.0', '6.9.0', '6.10.0', '6.11.0', '6.12.0'] as const;
+export const SUPPORTED_VERSIONS = ['6.6.1', '6.7.0', '6.8.0', '6.9.0', '6.10.0', '6.11.0', '6.12.0', '6.13.0'] as const;
 export type ProviderVersion = (typeof SUPPORTED_VERSIONS)[number];
-export const DEFAULT_VERSION: ProviderVersion = '6.12.0';
+export const DEFAULT_VERSION: ProviderVersion = '6.13.0';
 
 /**
  * Compare two semver strings. Returns -1 if a < b, 0 if equal, 1 if a > b.
@@ -207,16 +207,27 @@ export const VERSION_RESOURCE_ADDITIONS: Record<ProviderVersion, { type: string;
     {
       type: 'identitySources',
       config: `
-# Identity source resource (v6.11.0+)
-# resource "okta_identity_source" "example" {
-#   name = "My Identity Source"
-#   type = "SAML2"
-#   # protocol and policy blocks depend on source type
+# Identity source resources (v6.11.0+)
+# resource "okta_identity_source_group" "example" {
+#   identity_source_id = "<identity_source_id>"
+#   name               = "My Group"
 # }
 #
-# Data source: look up an existing identity source
-# data "okta_identity_source" "example" {
-#   id = "<identity_source_id>"
+# resource "okta_identity_source_user" "example" {
+#   identity_source_id = "<identity_source_id>"
+#   external_id        = "user-external-id"
+# }
+#
+# resource "okta_identity_source_import" "trigger" {
+#   identity_source_id = "<identity_source_id>"
+# }
+#
+# Data sources for identity source inspection:
+# data "okta_identity_source_groups" "all" {
+#   identity_source_id = "<identity_source_id>"
+# }
+# data "okta_identity_source_users" "all" {
+#   identity_source_id = "<identity_source_id>"
 # }
 `,
     },
@@ -297,14 +308,14 @@ export const VERSION_RESOURCE_ADDITIONS: Record<ProviderVersion, { type: string;
     {
       type: 'policies',
       config: `
-# New data source: read existing sign-on policy rule by ID (v6.12.0+)
-# data "okta_signon_policy_rule" "existing" {
+# New data source: read existing app sign-on policy rule (v6.12.0+)
+# data "okta_app_sign_on_policy_rule" "existing" {
 #   policy_id = "<policy_id>"
 #   id        = "<rule_id>"
 # }
 
-# New data source: read existing auth server policy rule by ID (v6.12.0+)
-# data "okta_auth_server_policy_rule" "existing" {
+# New data source: read existing auth server policy rule (v6.12.0+)
+# data "okta_authorization_servers_policies_rule" "existing" {
 #   auth_server_id = "<auth_server_id>"
 #   policy_id      = "<policy_id>"
 #   id             = "<rule_id>"
@@ -315,10 +326,34 @@ export const VERSION_RESOURCE_ADDITIONS: Record<ProviderVersion, { type: string;
       type: 'users',
       config: `
 # New data source: list users assignable to a resource (v6.12.0+)
-# data "okta_assignees_users" "candidates" {
+# data "okta_iam_assignees_user" "candidates" {
 #   resource_id   = "<resource_id>"
 #   resource_type = "APP"
 # }
+`,
+    },
+  ],
+
+  '6.13.0': [
+    {
+      type: 'governance',
+      config: `
+# Governance labels (v6.13.0+)
+# resource "okta_label" "example" {
+#   name = "My Label"
+# }
+#
+# Assign owner to a governed resource:
+# resource "okta_resource_owner" "example" {
+#   resource_id   = "<resource_id>"
+#   resource_type = "APP"
+#   owner_id      = okta_user.admin.id
+# }
+#
+# Data sources:
+# data "okta_resource_label" "example" { resource_id = "<id>" }
+# data "okta_iam_resource_set" "example" { id = "<id>" }
+# data "okta_principal_entitlements" "example" { principal_id = "<id>" }
 `,
     },
   ],
@@ -357,7 +392,10 @@ export const VERSION_ATTRIBUTE_NOTES: Record<ProviderVersion, string[]> = {
     'okta_authenticator: authenticator methods and WebAuthn custom AAGUID (aaguidGroups) support added',
     'okta_push_group: AD group push destination support added',
     'okta_app_signon_policy_rule: stay_signed_in_consent attribute added',
-    'okta_policy_rule_sign_on: identity_provider argument changed to TypeSet (may require state migration)',
+    'okta_policy_rule_signon: identity_provider argument changed to TypeSet (may require state migration)',
+    'New resource: okta_authenticator_webauthn_custom_aaguid (WebAuthn custom AAGUID management)',
+    'New resource: okta_authenticator_method_webauthn (WebAuthn authenticator method settings)',
+    'New resources: identity source group, user, import, and group membership management (v6.11.0+)',
     'okta_user: computed timestamp fields added',
     'okta_profile_mapping: terraform import support added',
     'okta_network_zone: diff suppression added (reduces false plan diffs)',
@@ -365,14 +403,25 @@ export const VERSION_ATTRIBUTE_NOTES: Record<ProviderVersion, string[]> = {
   '6.12.0': [
     'okta_app_oauth: backchannel_custom_authenticator_id attribute added (CIBA support)',
     'okta_app_signon_policy_rules: keep_me_signed_in attribute added',
-    'New data source: okta_signon_policy_rule (read sign-on policy rules)',
-    'New data source: okta_auth_server_policy_rule (read auth server policy rules)',
-    'New data source: okta_assignees_users (list users assignable to a resource)',
+    'New data source: okta_app_sign_on_policy_rule (read app sign-on policy rules)',
+    'New data source: okta_authorization_servers_policies_rule (read auth server policy rules)',
+    'New data source: okta_iam_assignees_user (list users assignable to a resource)',
     'Provider: 429 retries deferred to SDK for DPoP requests (improved rate-limit handling for DPoP-bound traffic)',
     'okta_idp_saml/social/oidc: nil pointer fix when accountLink.filter.groups is null',
     'okta_authenticator: WebAuthn update validation error fixed',
     'okta_policy_password: groups_included field is now respected',
     'okta_app_signon_policy_rules: now works in orgs without Risk Scoring enabled',
+  ],
+
+  '6.13.0': [
+    'New resource: okta_label (governance label management)',
+    'New resource: okta_resource_owner (assign owners to governed resources)',
+    'New data source: okta_resource_label',
+    'New data source: okta_iam_resource_set',
+    'New data source: okta_resource_owners_catalog_resource',
+    'New data source: okta_principal_entitlements',
+    'New data source: okta_catalog_entry_default',
+    'New data source: okta_catalog_entry_user_access_request_fields',
   ],
 };
 
