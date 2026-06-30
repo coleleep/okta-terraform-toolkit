@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { LogAnalysis, ClaudeInterpretation } from '../../shared/types';
+import { useStore } from '../hooks/useStore';
 
 function formatDuration(seconds: number): string {
   if (seconds < 60) return `${seconds}s`;
@@ -23,11 +24,12 @@ export default function LogAnalyzer() {
   const [interpreting, setInterpreting] = useState(false);
   const [interpretError, setInterpretError] = useState<string | null>(null);
   const [hasKey, setHasKey] = useState(false);
+  const probeResult = useStore(state => state.probeResult);
 
   const api = (window as unknown as { oktaTerraform: {
     openLogFile: () => Promise<string | null>;
     analyzeLog: (path: string) => Promise<{ success: boolean; data?: LogAnalysis; error?: string }>;
-    interpretLog: (analysis: LogAnalysis) => Promise<{ success: boolean; data?: ClaudeInterpretation; error?: string }>;
+    interpretLog: (params: { analysis: LogAnalysis; probeResult?: unknown }) => Promise<{ success: boolean; data?: ClaudeInterpretation; error?: string }>;
     hasClaudeKey: () => Promise<{ success: boolean; data?: boolean }>;
   }}).oktaTerraform;
 
@@ -40,7 +42,7 @@ export default function LogAnalyzer() {
     setInterpreting(true);
     setInterpretError(null);
     try {
-      const result = await api.interpretLog(analysis);
+      const result = await api.interpretLog({ analysis, probeResult: probeResult ?? undefined });
       if (result.success && result.data) {
         setInterpretation(result.data);
       } else {

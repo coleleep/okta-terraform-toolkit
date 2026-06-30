@@ -52,7 +52,8 @@ const api = {
   },
 
   // Claude AI
-  interpretLog: (analysis: unknown) => ipcRenderer.invoke('claude:interpret-log', analysis),
+  interpretLog: (params: { analysis: unknown; probeResult?: unknown }) =>
+    ipcRenderer.invoke('claude:interpret-log', params),
   buildWorkload: (description: string) => ipcRenderer.invoke('claude:build-workload', description),
   decodeError: (errorText: string) => ipcRenderer.invoke('claude:decode-error', errorText),
   generateSolution: (description: string, providerVersion: string) => ipcRenderer.invoke('claude:generate-solution', { description, providerVersion }),

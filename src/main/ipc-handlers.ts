@@ -16,7 +16,7 @@ import { convertConfigDeterministic } from './api/sync-convert';
 import { parseStateFile, syncWithSubResources, buildSyncSummary, discoverSourceResources, discoverTargetResources, matchResources, fetchAttributeDiff, parseTfAttributesFromFiles } from './api/sync';
 import { logger, setLevel, getLevel } from './logger';
 import { getMainWindow } from './index';
-import { ConnectionStatus, ManagedResourceType, ResourceCount, LogAnalysis, CompareParams } from '../shared/types';
+import { ConnectionStatus, ManagedResourceType, ResourceCount, LogAnalysis, CompareParams, ProbeResult } from '../shared/types';
 import { RESOURCE_DICTIONARY } from '../shared/resource-dictionary';
 import { runTerraform, cancelTerraform } from './api/terraform';
 import { saveTfStateRollbackBundle, checkRollbackBundle, prepareTfStateRollback, clearRollbackBundle } from './api/rollback';
@@ -214,9 +214,9 @@ export function registerIpcHandlers() {
   });
 
   // Claude AI
-  ipcMain.handle('claude:interpret-log', async (_event, analysis: LogAnalysis) => {
+  ipcMain.handle('claude:interpret-log', async (_event, params: { analysis: LogAnalysis; probeResult?: ProbeResult }) => {
     try {
-      const result = await interpretLog(analysis);
+      const result = await interpretLog(params.analysis, params.probeResult);
       return { success: true, data: result };
     } catch (error: unknown) {
       const message = error instanceof Error ? error.message : String(error);

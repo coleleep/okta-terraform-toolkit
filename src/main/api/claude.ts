@@ -5,7 +5,7 @@ import { app } from 'electron';
 import { spawnSync } from 'child_process';
 import { join } from 'path';
 import { readFileSync, writeFileSync, existsSync, unlinkSync } from 'fs';
-import { LogAnalysis, ClaudeInterpretation, CustomWorkloadEntry } from '../../shared/types';
+import { LogAnalysis, ClaudeInterpretation, CustomWorkloadEntry, ProbeResult } from '../../shared/types';
 import { RESOURCE_DICTIONARY } from '../../shared/resource-dictionary';
 import { SCOPE_REQUIREMENTS, API_KEY_ONLY_ENDPOINTS } from '../../shared/scopes';
 import { SUPPORTED_VERSIONS } from '../../shared/versions';
@@ -213,15 +213,43 @@ Be specific. Reference actual numbers from the data. If the issue isn't rate-lim
 When the issue is permission/scope related, tell the user EXACTLY which scope or admin role they need — reference the scope table.
 Don't hedge.`;
 
-export async function interpretLog(analysis: LogAnalysis): Promise<ClaudeInterpretation> {
+function buildRateLimitContext(analysis: LogAnalysis, probeResult?: ProbeResult): string {
+  // Tier 1: X-Rate-Limit-Limit headers extracted from the actual log run
+  const observed = analysis.endpoints.filter(e => e.minRateLimit > 0);
+  if (observed.length > 0) {
+    const lines = observed.map(e =>
+      `  ${e.pattern}: limit=${e.minRateLimit}/window, lowest_remaining=${e.lowestRemaining}`
+    );
+    return `ORG RATE LIMITS (source: X-Rate-Limit-Limit headers from this log run — org-specific):\n${lines.join('\n')}`;
+  }
+
+  // Tier 2: Probe results for the current org
+  if (probeResult) {
+    const lines = probeResult.endpoints
+      .filter(e => e.limit > 0 && e.status !== 'error' && e.status !== 'skipped')
+      .map(e => `  ${e.endpoint}: limit=${e.limit}/window`);
+    if (lines.length > 0) {
+      return `ORG RATE LIMITS (source: org probe — log did not include rate limit headers; re-run with TF_LOG=DEBUG for log-specific data):\n${lines.join('\n')}`;
+    }
+  }
+
+  // Tier 3: Documented Okta developer-tier defaults
+  return `ORG RATE LIMITS (source: documented Okta developer-tier defaults — no log headers or probe data available; re-run with TF_LOG=DEBUG for org-specific data):
+  Most management endpoints: ~600/window
+  App user/group assignment (/api/v1/apps/{id}/users, /api/v1/apps/{id}/groups): ~100/window
+  NOTE: Actual limits vary by org tier — treat these as rough estimates only.`;
+}
+
+export async function interpretLog(analysis: LogAnalysis, probeResult?: ProbeResult): Promise<ClaudeInterpretation> {
   const client = getClient();
   const scopeContext = buildScopeContext();
+  const rateLimitContext = buildRateLimitContext(analysis, probeResult);
 
   const cleanAnalysis = redact(JSON.stringify(analysis, null, 2));
   const response = await client.messages.create({
     model: 'claude-sonnet-4-6',
     max_tokens: 1024,
-    system: `${LOG_SYSTEM_PROMPT}\n\n${scopeContext}`,
+    system: `${LOG_SYSTEM_PROMPT}\n\n${rateLimitContext}\n\n${scopeContext}`,
     messages: [{
       role: 'user',
       content: `Analyze this Terraform run:\n\n${cleanAnalysis}\n\nRespond with the JSON object only.`,
