@@ -163,10 +163,12 @@ const LOG_SYSTEM_PROMPT = `You are an expert on the Okta Terraform Provider. You
 Key domain knowledge:
 
 RATE LIMITING & BACKOFF:
-- Okta rate limits are per-endpoint, typically 600 req/min for most endpoints, 100 req/min for app user/group assignment endpoints
+- Org-specific rate limits are provided below — use these actual values, not generic estimates
+- Rate limits vary by org tier; the numbers below come from (1) X-Rate-Limit-Limit headers in this log run, (2) a probe of this org, or (3) documented Okta developer-tier defaults as a last resort — the source is labeled in the data
 - 429 responses mean the rate limit was hit; the provider retries with exponential backoff (min_wait → max_wait)
 - max_api_capacity (0-100) controls proactive throttling: provider sleeps when Remaining/Limit < capacity%. Prevents 429s but can cause deadline errors if request_timeout is too low
-- Known-good config for ~100 req/window endpoints: max_api_capacity=70, request_timeout=120, parallelism=4, min_wait_seconds=17, max_wait_seconds=90
+- For endpoints with limits under 200/window: max_api_capacity=70, request_timeout=120, parallelism=4, min_wait_seconds=17, max_wait_seconds=90
+- If log was captured with TF_LOG=INFO instead of TF_LOG=DEBUG, rate limit headers will be absent from the log — note this in your analysis if using probe/default data
 
 TIMEOUTS & DEADLINES:
 - "context deadline exceeded" means request_timeout killed a request queued too long waiting for rate limit headroom
@@ -426,6 +428,24 @@ POLICY RULE PRIORITY MANAGEMENT:
 - Policies themselves also have priority — chain policies under the same scope by priority
 - Do NOT recommend parallelism=1 to solve priority conflicts — depends_on chains are the correct fix
 
+RESOURCES WHERE TERRAFORM DESTROY HAS NO EFFECT:
+These have no-op delete implementations — terraform destroy only removes from state, no API call:
+- okta_org_configuration (singleton — manages existing org settings, no delete endpoint)
+- okta_policy_mfa_default (default policy — Okta does not allow deleting default policies)
+- okta_policy_password_default (default policy — same as above)
+- okta_rate_limiting (provider emits warning: "This resource cannot be deleted via Terraform")
+- okta_rate_limit_admin_notification_settings (provider emits warning: "Delete Not Supported")
+- okta_rate_limit_warning_threshold_percentage (provider emits warning: "Delete Not Supported")
+- okta_resource_owner (governance resource — provider emits warning: "Delete Not Supported")
+- okta_request_setting_organization (governance — provider emits warning: "Delete Not Supported")
+- okta_request_setting_resource (governance — provider emits warning: "Delete Not Supported")
+
+RESOURCES WHERE DESTROY RESETS TO DEFAULTS (API call, but underlying singleton survives):
+- okta_security_notification_emails — destroy resets all notification flags to true (Okta defaults)
+- okta_threat_insight_settings — destroy resets threat insight action to 'none'
+
+When generating solutions with these resources: note in warnings that terraform destroy will not remove the configuration from Okta — it only removes the resource from Terraform state.
+
 RULES:
 1. If a resource/attribute doesn't exist in the provider, say so clearly in limitations. Don't invent resources.
 2. If a resource requires a specific version, flag it. If user's version is too old, warn them.
@@ -607,6 +627,19 @@ Import ID formats for sub-resources:
 - okta_app_user: app_id/user_id
 - okta_app_group_assignment: app_id/group_id
 - okta_group_memberships: group_id
+- okta_authenticator_webauthn_custom_aaguid: authenticator_id/aaguid
+- okta_authenticator_method_webauthn: authenticator_id
+- okta_identity_source_group: identity_source_id/id
+- okta_identity_source_group_membership: identity_source_id/group_or_external_id/id  ← 3-part ID, unusual format
+- okta_identity_source_user: identity_source_id/id
+- okta_app_signon_policy_rules: policy_id
+- okta_app_signon_policy: id
+- okta_label: id
+
+Resources that do NOT support terraform import (never generate import blocks for these):
+- okta_trusted_server — ImportState explicitly disabled in provider
+- okta_resource_owner — no import support
+- okta_identity_source_import — trigger-only resource, no import support
 
 Rules:
 - Every okta_group reference by ID → data.okta_group.NAME.id
