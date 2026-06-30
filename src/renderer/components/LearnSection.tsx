@@ -1,10 +1,12 @@
 import React, { useState } from 'react';
 import BestPractices from './BestPractices';
+import ResourceLimitations from './ResourceLimitations';
 
-type LearnTab = 'best-practices';
+type LearnTab = 'best-practices' | 'resource-limitations';
 
 const TABS: { id: LearnTab; label: string }[] = [
   { id: 'best-practices', label: 'Best Practices' },
+  { id: 'resource-limitations', label: 'Resource Limitations' },
 ];
 
 export default function LearnSection() {
@@ -30,6 +32,7 @@ export default function LearnSection() {
       </div>
 
       {activeTab === 'best-practices' && <BestPractices />}
+      {activeTab === 'resource-limitations' && <ResourceLimitations />}
     </div>
   );
 }
