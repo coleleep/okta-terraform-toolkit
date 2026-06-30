@@ -67,19 +67,19 @@ describe('identitySources resource type', () => {
   });
 });
 
-describe('okta_identity_source resource dictionary', () => {
-  it('has okta_identity_source resource entry', () => {
+describe('identity source resource dictionary entries', () => {
+  it('has okta_identity_source_group resource entry', () => {
     const entry = RESOURCE_DICTIONARY.find(
-      (r) => r.terraformResource === 'okta_identity_source' && r.description.includes('resource'),
+      (r) => r.terraformResource === 'okta_identity_source_group',
     );
     expect(entry).toBeDefined();
     expect(entry!.parentType).toBe('identitySources');
     expect(entry!.sinceVersion).toBe('6.11.0');
   });
 
-  it('has okta_identity_source data source entry', () => {
+  it('has okta_identity_source_users data source entry', () => {
     const entry = RESOURCE_DICTIONARY.find(
-      (r) => r.terraformResource === 'okta_identity_source' && r.description.includes('data source'),
+      (r) => r.terraformResource === 'okta_identity_source_users',
     );
     expect(entry).toBeDefined();
     expect(entry!.parentType).toBe('identitySources');

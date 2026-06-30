@@ -13,8 +13,8 @@ describe('v6.12.0 version registration', () => {
     expect(SUPPORTED_VERSIONS).toContain('6.12.0');
   });
 
-  it('sets DEFAULT_VERSION to 6.12.0', () => {
-    expect(DEFAULT_VERSION).toBe('6.12.0');
+  it('sets DEFAULT_VERSION to 6.13.0', () => {
+    expect(DEFAULT_VERSION).toBe('6.13.0');
   });
 
   it('isAvailableIn returns true for 6.12.0 in 6.12.0', () => {
@@ -42,14 +42,14 @@ describe('v6.12.0 resource additions', () => {
   it('has policies addition for 6.12.0 (new policy rule data sources)', () => {
     const policies = VERSION_RESOURCE_ADDITIONS['6.12.0'].find((a) => a.type === 'policies');
     expect(policies).toBeDefined();
-    expect(policies!.config).toMatch(/okta_signon_policy_rule/);
-    expect(policies!.config).toMatch(/okta_auth_server_policy_rule/);
+    expect(policies!.config).toMatch(/okta_app_sign_on_policy_rule/);
+    expect(policies!.config).toMatch(/okta_authorization_servers_policies_rule/);
   });
 
   it('has users addition for 6.12.0 (assignees data source)', () => {
     const users = VERSION_RESOURCE_ADDITIONS['6.12.0'].find((a) => a.type === 'users');
     expect(users).toBeDefined();
-    expect(users!.config).toMatch(/okta_assignees_users/);
+    expect(users!.config).toMatch(/okta_iam_assignees_user/);
   });
 
   it('getAdditionsForVersion includes 6.12.0 additions when version is 6.12.0', () => {
@@ -81,27 +81,27 @@ describe('v6.12.0 attribute notes', () => {
 });
 
 describe('v6.12.0 data source entries', () => {
-  it('has okta_signon_policy_rule data source with sinceVersion 6.12.0', () => {
+  it('has okta_app_sign_on_policy_rule data source with sinceVersion 6.12.0', () => {
     const entry = RESOURCE_DICTIONARY.find(
-      (r) => r.terraformResource === 'okta_signon_policy_rule' && r.description.toLowerCase().includes('data source'),
+      (r) => r.terraformResource === 'okta_app_sign_on_policy_rule',
     );
     expect(entry).toBeDefined();
     expect(entry!.parentType).toBe('policies');
     expect(entry!.sinceVersion).toBe('6.12.0');
   });
 
-  it('has okta_auth_server_policy_rule data source with sinceVersion 6.12.0', () => {
+  it('has okta_authorization_servers_policies_rule data source with sinceVersion 6.12.0', () => {
     const entry = RESOURCE_DICTIONARY.find(
-      (r) => r.terraformResource === 'okta_auth_server_policy_rule' && r.description.toLowerCase().includes('data source'),
+      (r) => r.terraformResource === 'okta_authorization_servers_policies_rule',
     );
     expect(entry).toBeDefined();
     expect(entry!.parentType).toBe('authServers');
     expect(entry!.sinceVersion).toBe('6.12.0');
   });
 
-  it('has okta_assignees_users data source with sinceVersion 6.12.0', () => {
+  it('has okta_iam_assignees_user data source with sinceVersion 6.12.0', () => {
     const entry = RESOURCE_DICTIONARY.find(
-      (r) => r.terraformResource === 'okta_assignees_users',
+      (r) => r.terraformResource === 'okta_iam_assignees_user',
     );
     expect(entry).toBeDefined();
     expect(entry!.parentType).toBe('users');
