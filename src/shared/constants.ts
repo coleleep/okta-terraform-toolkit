@@ -68,7 +68,7 @@ export const STATUS_OK_THRESHOLD = 0.5;
 export const STATUS_WARNING_THRESHOLD = 0.1;
 
 // Resource type definitions for selection & counting
-// Covers all major resource categories in Okta Terraform Provider v6.12.0
+// Covers all major resource categories in Okta Terraform Provider v6.13.0
 export interface ResourceTypeDef {
   type: ManagedResourceType;
   label: string;
