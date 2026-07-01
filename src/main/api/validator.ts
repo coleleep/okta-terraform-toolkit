@@ -190,43 +190,62 @@ export function exportProject(
 ): ExportResult {
   const files: Record<string, string> = { ...maskedFiles };
   const usedVarNames = new Set<string>();
-  const varNameForToken = new Map<string, string>();
   const declarationsToAdd: string[] = [];
   const tfvarsAssignmentsToAdd: string[] = [];
 
-  for (const entry of entries) {
-    const isFromTfvars = entry.sourceFile.endsWith('.tfvars');
+  // Seed usedVarNames with variable names already declared in an existing
+  // variables.tf (e.g. uploaded by the user, or left over from a prior
+  // export). Without this, a freshly generated name like "app_id_1" could
+  // collide with a pre-existing declaration of the same name, producing
+  // invalid HCL (duplicate variable declaration).
+  const existingVariablesTfForScan = files['variables.tf'] ?? '';
+  for (const match of existingVariablesTfForScan.matchAll(/variable\s+"([^"]+)"/g)) {
+    usedVarNames.add(match[1]);
+  }
 
-    if (isFromTfvars) {
-      // Restore in place: replace the token with the real value directly in the tfvars content.
+  const tfFilenames = Object.keys(files).filter((f) => f.endsWith('.tf'));
+
+  for (const entry of entries) {
+    // The promote/restore decision must be based on where the token actually
+    // appears in the project, not on entry.sourceFile — vaultProject dedups by
+    // VALUE across the whole project, so a single entry's sourceFile only
+    // reflects whichever file the value was first encountered in. If the same
+    // value also appears in a .tfvars file, that occurrence still needs the
+    // real value restored, never a var. reference (tfvars files can't
+    // reference variables) — and it must not be left as an unreplaced token.
+    const needsPromotion = tfFilenames.some((filename) => files[filename].includes(entry.token));
+
+    if (needsPromotion) {
+      // Promote: derive a unique variable name from sourceAttr.
+      let baseName = entry.sourceAttr.replace(/[^a-zA-Z0-9_]/g, '_') || 'value';
+      let counter = 1;
+      let varName = `${baseName}_${counter}`;
+      while (usedVarNames.has(varName)) {
+        counter += 1;
+        varName = `${baseName}_${counter}`;
+      }
+      usedVarNames.add(varName);
+
+      declarationsToAdd.push(
+        `variable "${varName}" {\n  type      = string\n  sensitive = true\n}\n`,
+      );
+      tfvarsAssignmentsToAdd.push(`${varName} = "${entry.value}"`);
+
       for (const [filename, content] of Object.entries(files)) {
+        if (filename.endsWith('.tfvars')) continue; // never rewrite tfvars content with var. references
         if (content.includes(entry.token)) {
-          files[filename] = content.split(entry.token).join(entry.value);
+          files[filename] = content.split(entry.token).join(`var.${varName}`);
         }
       }
-      continue;
     }
 
-    // Promote: derive a unique variable name from sourceAttr.
-    let baseName = entry.sourceAttr.replace(/[^a-zA-Z0-9_]/g, '_') || 'value';
-    let counter = 1;
-    let varName = `${baseName}_${counter}`;
-    while (usedVarNames.has(varName)) {
-      counter += 1;
-      varName = `${baseName}_${counter}`;
-    }
-    usedVarNames.add(varName);
-    varNameForToken.set(entry.token, varName);
-
-    declarationsToAdd.push(
-      `variable "${varName}" {\n  type      = string\n  sensitive = true\n}\n`,
-    );
-    tfvarsAssignmentsToAdd.push(`${varName} = "${entry.value}"`);
-
+    // Regardless of promotion, any occurrence of this token in a .tfvars file
+    // gets the real value restored in place — a .tfvars file must never end
+    // up with a var. reference or a leftover literal token.
     for (const [filename, content] of Object.entries(files)) {
-      if (filename.endsWith('.tfvars')) continue; // never rewrite tfvars content with var. references
+      if (!filename.endsWith('.tfvars')) continue;
       if (content.includes(entry.token)) {
-        files[filename] = content.split(entry.token).join(`var.${varName}`);
+        files[filename] = content.split(entry.token).join(entry.value);
       }
     }
   }

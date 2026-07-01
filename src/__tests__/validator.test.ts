@@ -248,4 +248,52 @@ describe('exportProject', () => {
     expect(result.files['variables.tf']).toContain('variable "app_id_1"');
     expect(result.files['variables.tf']).toContain('variable "app_id_2"');
   });
+
+  it('promotes a value in .tf and restores the real value in place in .tfvars when the same value appears in both files', () => {
+    const original = {
+      'main.tf': 'app_id = "0oaABCDEFGHIJKLMNOPQ"',
+      'terraform.tfvars': 'other_ref = "0oaABCDEFGHIJKLMNOPQ"',
+    };
+    const { maskedFiles, entries } = vaultProject(original);
+
+    // vaultProject dedups by value, so there should be exactly one entry for
+    // this shared value (sourceFile reflects whichever file was iterated first).
+    expect(entries).toHaveLength(1);
+
+    const result = exportProject(maskedFiles, entries);
+
+    // main.tf must reference the promoted variable, never the literal token.
+    expect(result.files['main.tf']).toMatch(/var\.app_id_1/);
+    expect(result.files['main.tf']).not.toContain('0oaABCDEFGHIJKLMNOPQ');
+    expect(result.files['main.tf']).not.toMatch(/\{\{OKTA_ID_1\}\}/);
+
+    // terraform.tfvars must have the REAL VALUE restored in place — not the
+    // literal token, and not a var. reference (tfvars files can't use var.).
+    expect(result.files['terraform.tfvars']).toContain('other_ref = "0oaABCDEFGHIJKLMNOPQ"');
+    expect(result.files['terraform.tfvars']).not.toMatch(/\{\{OKTA_ID_1\}\}/);
+    expect(result.files['terraform.tfvars']).not.toContain('var.app_id_1');
+
+    // Only one variable declaration should be created for this shared value.
+    const declarationMatches = result.files['variables.tf'].match(/variable\s+"app_id_1"/g) ?? [];
+    expect(declarationMatches).toHaveLength(1);
+  });
+
+  it('avoids colliding with a variable name already declared in an existing variables.tf', () => {
+    const original = {
+      'main.tf': 'app_id = "0oaABCDEFGHIJKLMNOPQ"',
+      'variables.tf': 'variable "app_id_1" {\n  type = string\n}\n',
+    };
+    const { maskedFiles, entries } = vaultProject(original);
+
+    const result = exportProject(maskedFiles, entries);
+
+    // The pre-existing declaration must survive untouched.
+    expect(result.files['variables.tf']).toContain('variable "app_id_1" {\n  type = string\n}');
+
+    // The newly generated variable must not collide with the pre-existing name.
+    expect(result.files['variables.tf']).not.toMatch(/variable\s+"app_id_1"\s*\{\s*type\s*=\s*string\s*\n\s*sensitive/);
+    expect(result.files['variables.tf']).toContain('variable "app_id_2"');
+    expect(result.files['main.tf']).toMatch(/var\.app_id_2/);
+    expect(result.files['terraform.tfvars']).toContain('app_id_2 = "0oaABCDEFGHIJKLMNOPQ"');
+  });
 });
