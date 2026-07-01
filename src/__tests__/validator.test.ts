@@ -132,6 +132,37 @@ describe('vaultProject', () => {
     expect(result.entries).toHaveLength(0);
   });
 
+  it('masks a realistic large JWT whose payload segment exceeds 20,000 characters', () => {
+    // A large Okta JWT (e.g. a token with a `groups` claim covering hundreds
+    // of groups) can have a payload segment well beyond a few KB. The exact
+    // content of the payload doesn't matter for this pattern (it only checks
+    // charset/length), so a synthetic base64url-shaped run of 'a' stands in
+    // for a real large claims payload.
+    const header = 'eyJhbGciOiJIUzI1NiJ9';
+    const payload = 'a'.repeat(20_000);
+    const signature = 'dozjgNryP4J3jVmNHl0w5N_XgL0n3I9PlFUP0THsR8U';
+    const jwt = `${header}.${payload}.${signature}`;
+    const files = { 'main.tf': `id_token = "${jwt}"` };
+
+    const result = vaultProject(files);
+
+    expect(result.maskedFiles['main.tf']).not.toContain(jwt);
+    expect(result.maskedFiles['main.tf']).not.toContain(payload);
+    expect(result.entries[0].kind).toBe('jwt');
+  });
+
+  it('does not hang on a large malformed/unterminated JWT-like value with no closing quote', () => {
+    const junk = 'A'.repeat(200_000);
+    const files = { 'main.tf': `id_token = "${junk}` };
+
+    const start = Date.now();
+    const result = vaultProject(files);
+    const elapsedMs = Date.now() - start;
+
+    expect(elapsedMs).toBeLessThan(1000);
+    expect(result.entries).toHaveLength(0);
+  });
+
   it('masks a legitimate value that happens to contain a literal "{{" placeholder', () => {
     const files = { 'main.tf': 'client_secret = "{{not-a-real-token}}"' };
     const result = vaultProject(files);

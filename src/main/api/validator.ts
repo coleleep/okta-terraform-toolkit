@@ -72,11 +72,19 @@ const VAULT_PATTERNS: VaultPattern[] = [
   },
   {
     kind: 'jwt',
-    // Each JWT segment is also bounded to 5000 chars (realistically under a
-    // few KB) so the value side can't contribute its own backtracking blowup
-    // on a long run of valid base64url characters with no closing quote.
+    // Segment lengths are intentionally left uncapped (only a lower bound of
+    // 20 chars, to avoid false positives on short dotted strings). An earlier
+    // version capped each segment at 5000 chars as defense-in-depth against
+    // ReDoS, but real large Okta JWTs (e.g. a token with a `groups` claim
+    // covering hundreds of groups) can have a payload segment well beyond
+    // 5000 chars — that cap silently failed to match those tokens, leaving
+    // them unmasked and sent to the LLM in plaintext, which is worse than
+    // the ReDoS hang it was meant to prevent. Benchmarking confirmed the
+    // ATTR bound above (\w{1,100}) is what actually prevents the exponential
+    // backtracking blowup on unterminated input; removing this cap keeps a
+    // 200KB malformed/unterminated input completing in well under 1 second.
     regex: new RegExp(
-      `(${ATTR})\\s*=\\s*"([A-Za-z0-9_\\-]{20,5000}\\.[A-Za-z0-9_\\-]{20,5000}\\.[A-Za-z0-9_\\-]{20,5000})"`,
+      `(${ATTR})\\s*=\\s*"([A-Za-z0-9_\\-]{20,}\\.[A-Za-z0-9_\\-]{20,}\\.[A-Za-z0-9_\\-]{20,})"`,
       'g'
     ),
     extractValue: (m) => m[2],
