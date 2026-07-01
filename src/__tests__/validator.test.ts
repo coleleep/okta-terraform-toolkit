@@ -132,6 +132,28 @@ describe('vaultProject', () => {
     expect(result.entries).toHaveLength(0);
   });
 
+  it('masks a realistic multi-cert chain whose combined body exceeds 10,000 characters', () => {
+    // A `ca_bundle` or `certificate_chain` attribute holding a CA bundle,
+    // cross-signed intermediates, or an mTLS chain routinely concatenates
+    // six or more PEM blocks. The exact base64 content doesn't matter for
+    // this pattern (it only checks the BEGIN/END markers and charset), so a
+    // synthetic repeating run stands in for real certificate bodies.
+    const makeCert = (bodyLen: number) => {
+      const body = 'MIIB'.repeat(Math.ceil(bodyLen / 4)).slice(0, bodyLen);
+      return `-----BEGIN CERTIFICATE-----\n${body}\n-----END CERTIFICATE-----`;
+    };
+    const chain = Array.from({ length: 6 }, () => makeCert(1874)).join('\n');
+    expect(chain.length).toBeGreaterThan(10_000);
+
+    const files = { 'main.tf': `ca_bundle = "${chain}"` };
+    const result = vaultProject(files);
+
+    expect(result.maskedFiles['main.tf']).not.toContain('BEGIN CERTIFICATE');
+    expect(result.maskedFiles['main.tf']).not.toContain('MIIB');
+    expect(result.entries.length).toBeGreaterThan(0);
+    expect(result.entries[0].kind).toBe('pem_key');
+  });
+
   it('masks a realistic large JWT whose payload segment exceeds 20,000 characters', () => {
     // A large Okta JWT (e.g. a token with a `groups` claim covering hundreds
     // of groups) can have a payload segment well beyond a few KB. The exact

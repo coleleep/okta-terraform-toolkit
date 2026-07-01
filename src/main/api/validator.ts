@@ -98,11 +98,20 @@ const VAULT_PATTERNS: VaultPattern[] = [
   },
   {
     kind: 'pem_key',
-    // The PEM body is bounded to 10000 chars (real PEM keys are well under
-    // 10KB of base64) so the lazy [\s\S]+? can't scan unboundedly through a
-    // large truncated/malformed PEM block that never reaches "-----END".
+    // The PEM body length is intentionally left uncapped. An earlier version
+    // capped it at 10000 chars as defense-in-depth against ReDoS, but a
+    // legitimate multi-cert chain (e.g. a `ca_bundle` or `certificate_chain`
+    // attribute holding a CA bundle, cross-signed intermediates, or an mTLS
+    // chain — six or more concatenated PEM blocks is an ordinary shape for
+    // these) can easily exceed 10KB. That cap silently failed to match such
+    // chains, leaving the certificate material unmasked and sent to the LLM
+    // in plaintext, which is worse than the ReDoS hang it was meant to
+    // prevent (same failure mode fixed for the jwt pattern above). Benchmarking
+    // confirmed the ATTR bound above (\w{1,100}) is what actually prevents the
+    // exponential backtracking blowup on unterminated input; removing this cap
+    // keeps a 200KB malformed/unterminated PEM completing in well under 1 second.
     regex: new RegExp(
-      `(${ATTR})\\s*=\\s*"(-----BEGIN [A-Z ]+-----[\\s\\S]{1,10000}?-----END [A-Z ]+-----)"`,
+      `(${ATTR})\\s*=\\s*"(-----BEGIN [A-Z ]+-----[\\s\\S]+?-----END [A-Z ]+-----)"`,
       'g'
     ),
     extractValue: (m) => m[2],
