@@ -4,24 +4,48 @@ type VaultKind = VaultEntry['kind'];
 
 interface VaultPattern {
   kind: VaultKind;
-  // Matches the full text to mask, with an optional capture group (group 1)
-  // for the attribute name when the pattern spans "attr = "value"".
+  // Matches the full text to mask. Capture group 1 is the attribute name and
+  // group 2 is the sensitive value, in the shape `attr = "value"`.
+  // Currently every pattern requires this shape (attr is always present);
+  // documented per-field below in case that assumption changes later.
   regex: RegExp;
   // Extracts just the sensitive value from a match, given the full match and its groups.
   extractValue: (match: RegExpMatchArray) => string;
+  // Extracts the attribute name (capture group 1). Always required today —
+  // all 8 patterns match "attr = "value"" — but kept as its own field in
+  // case a future pattern needs to derive/default the attribute differently.
   extractAttr: (match: RegExpMatchArray) => string;
 }
+
+// Matches tokens this module itself generates, e.g. "{{OKTA_ID_1}}".
+// Used to detect "this value is already a token we inserted" without
+// falsely matching a legitimate value that merely contains literal "{{"
+// (e.g. an unrelated Terraform template placeholder).
+const GENERATED_TOKEN_SHAPE = /^\{\{[A-Z_]+_\d+\}\}$/;
+
+// HCL attribute names are realistically well under 100 characters. Bounding
+// this quantifier (instead of leaving it as unbounded \w+) matters for more
+// than tidiness: an unbounded \w+ prefix combined with a value pattern that
+// fails to find its closing delimiter (e.g. a truncated PEM/JWT, or any
+// unterminated string) causes the regex engine to retry the ENTIRE pattern
+// starting at every word-character position in the remaining input — this is
+// what caused multi-second-to-tens-of-seconds hangs on large inputs across
+// several of the patterns below, not just the two flagged in review.
+const ATTR = '\\w{1,100}';
 
 const VAULT_PATTERNS: VaultPattern[] = [
   {
     kind: 'okta_id',
-    regex: /(\w+)\s*=\s*"((?:00[a-zA-Z]|0oa)[A-Za-z0-9]{17})"/g,
+    regex: new RegExp(`(${ATTR})\\s*=\\s*"((?:00[a-zA-Z]|0oa)[A-Za-z0-9]{17})"`, 'g'),
     extractValue: (m) => m[2],
     extractAttr: (m) => m[1],
   },
   {
     kind: 'org_url',
-    regex: /(\w+)\s*=\s*"((?:https?:\/\/)?[a-zA-Z0-9\-]+(?:\.[a-zA-Z0-9\-]+)*\.okta(?:preview)?\.com)"/g,
+    regex: new RegExp(
+      `(${ATTR})\\s*=\\s*"((?:https?:\\/\\/)?[a-zA-Z0-9\\-]+(?:\\.[a-zA-Z0-9\\-]+)*\\.okta(?:preview)?\\.com)"`,
+      'g'
+    ),
     extractValue: (m) => m[2],
     extractAttr: (m) => m[1],
   },
@@ -33,7 +57,10 @@ const VAULT_PATTERNS: VaultPattern[] = [
   },
   {
     kind: 'email',
-    regex: /(\w+)\s*=\s*"([a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,})"/g,
+    regex: new RegExp(
+      `(${ATTR})\\s*=\\s*"([a-zA-Z0-9._%+\\-]+@[a-zA-Z0-9.\\-]+\\.[a-zA-Z]{2,})"`,
+      'g'
+    ),
     extractValue: (m) => m[2],
     extractAttr: (m) => m[1],
   },
@@ -45,19 +72,31 @@ const VAULT_PATTERNS: VaultPattern[] = [
   },
   {
     kind: 'jwt',
-    regex: /(\w+)\s*=\s*"([A-Za-z0-9_\-]{20,}\.[A-Za-z0-9_\-]{20,}\.[A-Za-z0-9_\-]{20,})"/g,
+    // Each JWT segment is also bounded to 5000 chars (realistically under a
+    // few KB) so the value side can't contribute its own backtracking blowup
+    // on a long run of valid base64url characters with no closing quote.
+    regex: new RegExp(
+      `(${ATTR})\\s*=\\s*"([A-Za-z0-9_\\-]{20,5000}\\.[A-Za-z0-9_\\-]{20,5000}\\.[A-Za-z0-9_\\-]{20,5000})"`,
+      'g'
+    ),
     extractValue: (m) => m[2],
     extractAttr: (m) => m[1],
   },
   {
     kind: 'token',
-    regex: /(\w+)\s*=\s*"((?:SSWS|Bearer)\s+[A-Za-z0-9_.\-]{20,})"/g,
+    regex: new RegExp(`(${ATTR})\\s*=\\s*"((?:SSWS|Bearer)\\s+[A-Za-z0-9_.\\-]{20,})"`, 'g'),
     extractValue: (m) => m[2],
     extractAttr: (m) => m[1],
   },
   {
     kind: 'pem_key',
-    regex: /(\w+)\s*=\s*"(-----BEGIN [A-Z ]+-----[\s\S]+?-----END [A-Z ]+-----)"/g,
+    // The PEM body is bounded to 10000 chars (real PEM keys are well under
+    // 10KB of base64) so the lazy [\s\S]+? can't scan unboundedly through a
+    // large truncated/malformed PEM block that never reaches "-----END".
+    regex: new RegExp(
+      `(${ATTR})\\s*=\\s*"(-----BEGIN [A-Z ]+-----[\\s\\S]{1,10000}?-----END [A-Z ]+-----)"`,
+      'g'
+    ),
     extractValue: (m) => m[2],
     extractAttr: (m) => m[1],
   },
@@ -68,7 +107,14 @@ export function vaultProject(files: Record<string, string>): VaultResult {
   const valueToToken = new Map<string, string>();
   const entries: VaultEntry[] = [];
   const tokenCounters: Record<VaultKind, number> = {
-    okta_id: 0, org_url: 0, token: 0, client_secret: 0, email: 0, jwt: 0, pem_key: 0, hcl_pii_attr: 0,
+    okta_id: 0,
+    org_url: 0,
+    token: 0,
+    client_secret: 0,
+    email: 0,
+    jwt: 0,
+    pem_key: 0,
+    hcl_pii_attr: 0,
   };
 
   function tokenFor(kind: VaultKind, value: string, sourceFile: string, sourceAttr: string): string {
@@ -94,9 +140,19 @@ export function vaultProject(files: Record<string, string>): VaultResult {
         const attr = pattern.extractAttr(match);
         // Skip values that were already replaced by an earlier, more specific pattern
         // (e.g. an email matched by hcl_pii_attr's "login" case after email's generic case ran).
-        if (!value.includes('{{')) {
+        // GENERATED_TOKEN_SHAPE checks whether `value` IS a token we already generated
+        // (e.g. "{{EMAIL_1}}"), as opposed to a legitimate value that merely happens to
+        // contain the literal substring "{{" (e.g. an unrelated Terraform template
+        // placeholder) — the latter must still be masked, not silently skipped.
+        if (!GENERATED_TOKEN_SHAPE.test(value)) {
           const token = tokenFor(pattern.kind, value, filename, attr);
-          return match[0].replace(value, token);
+          // Reconstruct the replacement directly from the known "attr = "value""
+          // structure instead of searching for `value` as a substring inside
+          // match[0] — a substring search can match the wrong occurrence (e.g.
+          // the attribute name itself, when attr and value are equal strings,
+          // as in `client_secret = "client_secret"`), leaving the real secret
+          // unmasked in plaintext.
+          return `${attr} = "${token}"`;
         }
         return match[0];
       });
