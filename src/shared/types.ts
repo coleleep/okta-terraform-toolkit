@@ -304,3 +304,32 @@ export interface RollbackManifest {
   swapped?: boolean;
   importedAddresses?: string[];
 }
+
+export interface VaultEntry {
+  token: string;         // e.g. "{{OKTA_ID_1}}"
+  value: string;         // original hardcoded value — never sent to the LLM
+  kind: 'okta_id' | 'org_url' | 'token' | 'client_secret' | 'email' | 'jwt' | 'pem_key' | 'hcl_pii_attr';
+  sourceFile: string;    // filename this value was found in
+  sourceAttr: string;    // HCL attribute name, e.g. "app_id" — used to derive a variable name on export
+}
+
+export interface VaultResult {
+  maskedFiles: Record<string, string>; // filename -> masked content
+  entries: VaultEntry[];
+}
+
+export interface Finding {
+  id: string;
+  category: 'correctness' | 'optimization';
+  severity: 'error' | 'warning' | 'suggestion';
+  file: string;
+  resourceAddress: string;  // e.g. "okta_app_oauth.my_app"
+  title: string;
+  explanation: string;
+  fixedSnippet: string;     // masked HCL after fix
+}
+
+export interface ValidatorAnalysis {
+  findings: Finding[];
+  fixedMaskedFiles: Record<string, string>; // filename -> corrected masked content (.tf/.tfvars only)
+}
