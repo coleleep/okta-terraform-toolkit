@@ -179,3 +179,69 @@ export function vaultProject(files: Record<string, string>): VaultResult {
 
   return { maskedFiles, entries };
 }
+
+export interface ExportResult {
+  files: Record<string, string>; // filename -> final content, ready to write to disk
+}
+
+export function exportProject(
+  maskedFiles: Record<string, string>,
+  entries: VaultEntry[],
+): ExportResult {
+  const files: Record<string, string> = { ...maskedFiles };
+  const usedVarNames = new Set<string>();
+  const varNameForToken = new Map<string, string>();
+  const declarationsToAdd: string[] = [];
+  const tfvarsAssignmentsToAdd: string[] = [];
+
+  for (const entry of entries) {
+    const isFromTfvars = entry.sourceFile.endsWith('.tfvars');
+
+    if (isFromTfvars) {
+      // Restore in place: replace the token with the real value directly in the tfvars content.
+      for (const [filename, content] of Object.entries(files)) {
+        if (content.includes(entry.token)) {
+          files[filename] = content.split(entry.token).join(entry.value);
+        }
+      }
+      continue;
+    }
+
+    // Promote: derive a unique variable name from sourceAttr.
+    let baseName = entry.sourceAttr.replace(/[^a-zA-Z0-9_]/g, '_') || 'value';
+    let counter = 1;
+    let varName = `${baseName}_${counter}`;
+    while (usedVarNames.has(varName)) {
+      counter += 1;
+      varName = `${baseName}_${counter}`;
+    }
+    usedVarNames.add(varName);
+    varNameForToken.set(entry.token, varName);
+
+    declarationsToAdd.push(
+      `variable "${varName}" {\n  type      = string\n  sensitive = true\n}\n`,
+    );
+    tfvarsAssignmentsToAdd.push(`${varName} = "${entry.value}"`);
+
+    for (const [filename, content] of Object.entries(files)) {
+      if (filename.endsWith('.tfvars')) continue; // never rewrite tfvars content with var. references
+      if (content.includes(entry.token)) {
+        files[filename] = content.split(entry.token).join(`var.${varName}`);
+      }
+    }
+  }
+
+  if (declarationsToAdd.length > 0) {
+    const existingVariablesTf = files['variables.tf'] ?? '';
+    const separator = existingVariablesTf.trim().length > 0 ? '\n' : '';
+    files['variables.tf'] = existingVariablesTf + separator + declarationsToAdd.join('\n');
+  }
+
+  if (tfvarsAssignmentsToAdd.length > 0) {
+    const existingTfvars = files['terraform.tfvars'] ?? '';
+    const separator = existingTfvars.trim().length > 0 ? '\n' : '';
+    files['terraform.tfvars'] = existingTfvars + separator + tfvarsAssignmentsToAdd.join('\n') + '\n';
+  }
+
+  return { files };
+}

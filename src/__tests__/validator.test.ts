@@ -1,4 +1,4 @@
-import { vaultProject } from '../main/api/validator';
+import { vaultProject, exportProject } from '../main/api/validator';
 
 describe('vaultProject', () => {
   it('masks an Okta ID and records a reversible vault entry', () => {
@@ -194,5 +194,58 @@ describe('vaultProject', () => {
       value: '{{not-a-real-token}}',
       kind: 'client_secret',
     });
+  });
+});
+
+describe('exportProject', () => {
+  it('promotes a .tf-sourced value to variables.tf + terraform.tfvars, not inlined', () => {
+    const original = { 'main.tf': 'resource "okta_app_oauth" "x" { app_id = "0oaABCDEFGHIJKLMNOPQ" }' };
+    const { maskedFiles, entries } = vaultProject(original);
+
+    const result = exportProject(maskedFiles, entries);
+
+    expect(result.files['main.tf']).not.toContain('0oaABCDEFGHIJKLMNOPQ');
+    expect(result.files['main.tf']).toMatch(/var\.app_id_1/);
+    expect(result.files['variables.tf']).toContain('variable "app_id_1"');
+    expect(result.files['variables.tf']).not.toContain('0oaABCDEFGHIJKLMNOPQ');
+    expect(result.files['variables.tf']).not.toContain('default');
+    expect(result.files['terraform.tfvars']).toContain('app_id_1 = "0oaABCDEFGHIJKLMNOPQ"');
+  });
+
+  it('restores a .tfvars-sourced value in place without promoting it', () => {
+    const original = { 'terraform.tfvars': 'app_id = "0oaABCDEFGHIJKLMNOPQ"' };
+    const { maskedFiles, entries } = vaultProject(original);
+
+    const result = exportProject(maskedFiles, entries);
+
+    expect(result.files['terraform.tfvars']).toBe('app_id = "0oaABCDEFGHIJKLMNOPQ"');
+    expect(result.files['variables.tf']).toBeUndefined();
+  });
+
+  it('appends to an existing variables.tf without disturbing existing declarations', () => {
+    const original = {
+      'main.tf': 'app_id = "0oaABCDEFGHIJKLMNOPQ"',
+      'variables.tf': 'variable "region" {\n  type = string\n}\n',
+    };
+    const { maskedFiles, entries } = vaultProject(original);
+
+    const result = exportProject(maskedFiles, entries);
+
+    expect(result.files['variables.tf']).toContain('variable "region"');
+    expect(result.files['variables.tf']).toContain('variable "app_id_1"');
+  });
+
+  it('deduplicates variable names when the same sourceAttr appears more than once', () => {
+    const original = {
+      'main.tf': 'a = "0oaAAAAAAAAAAAAAAAAA"\nb = "0oaBBBBBBBBBBBBBBBBB"',
+    };
+    // Force both entries to share sourceAttr "app_id" to exercise the dedup counter.
+    const vaulted = vaultProject(original);
+    const entries = vaulted.entries.map(e => ({ ...e, sourceAttr: 'app_id' }));
+
+    const result = exportProject(vaulted.maskedFiles, entries);
+
+    expect(result.files['variables.tf']).toContain('variable "app_id_1"');
+    expect(result.files['variables.tf']).toContain('variable "app_id_2"');
   });
 });
