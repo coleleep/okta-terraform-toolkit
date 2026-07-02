@@ -1,4 +1,6 @@
-import { VaultEntry, VaultResult } from '../../shared/types';
+import { getClient } from './claude';
+import { RESOURCE_DICTIONARY } from '../../shared/resource-dictionary';
+import { VaultEntry, VaultResult, Finding, ValidatorAnalysis } from '../../shared/types';
 
 type VaultKind = VaultEntry['kind'];
 
@@ -263,4 +265,95 @@ export function exportProject(
   }
 
   return { files };
+}
+
+function buildResourceNameContext(): string {
+  const names = RESOURCE_DICTIONARY.map(r => r.terraformResource).join(', ');
+  return `Valid Okta Terraform resource and data source names (use ONLY these — never invent a resource name not in this list):\n${names}`;
+}
+
+const VALIDATOR_SYSTEM_PROMPT = `You are a senior Okta Terraform reviewer. You will be given one or more masked Terraform files (secrets and identifiers have been replaced with tokens like {{OKTA_ID_1}} — treat these as opaque placeholders, never remove or rewrite the token syntax itself).
+
+${buildResourceNameContext()}
+
+Review the combined project across ALL provided files for:
+
+CORRECTNESS issues:
+- Resource or data source names that are not in the valid list above (these are hallucinations and must be flagged as errors)
+- Missing required attributes or use of deprecated attributes
+- Resources that reference another resource without a "depends_on" where Terraform cannot infer the ordering automatically
+- Conflicting or ambiguous "priority" values across policy rules or auth server rules
+- Import ID or destroy-behavior mistakes
+
+OPTIMIZATION suggestions (always severity "suggestion", never "error" or "warning"):
+- Near-identical repeated resource blocks that could collapse into a single block using for_each or count
+- SAML/OIDC app resources where "skip_authentication_policy" would reduce unnecessary /policies API calls, when the authentication policy is not independently managed elsewhere in the project
+- Hardcoded value duplication where a "data" source lookup would be more maintainable
+- Provider configuration tuning opportunities (max_retries, parallelism) if a provider.tf is included
+
+Never suggest "skip_users" or "skip_groups" — both are deprecated in the Okta Terraform provider and must not appear in any recommendation.
+
+For each finding, call the report_findings tool with the complete list of findings AND the complete corrected content for every .tf/.tfvars file that needed a change (files with no issues can be omitted from fixedFiles).`;
+
+export async function analyzeProject(maskedFiles: Record<string, string>): Promise<ValidatorAnalysis> {
+  const client = getClient();
+
+  const fileBlocks = Object.entries(maskedFiles)
+    .map(([name, content]) => `--- ${name} ---\n${content}`)
+    .join('\n\n');
+
+  const response = await client.messages.create({
+    model: 'claude-sonnet-4-6',
+    max_tokens: 8192,
+    system: VALIDATOR_SYSTEM_PROMPT,
+    messages: [{
+      role: 'user',
+      content: `Review this Terraform project:\n\n${fileBlocks}`,
+    }],
+    tool_choice: { type: 'any' },
+    tools: [{
+      name: 'report_findings',
+      description: 'Report validation findings and corrected file content',
+      input_schema: {
+        type: 'object' as const,
+        properties: {
+          findings: {
+            type: 'array',
+            items: {
+              type: 'object',
+              properties: {
+                id: { type: 'string' },
+                category: { type: 'string', enum: ['correctness', 'optimization'] },
+                severity: { type: 'string', enum: ['error', 'warning', 'suggestion'] },
+                file: { type: 'string' },
+                resourceAddress: { type: 'string' },
+                title: { type: 'string' },
+                explanation: { type: 'string' },
+                fixedSnippet: { type: 'string' },
+              },
+              required: ['id', 'category', 'severity', 'file', 'resourceAddress', 'title', 'explanation', 'fixedSnippet'],
+            },
+          },
+          fixedFiles: {
+            type: 'object',
+            description: 'Map of filename to full corrected file content, for files that needed changes',
+            additionalProperties: { type: 'string' },
+          },
+        },
+        required: ['findings', 'fixedFiles'],
+      },
+    }],
+  });
+
+  const toolUseBlock = response.content.find(b => b.type === 'tool_use');
+  if (!toolUseBlock || toolUseBlock.type !== 'tool_use') {
+    throw new Error('Claude did not return structured validation results');
+  }
+
+  const input = toolUseBlock.input as { findings: Finding[]; fixedFiles: Record<string, string> };
+
+  return {
+    findings: input.findings,
+    fixedMaskedFiles: { ...maskedFiles, ...input.fixedFiles },
+  };
 }
