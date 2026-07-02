@@ -267,6 +267,41 @@ export function exportProject(
   return { files };
 }
 
+const IDLE_TIMEOUT_MS = 15 * 60 * 1000;
+
+interface ValidatorSession {
+  vault: VaultResult;
+  timer: ReturnType<typeof setTimeout>;
+}
+
+const sessions = new Map<string, ValidatorSession>();
+let sessionCounter = 0;
+
+export function createSession(vault: VaultResult): string {
+  sessionCounter += 1;
+  const id = `validator-session-${sessionCounter}`;
+  const timer = setTimeout(() => sessions.delete(id), IDLE_TIMEOUT_MS);
+  sessions.set(id, { vault, timer });
+  return id;
+}
+
+export function getSession(id: string): ValidatorSession | null {
+  return sessions.get(id) ?? null;
+}
+
+export function touchSession(id: string): void {
+  const session = sessions.get(id);
+  if (!session) return;
+  clearTimeout(session.timer);
+  session.timer = setTimeout(() => sessions.delete(id), IDLE_TIMEOUT_MS);
+}
+
+export function clearSession(id: string): void {
+  const session = sessions.get(id);
+  if (session) clearTimeout(session.timer);
+  sessions.delete(id);
+}
+
 function buildResourceNameContext(): string {
   const names = RESOURCE_DICTIONARY.map(r => r.terraformResource).join(', ');
   return `Valid Okta Terraform resource and data source names (use ONLY these — never invent a resource name not in this list):\n${names}`;

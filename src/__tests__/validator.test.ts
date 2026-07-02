@@ -1,4 +1,4 @@
-import { vaultProject, exportProject } from '../main/api/validator';
+import { vaultProject, exportProject, createSession, getSession, clearSession, touchSession } from '../main/api/validator';
 
 describe('vaultProject', () => {
   it('masks an Okta ID and records a reversible vault entry', () => {
@@ -295,5 +295,50 @@ describe('exportProject', () => {
     expect(result.files['variables.tf']).toContain('variable "app_id_2"');
     expect(result.files['main.tf']).toMatch(/var\.app_id_2/);
     expect(result.files['terraform.tfvars']).toContain('app_id_2 = "0oaABCDEFGHIJKLMNOPQ"');
+  });
+});
+
+describe('validator session store', () => {
+  afterEach(() => {
+    jest.useRealTimers();
+  });
+
+  it('creates and retrieves a session by id', () => {
+    const id = createSession({ maskedFiles: { 'main.tf': 'x' }, entries: [] });
+    const session = getSession(id);
+
+    expect(session).not.toBeNull();
+    expect(session!.vault.maskedFiles['main.tf']).toBe('x');
+  });
+
+  it('returns null for an unknown session id', () => {
+    expect(getSession('does-not-exist')).toBeNull();
+  });
+
+  it('clearSession removes the session', () => {
+    const id = createSession({ maskedFiles: {}, entries: [] });
+    clearSession(id);
+
+    expect(getSession(id)).toBeNull();
+  });
+
+  it('auto-clears a session after 15 minutes of inactivity', () => {
+    jest.useFakeTimers();
+    const id = createSession({ maskedFiles: {}, entries: [] });
+
+    jest.advanceTimersByTime(15 * 60 * 1000 + 1000);
+
+    expect(getSession(id)).toBeNull();
+  });
+
+  it('touchSession resets the idle timer', () => {
+    jest.useFakeTimers();
+    const id = createSession({ maskedFiles: {}, entries: [] });
+
+    jest.advanceTimersByTime(10 * 60 * 1000);
+    touchSession(id);
+    jest.advanceTimersByTime(10 * 60 * 1000);
+
+    expect(getSession(id)).not.toBeNull(); // 20 min total elapsed, but touched at 10 min mark
   });
 });
