@@ -8,7 +8,7 @@ interface VaultSummaryEntry {
   sourceAttr: string;
 }
 
-type Stage = 'upload' | 'ready' | 'analyzing' | 'reviewed' | 'exported';
+type Stage = 'upload' | 'ready' | 'analyzing' | 'reviewed' | 'exporting' | 'exported';
 
 const SEVERITY_STYLES: Record<Finding['severity'], string> = {
   error: 'bg-red-50 text-red-700 border-red-200',
@@ -68,9 +68,11 @@ export default function ValidatorSection() {
   const handleExport = async () => {
     if (!sessionId) return;
     setError(null);
+    setStage('exporting');
     const result = await window.oktaTerraform.validatorExport(sessionId, fixedMaskedFiles);
     if (!result.success) {
       setError(result.error ?? 'Export failed');
+      setStage('reviewed');
       return;
     }
     setExportedDir(result.data ?? null);
@@ -125,6 +127,7 @@ export default function ValidatorSection() {
         <div className="bg-surface-2 rounded-xl border border-border overflow-hidden">
           <button
             onClick={() => setVaultExpanded(!vaultExpanded)}
+            aria-expanded={vaultExpanded}
             className="w-full flex items-center justify-between px-4 py-3 text-left"
           >
             <span className="text-sm font-medium text-text-primary">
@@ -160,6 +163,12 @@ export default function ValidatorSection() {
         </div>
       )}
 
+      {stage === 'exporting' && (
+        <div className="bg-surface-2 rounded-xl border border-border p-6 text-center text-text-secondary text-sm">
+          Exporting...
+        </div>
+      )}
+
       {stage === 'reviewed' && (
         <div className="space-y-4">
           <FindingsGroup title="Correctness" findings={correctnessFindings} />
@@ -173,9 +182,9 @@ export default function ValidatorSection() {
         </div>
       )}
 
-      {stage === 'exported' && exportedDir && (
+      {stage === 'exported' && (
         <div className="bg-green-50 border border-green-200 text-green-700 text-xs rounded-lg p-3">
-          Exported to {exportedDir}
+          {exportedDir ? `Exported to ${exportedDir}` : 'Export complete.'}
         </div>
       )}
 
