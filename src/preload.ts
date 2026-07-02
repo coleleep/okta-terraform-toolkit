@@ -72,6 +72,14 @@ const api = {
     ipcRenderer.invoke('sync:convert', { tfContent, matches, targetOrgUrl }),
   stageTfFiles: (tfFiles: Record<string, string>, stateContent?: string) =>
     ipcRenderer.invoke('sync:stage-files', { tfFiles, stateContent }),
+
+  // Validator
+  validatorOpenFiles: () => ipcRenderer.invoke('validator:open-files'),
+  validatorAnalyze: (sessionId: string) => ipcRenderer.invoke('validator:analyze', { sessionId }),
+  validatorExport: (sessionId: string, fixedMaskedFiles: Record<string, string>) =>
+    ipcRenderer.invoke('validator:export', { sessionId, fixedMaskedFiles }),
+  validatorClearSession: (sessionId: string) => ipcRenderer.invoke('validator:clear-session', { sessionId }),
+
   syncDeepProbe: (terraformTypes: string[]) =>
     ipcRenderer.invoke('sync:deep-probe', { terraformTypes }),
   syncCompare: (sourceTypes: string[], reversed?: boolean) =>
