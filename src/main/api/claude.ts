@@ -603,9 +603,12 @@ export async function convertConfig(
     }
   }
   const matchContext = matchLines.join('\n');
-  const cleanTfContent = redact(tfContent);
-  const cleanTargetOrgUrl = redact(targetOrgUrl);
-  const cleanMatchContext = redact(matchContext);
+
+  // NOTE: tfContent, targetOrgUrl, and matchContext are NOT redacted here.
+  // Unlike the other 4 LLM call sites, this data isn't summarized for a human —
+  // it drives real Terraform codegen (org URL, resource IDs) that gets applied
+  // to the user's own org. Redacting it corrupts the generated HCL with literal
+  // placeholder strings like "[OKTA_ID]" instead of real values.
 
   const response = await client.messages.create({
     model: 'claude-sonnet-4-6',
@@ -729,7 +732,7 @@ resource "okta_auth_server_policy" "policy_2" {
 }`,
     messages: [{
       role: 'user',
-      content: `Target org: ${cleanTargetOrgUrl}\n\nResource mapping:\n${cleanMatchContext}\n\nOriginal .tf configuration:\n${cleanTfContent}`,
+      content: `Target org: ${targetOrgUrl}\n\nResource mapping:\n${matchContext}\n\nOriginal .tf configuration:\n${tfContent}`,
     }],
     tool_choice: { type: 'any' },
     tools: [{
