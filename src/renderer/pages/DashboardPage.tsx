@@ -254,7 +254,7 @@ export default function DashboardPage() {
 
           <div className={activeSection === 'plan' ? '' : 'hidden'}><PlanSection /></div>
           <div className={activeSection === 'sync' ? '' : 'hidden'}><SyncSection /></div>
-          <div className={activeSection === 'validate' ? '' : 'hidden'}><ValidatorSection /></div>
+          {activeSection === 'validate' && <ValidatorSection />}
           <div className={activeSection === 'debug' ? '' : 'hidden'}><DebugSection /></div>
           <div className={activeSection === 'learn' ? '' : 'hidden'}><LearnSection /></div>
 
