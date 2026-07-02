@@ -7,11 +7,12 @@ import PlanSection from '../components/PlanSection';
 import DebugSection from '../components/DebugSection';
 import LearnSection from '../components/LearnSection';
 import SyncSection from '../components/SyncSection';
+import ValidatorSection from '../components/ValidatorSection';
 import SettingsModal from '../components/SettingsModal';
 import ConnectOrgModal from '../components/ConnectOrgModal';
 import { SUPPORTED_VERSIONS } from '../../shared/versions';
 
-type Section = 'rate-limits' | 'plan' | 'sync' | 'debug' | 'learn';
+type Section = 'rate-limits' | 'plan' | 'sync' | 'validate' | 'debug' | 'learn';
 
 /* ── SVG Icons ─────────────────────────────────────────────── */
 const icons: Record<Section, React.ReactNode> = {
@@ -37,6 +38,12 @@ const icons: Record<Section, React.ReactNode> = {
       <polyline points="3 16 3 12 7 12" />
     </svg>
   ),
+  validate: (
+    <svg width="18" height="18" viewBox="0 0 18 18" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M9 15l-4-4 1.4-1.4L9 12.2l5.6-5.6L16 8l-7 7z" />
+      <circle cx="9" cy="9" r="7.5" />
+    </svg>
+  ),
   debug: (
     <svg width="18" height="18" viewBox="0 0 18 18" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
       <path d="M3 4h12" />
@@ -58,6 +65,7 @@ const NAV_ITEMS: { id: Section; label: string }[] = [
   { id: 'rate-limits', label: 'Rate Limits' },
   { id: 'plan', label: 'Plan' },
   { id: 'sync', label: 'Sync' },
+  { id: 'validate', label: 'Validate' },
   { id: 'debug', label: 'Debug' },
   { id: 'learn', label: 'Learn' },
 ];
@@ -246,6 +254,7 @@ export default function DashboardPage() {
 
           <div className={activeSection === 'plan' ? '' : 'hidden'}><PlanSection /></div>
           <div className={activeSection === 'sync' ? '' : 'hidden'}><SyncSection /></div>
+          {activeSection === 'validate' && <ValidatorSection />}
           <div className={activeSection === 'debug' ? '' : 'hidden'}><DebugSection /></div>
           <div className={activeSection === 'learn' ? '' : 'hidden'}><LearnSection /></div>
 

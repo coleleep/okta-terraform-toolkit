@@ -134,7 +134,7 @@ export function setApiKey(key: string): void {
   setClaudeConfig({ apiKey: key, baseUrl: existing?.baseUrl });
 }
 
-function getClient(): Anthropic {
+export function getClient(): Anthropic {
   const config = getClaudeConfig();
   if (!config?.apiKey) {
     throw new Error(

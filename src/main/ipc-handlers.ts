@@ -12,6 +12,7 @@ import { analyzeTargetRuntime } from './api/target-analyzer';
 import { probeSubResourceEndpoint } from './api/deep-probe';
 import { parseLogFile } from './api/log-parser';
 import { interpretLog, buildWorkload, decodeError, generateSolution, convertConfig, getApiKey, setApiKey, getClaudeConfig, setClaudeConfig, removeClaudeConfig, getOcmStatus } from './api/claude';
+import { vaultProject, analyzeProject, exportProject, createSession, getSession, touchSession, clearSession } from './api/validator';
 import { convertConfigDeterministic } from './api/sync-convert';
 import { parseStateFile, syncWithSubResources, buildSyncSummary, discoverSourceResources, discoverTargetResources, matchResources, fetchAttributeDiff, parseTfAttributesFromFiles } from './api/sync';
 import { logger, setLevel, getLevel } from './logger';
@@ -528,6 +529,109 @@ export function registerIpcHandlers() {
       const message = error instanceof Error ? error.message : String(error);
       return { success: false, error: message };
     }
+  });
+
+  // Validator — file upload (.tf/.tfstate/.tfvars)
+  ipcMain.handle('validator:open-files', async () => {
+    const { dialog } = await import('electron');
+    const win = getMainWindow();
+    if (!win) return { success: false, error: 'No window available.' };
+    const result = await dialog.showOpenDialog(win, {
+      title: 'Select Terraform project files (.tf, .tfstate, .tfvars)',
+      filters: [
+        { name: 'Terraform Files', extensions: ['tf', 'tfstate', 'tfvars'] },
+        { name: 'All Files', extensions: ['*'] },
+      ],
+      properties: ['openFile', 'multiSelections'],
+    });
+    if (result.canceled || !result.filePaths.length) return { success: false, error: 'Cancelled' };
+
+    const files: Record<string, string> = {};
+    for (const fp of result.filePaths) {
+      files[path.basename(fp)] = fs.readFileSync(fp, 'utf-8');
+    }
+
+    if (!Object.keys(files).some(name => name.endsWith('.tf'))) {
+      return { success: false, error: 'At least one .tf file is required.' };
+    }
+
+    const vault = vaultProject(files);
+    const sessionId = createSession(vault);
+    logger.info('validator', 'files vaulted', { sessionId, fileCount: Object.keys(files).length, entryCount: vault.entries.length });
+
+    return {
+      success: true,
+      data: {
+        sessionId,
+        maskedFiles: vault.maskedFiles,
+        // Real values never leave the main process — only tokens, kinds, and source locations.
+        vaultSummary: vault.entries.map(e => ({ token: e.token, kind: e.kind, sourceFile: e.sourceFile, sourceAttr: e.sourceAttr })),
+      },
+    };
+  });
+
+  // Validator — AI analysis of masked files
+  ipcMain.handle('validator:analyze', async (_event, params: { sessionId: string }) => {
+    try {
+      const session = getSession(params.sessionId);
+      if (!session) {
+        return { success: false, error: 'Session expired or not found. Please re-upload your files.' };
+      }
+      touchSession(params.sessionId);
+
+      logger.info('validator', 'analyze started', { sessionId: params.sessionId });
+      const analysis = await analyzeProject(session.vault.maskedFiles);
+      logger.info('validator', 'analyze complete', { sessionId: params.sessionId, findingCount: analysis.findings.length });
+
+      return { success: true, data: analysis };
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : String(error);
+      logger.error('validator', 'analyze failed', { error: message });
+      return { success: false, error: message };
+    }
+  });
+
+  // Validator — export fixed project (restores/promotes vaulted values, clears session)
+  ipcMain.handle('validator:export', async (_event, params: { sessionId: string; fixedMaskedFiles: Record<string, string> }) => {
+    try {
+      const session = getSession(params.sessionId);
+      if (!session) {
+        return { success: false, error: 'Session expired or not found. Please re-upload your files.' };
+      }
+
+      const { dialog } = await import('electron');
+      const win = getMainWindow();
+      if (!win) return { success: false, error: 'No window available.' };
+
+      const dirResult = await dialog.showOpenDialog(win, {
+        title: 'Choose directory for validated Terraform project',
+        properties: ['openDirectory', 'createDirectory'],
+      });
+      if (dirResult.canceled || !dirResult.filePaths[0]) {
+        return { success: false, error: 'Cancelled' };
+      }
+
+      const { files } = exportProject(params.fixedMaskedFiles, session.vault.entries);
+      const dir = dirResult.filePaths[0];
+      for (const [filename, content] of Object.entries(files)) {
+        fs.writeFileSync(path.join(dir, filename), content, 'utf8');
+      }
+
+      clearSession(params.sessionId);
+      logger.info('validator', 'export complete', { sessionId: params.sessionId, fileCount: Object.keys(files).length });
+
+      return { success: true, data: dir };
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : String(error);
+      logger.error('validator', 'export failed', { error: message });
+      return { success: false, error: message };
+    }
+  });
+
+  // Validator — explicit session clear (Discard / Start Over, or tab unmount)
+  ipcMain.handle('validator:clear-session', (_event, params: { sessionId: string }) => {
+    clearSession(params.sessionId);
+    return { success: true };
   });
 
   // Sync — deep probe target org for resource types in the source config

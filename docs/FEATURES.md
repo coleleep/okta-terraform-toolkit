@@ -77,6 +77,17 @@ Produces production-ready Terraform files with best-practice configurations:
 
 → [How to use: Code Generation](USAGE.md#code-generation)
 
+### Terraform Validator
+
+Upload `.tf`, `.tfstate`, or `.tfvars` files and validate them for correctness and optimization opportunities before applying.
+
+- **Automatic PII masking** — detects and masks hardcoded secrets (API keys, tokens, certificates) before any content is sent to the AI; a summary lists every masked value and the file it came from
+- **AI analysis** — findings returned and grouped by severity: errors, warnings, and suggestions
+- **Secret promotion on export** — masked values are extracted to `variables.tf` + `terraform.tfvars` automatically when you export the validated files
+- **Session lifecycle** — sessions expire after 15 minutes of inactivity with no data retained
+
+→ [How to use: Terraform Validator](USAGE.md#terraform-validator)
+
 ## Supported Provider Versions
 
 6.6.1 through 6.13.0 (default). Version-specific resource additions and attribute changes are tracked automatically.
@@ -102,6 +113,7 @@ src/
 │   │   ├── okta-provider-manager.ts  # Provider version download & mirror
 │   │   ├── log-parser.ts        # TF_LOG debug file parser & interpreter
 │   │   ├── redact.ts            # Sensitive data redaction
+│   │   ├── validator.ts         # Terraform file validation, PII masking, and export with secret promotion
 │   │   └── write-probe-test.ts  # Test fixture generation
 │   ├── logger.ts       # Structured audit logging with rotation
 │   ├── ipc-handlers.ts # IPC command registry (50+ handlers)
@@ -128,6 +140,7 @@ src/
 │   │   ├── BestPractices.tsx         # Best practice guidelines
 │   │   ├── ResourceLimitations.tsx   # Resource import/destroy/OIE limitations reference
 │   │   ├── LearnSection.tsx          # Learn tab container (Best Practices + Resource Limitations)
+│   │   ├── ValidatorSection.tsx      # Terraform Validator tab (upload, mask preview, analysis, export)
 │   │   ├── SettingsModal.tsx         # App preferences & AI config
 │   │   ├── ContextualTip.tsx         # Inline help tooltips
 │   │   ├── CustomWorkload.tsx        # User workload input
