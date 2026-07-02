@@ -299,6 +299,10 @@ describe('exportProject', () => {
 });
 
 describe('validator session store', () => {
+  beforeEach(() => {
+    jest.useFakeTimers();
+  });
+
   afterEach(() => {
     jest.clearAllTimers();
     jest.useRealTimers();
@@ -324,7 +328,6 @@ describe('validator session store', () => {
   });
 
   it('auto-clears a session after 15 minutes of inactivity', () => {
-    jest.useFakeTimers();
     const id = createSession({ maskedFiles: {}, entries: [] });
 
     jest.advanceTimersByTime(15 * 60 * 1000 + 1000);
@@ -333,7 +336,6 @@ describe('validator session store', () => {
   });
 
   it('touchSession resets the idle timer', () => {
-    jest.useFakeTimers();
     const id = createSession({ maskedFiles: {}, entries: [] });
 
     jest.advanceTimersByTime(10 * 60 * 1000);
