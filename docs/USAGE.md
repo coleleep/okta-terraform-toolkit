@@ -12,6 +12,7 @@ A step-by-step guide for each OTTO feature. If you are new to OTTO, start with [
 - [Code Generation](#code-generation)
 - [Target Runtime Planner](#target-runtime-planner)
 - [Cross-Org Sync](#cross-org-sync)
+- [Terraform Validator](#terraform-validator)
 - [AI Features](#ai-features)
 
 ---
@@ -166,6 +167,27 @@ The header updates to show your org URL once connected. Click **Disconnect** to 
 - OTTO saves a rollback bundle before each apply. Use it under **Rollback** if you need to undo.
 - Deterministic convert mode handles most ID substitutions without an AI key. AI conversion adds intelligence for complex cross-resource mappings.
 - Use the **swap** button (⇅) between the org panels to swap source and target and verify parity in both directions.
+
+---
+
+## Terraform Validator
+
+The **Validate** tab lets you check Terraform files for correctness and optimization opportunities before applying them.
+
+### Supported file types
+- `.tf` — Terraform configuration files
+- `.tfstate` — Terraform state files
+- `.tfvars` — Variable definition files
+
+### How it works
+1. **Upload** — Drag-and-drop or click to select one or more Terraform files.
+2. **Review masked values** — OTTO automatically detects and masks hardcoded secrets (API keys, tokens, certificates) before sending anything to the AI. A summary shows which values were masked and from which files, so nothing sensitive leaves your machine in plaintext.
+3. **Analyze** — Click **Analyze** to send the masked files to the AI for review. Findings are grouped by severity: errors, warnings, and suggestions.
+4. **Export** — Click **Export** to write the validated files back to disk. Hardcoded values that were masked are promoted to `variables.tf` + `terraform.tfvars` automatically.
+5. **Discard** — Click **Discard** to cancel the session without writing any files.
+
+### Session lifecycle
+Sessions expire automatically after 15 minutes of inactivity. If your session expires, start over from the Upload step.
 
 ---
 
