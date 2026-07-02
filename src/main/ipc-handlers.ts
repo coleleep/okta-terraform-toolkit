@@ -601,7 +601,7 @@ export function registerIpcHandlers() {
 
       const { dialog } = await import('electron');
       const win = getMainWindow();
-      if (!win) throw new Error('No window');
+      if (!win) return { success: false, error: 'No window available.' };
 
       const dirResult = await dialog.showOpenDialog(win, {
         title: 'Choose directory for validated Terraform project',

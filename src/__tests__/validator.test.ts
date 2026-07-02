@@ -300,6 +300,7 @@ describe('exportProject', () => {
 
 describe('validator session store', () => {
   afterEach(() => {
+    jest.clearAllTimers();
     jest.useRealTimers();
   });
 
