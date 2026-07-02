@@ -535,16 +535,16 @@ export function registerIpcHandlers() {
   ipcMain.handle('validator:open-files', async () => {
     const { dialog } = await import('electron');
     const win = getMainWindow();
-    if (!win) return null;
+    if (!win) return { success: false, error: 'No window available.' };
     const result = await dialog.showOpenDialog(win, {
       title: 'Select Terraform project files (.tf, .tfstate, .tfvars)',
       filters: [
-        { name: 'Terraform Files', extensions: ['tf', 'tfstate', 'tfvars', 'json'] },
+        { name: 'Terraform Files', extensions: ['tf', 'tfstate', 'tfvars'] },
         { name: 'All Files', extensions: ['*'] },
       ],
       properties: ['openFile', 'multiSelections'],
     });
-    if (result.canceled || !result.filePaths.length) return null;
+    if (result.canceled || !result.filePaths.length) return { success: false, error: 'Cancelled' };
 
     const files: Record<string, string> = {};
     for (const fp of result.filePaths) {
