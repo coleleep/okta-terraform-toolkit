@@ -4,19 +4,80 @@ import { VaultEntry, VaultResult, Finding, ValidatorAnalysis } from '../../share
 
 type VaultKind = VaultEntry['kind'];
 
+type AttrValueGroups = Record<string, string | undefined>;
+
 interface VaultPattern {
   kind: VaultKind;
-  // Matches the full text to mask. Capture group 1 is the attribute name and
-  // group 2 is the sensitive value, in the shape `attr = "value"`.
-  // Currently every pattern requires this shape (attr is always present);
-  // documented per-field below in case that assumption changes later.
+  // Matches the full text to mask, in either HCL (`attr = "value"`) or JSON
+  // (`"attr": "value"`) shape — see attrValuePattern(). Uses named capture
+  // groups (hclAttr/hclVal vs jsonAttr/jsonVal) so extractAttr/extractValue
+  // can tell which syntax matched.
   regex: RegExp;
-  // Extracts just the sensitive value from a match, given the full match and its groups.
-  extractValue: (match: RegExpMatchArray) => string;
-  // Extracts the attribute name (capture group 1). Always required today —
-  // all 8 patterns match "attr = "value"" — but kept as its own field in
-  // case a future pattern needs to derive/default the attribute differently.
-  extractAttr: (match: RegExpMatchArray) => string;
+  // Matches the same attribute name, but array-valued: `attr = [...]` (HCL)
+  // or `"attr": [...]` (JSON) — see attrArrayPattern(). The body is
+  // re-scanned per-element using valuePattern below, since one array can mix
+  // PII and non-PII elements.
+  arrayRegex: RegExp;
+  // The raw value-pattern source (same one baked into `regex`), reused to
+  // build a per-element regex against an array body.
+  valuePattern: string;
+  // Extracts just the sensitive value from the named capture groups.
+  extractValue: (groups: AttrValueGroups) => string;
+  // Extracts the attribute name from the named capture groups.
+  extractAttr: (groups: AttrValueGroups) => string;
+  // For value shapes specific enough to be unambiguous on their own (an Okta
+  // ID, an org URL, an email, a JWT, an SSWS/Bearer token, a PEM block) —
+  // matches the bare valuePattern anywhere in the raw text, not just when the
+  // whole quoted value equals it. Real .tfstate content routinely embeds
+  // these as substrings of a larger JSON- or XML-encoded string (e.g. the
+  // `links`, `metadata`, `embed_url` attributes Okta's provider produces),
+  // where the attr="value" shape never matches at all. Patterns whose value
+  // shape is generic (client_secret, hcl_pii_attr — both use `[^"]+`) must
+  // stay attribute-anchored; scanning those anywhere would mask arbitrary
+  // strings.
+  bareRegex: RegExp | null;
+}
+
+// Builds a regex source matching `attrPattern = "valuePattern"` (HCL) or
+// `"attrPattern": "valuePattern"` (JSON, as used by .tfstate). Both branches
+// share the same value pattern and ATTR-style bounding, so the ReDoS defense
+// documented on ATTR below applies equally to the JSON branch.
+function attrValuePattern(attrPattern: string, valuePattern: string): string {
+  return (
+    `(?:(?<hclAttr>${attrPattern})\\s*=\\s*"(?<hclVal>${valuePattern})")` +
+    `|` +
+    `(?:"(?<jsonAttr>${attrPattern})"\\s*:\\s*"(?<jsonVal>${valuePattern})")`
+  );
+}
+
+// Builds a regex source matching `attrPattern = [...]` (HCL) or
+// `"attrPattern": [...]` (JSON) array-valued attributes. The array body is
+// captured whole (hclArrBody/jsonArrBody) and re-scanned per-element in
+// vaultProject. Bounding the body to "no ] character" (rather than a lazy
+// match through arbitrary content) keeps this linear-time even on a
+// malformed, unterminated array — same rationale as the ATTR bound below.
+function attrArrayPattern(attrPattern: string): string {
+  return (
+    `(?:(?<hclArrAttr>${attrPattern})\\s*=\\s*\\[(?<hclArrBody>[^\\]]*)\\])` +
+    `|` +
+    `(?:"(?<jsonArrAttr>${attrPattern})"\\s*:\\s*\\[(?<jsonArrBody>[^\\]]*)\\])`
+  );
+}
+
+function extractAttrGroup(g: AttrValueGroups): string {
+  return (g.hclAttr ?? g.jsonAttr)!;
+}
+
+function extractValueGroup(g: AttrValueGroups): string {
+  return (g.hclVal ?? g.jsonVal)!;
+}
+
+function extractArrAttrGroup(g: AttrValueGroups): string {
+  return (g.hclArrAttr ?? g.jsonArrAttr)!;
+}
+
+function extractArrBodyGroup(g: AttrValueGroups): string {
+  return (g.hclArrBody ?? g.jsonArrBody)!;
 }
 
 // Matches tokens this module itself generates, e.g. "{{OKTA_ID_1}}".
@@ -35,90 +96,121 @@ const GENERATED_TOKEN_SHAPE = /^\{\{[A-Z_]+_\d+\}\}$/;
 // several of the patterns below, not just the two flagged in review.
 const ATTR = '\\w{1,100}';
 
+// Builds both the scalar and array-valued regex for a pattern from the same
+// attrPattern/valuePattern, so the two can never drift out of sync (e.g. one
+// getting a value-length cap added without the other). scanAnywhere adds a
+// bareRegex matching valuePattern anywhere in the raw text (see VaultPattern
+// above) — only pass true for value shapes specific enough not to need
+// attribute context.
+function makeVaultPattern(
+  kind: VaultKind,
+  attrPattern: string,
+  valuePattern: string,
+  scanAnywhere = false
+): VaultPattern {
+  return {
+    kind,
+    regex: new RegExp(attrValuePattern(attrPattern, valuePattern), 'g'),
+    arrayRegex: new RegExp(attrArrayPattern(attrPattern), 'g'),
+    valuePattern,
+    extractValue: extractValueGroup,
+    extractAttr: extractAttrGroup,
+    bareRegex: scanAnywhere ? new RegExp(valuePattern, 'g') : null,
+  };
+}
+
+// Order matters: patterns whose value can legitimately span many KB (jwt,
+// token, pem_key) run FIRST so they fully tokenize their own attribute's
+// value before any scanAnywhere pass below gets a chance to match a
+// coincidental substring inside it (e.g. a 20-char lowercase-alnum run
+// inside a large JWT payload looks exactly like an Okta ID). Once such a
+// value is replaced by its token, its curly braces break every later
+// pattern's charset, so order — not luck — is what prevents cross-pattern
+// clobbering.
 const VAULT_PATTERNS: VaultPattern[] = [
-  {
-    kind: 'okta_id',
-    regex: new RegExp(`(${ATTR})\\s*=\\s*"((?:00[a-zA-Z]|0oa)[A-Za-z0-9]{17})"`, 'g'),
-    extractValue: (m) => m[2],
-    extractAttr: (m) => m[1],
-  },
-  {
-    kind: 'org_url',
-    regex: new RegExp(
-      `(${ATTR})\\s*=\\s*"((?:https?:\\/\\/)?[a-zA-Z0-9\\-]+(?:\\.[a-zA-Z0-9\\-]+)*\\.okta(?:preview)?\\.com)"`,
-      'g'
-    ),
-    extractValue: (m) => m[2],
-    extractAttr: (m) => m[1],
-  },
-  {
-    kind: 'client_secret',
-    regex: /(client_secret)\s*=\s*"([^"]+)"/g,
-    extractValue: (m) => m[2],
-    extractAttr: (m) => m[1],
-  },
-  {
-    kind: 'email',
-    regex: new RegExp(
-      `(${ATTR})\\s*=\\s*"([a-zA-Z0-9._%+\\-]+@[a-zA-Z0-9.\\-]+\\.[a-zA-Z]{2,})"`,
-      'g'
-    ),
-    extractValue: (m) => m[2],
-    extractAttr: (m) => m[1],
-  },
-  {
-    kind: 'hcl_pii_attr',
-    regex: /(firstName|lastName|displayName|login|mobilePhone|primaryPhone)\s*=\s*"([^"]+)"/g,
-    extractValue: (m) => m[2],
-    extractAttr: (m) => m[1],
-  },
-  {
-    kind: 'jwt',
-    // Segment lengths are intentionally left uncapped (only a lower bound of
-    // 20 chars, to avoid false positives on short dotted strings). An earlier
-    // version capped each segment at 5000 chars as defense-in-depth against
-    // ReDoS, but real large Okta JWTs (e.g. a token with a `groups` claim
-    // covering hundreds of groups) can have a payload segment well beyond
-    // 5000 chars — that cap silently failed to match those tokens, leaving
-    // them unmasked and sent to the LLM in plaintext, which is worse than
-    // the ReDoS hang it was meant to prevent. Benchmarking confirmed the
-    // ATTR bound above (\w{1,100}) is what actually prevents the exponential
-    // backtracking blowup on unterminated input; removing this cap keeps a
-    // 200KB malformed/unterminated input completing in well under 1 second.
-    regex: new RegExp(
-      `(${ATTR})\\s*=\\s*"([A-Za-z0-9_\\-]{20,}\\.[A-Za-z0-9_\\-]{20,}\\.[A-Za-z0-9_\\-]{20,})"`,
-      'g'
-    ),
-    extractValue: (m) => m[2],
-    extractAttr: (m) => m[1],
-  },
-  {
-    kind: 'token',
-    regex: new RegExp(`(${ATTR})\\s*=\\s*"((?:SSWS|Bearer)\\s+[A-Za-z0-9_.\\-]{20,})"`, 'g'),
-    extractValue: (m) => m[2],
-    extractAttr: (m) => m[1],
-  },
-  {
-    kind: 'pem_key',
-    // The PEM body length is intentionally left uncapped. An earlier version
-    // capped it at 10000 chars as defense-in-depth against ReDoS, but a
-    // legitimate multi-cert chain (e.g. a `ca_bundle` or `certificate_chain`
-    // attribute holding a CA bundle, cross-signed intermediates, or an mTLS
-    // chain — six or more concatenated PEM blocks is an ordinary shape for
-    // these) can easily exceed 10KB. That cap silently failed to match such
-    // chains, leaving the certificate material unmasked and sent to the LLM
-    // in plaintext, which is worse than the ReDoS hang it was meant to
-    // prevent (same failure mode fixed for the jwt pattern above). Benchmarking
-    // confirmed the ATTR bound above (\w{1,100}) is what actually prevents the
-    // exponential backtracking blowup on unterminated input; removing this cap
-    // keeps a 200KB malformed/unterminated PEM completing in well under 1 second.
-    regex: new RegExp(
-      `(${ATTR})\\s*=\\s*"(-----BEGIN [A-Z ]+-----[\\s\\S]+?-----END [A-Z ]+-----)"`,
-      'g'
-    ),
-    extractValue: (m) => m[2],
-    extractAttr: (m) => m[1],
-  },
+  // jwt: segment lengths are intentionally left uncapped in the
+  // attr-anchored pattern (only a lower bound of 20 chars, to avoid false
+  // positives on short dotted strings). An earlier version capped each
+  // segment at 5000 chars as defense-in-depth against ReDoS, but real large
+  // Okta JWTs (e.g. a token with a `groups` claim covering hundreds of
+  // groups) can have a payload segment well beyond 5000 chars — that cap
+  // silently failed to match those tokens, leaving them unmasked and sent to
+  // the LLM in plaintext, which is worse than the ReDoS hang it was meant to
+  // prevent. The ATTR bound above (\w{1,100}) is what actually prevents the
+  // exponential backtracking blowup on unterminated input — but that
+  // protection comes from the attr="..." prefix being cheap to fail almost
+  // everywhere, which only applies to the attr-anchored regex. scanAnywhere
+  // is deliberately NOT enabled here: without that cheap-fail prefix, the
+  // same unbounded quantifiers scanned across a large malformed blob
+  // backtrack at every position (O(n²)), reintroducing the exact hang this
+  // pattern was already fixed for. JWTs also don't need scanAnywhere in
+  // practice — in real Okta .tfstate content they're always their own
+  // top-level attribute value, never embedded as a substring inside another
+  // JSON/XML-encoded string blob, so the attr-anchored pass already covers
+  // them.
+  makeVaultPattern(
+    'jwt',
+    ATTR,
+    '[A-Za-z0-9_\\-]{20,}\\.[A-Za-z0-9_\\-]{20,}\\.[A-Za-z0-9_\\-]{20,}'
+  ),
+  // token: the SSWS/Bearer literal prefix is cheap to fail almost anywhere,
+  // so scanning it anywhere in the raw text carries none of the jwt/pem_key
+  // backtracking risk above — safe to enable.
+  makeVaultPattern('token', ATTR, '(?:SSWS|Bearer)\\s+[A-Za-z0-9_.\\-]{20,}', true),
+  // pem_key: the PEM body length is intentionally left uncapped in the
+  // attr-anchored pattern for the same reason as jwt above (a legitimate
+  // multi-cert chain — a `ca_bundle` or `certificate_chain` holding a CA
+  // bundle, cross-signed intermediates, or an mTLS chain — routinely exceeds
+  // 10KB, and an earlier length cap silently failed to match such chains).
+  // scanAnywhere is deliberately NOT enabled for the same reason as jwt: no
+  // cheap-fail prefix outside the attr-anchored context, and PEM blocks are
+  // always their own top-level attribute value in real Okta Terraform
+  // content, never embedded as a substring.
+  makeVaultPattern('pem_key', ATTR, '-----BEGIN [A-Z ]+-----[\\s\\S]+?-----END [A-Z ]+-----'),
+  makeVaultPattern('client_secret', 'client_secret', '[^"]+'),
+  // Okta resource IDs are always exactly 20 characters, alphanumeric, and
+  // conventionally start with a lowercase letter or digit (e.g. 0oa=app,
+  // 00u=user, oty=user type, exk=IdP signing key, prm=profile mapping,
+  // rst=policy — the provider mints new type prefixes over time, so an
+  // enumerated prefix list silently misses IDs as Okta adds resource types;
+  // matching the fixed 20-char shape instead of specific prefixes doesn't).
+  // The shape is a fixed count, not an unbounded quantifier, so scanning it
+  // anywhere carries no backtracking risk — a failed attempt at any position
+  // costs O(1), not O(n).
+  makeVaultPattern('okta_id', ATTR, '\\b[a-z0-9][A-Za-z0-9]{19}\\b', true),
+  // org_url / email: bounded to realistic DNS/RFC lengths (label ≤63 chars,
+  // ≤10 labels; email local-part ≤64 chars, domain ≤253 chars) so the
+  // scanAnywhere pass can't backtrack proportionally to input size — on a
+  // large malformed blob with no '@' or ".okta" anywhere, an unbounded
+  // quantifier here reintroduces the same O(n²) hang as jwt/pem_key above.
+  // These bounds are generous relative to any real org URL or email address,
+  // so legitimate values are unaffected; only the worst-case cost of a
+  // failed match on adversarial input is capped.
+  makeVaultPattern(
+    'org_url',
+    ATTR,
+    '(?:https?:\\/\\/)?[a-zA-Z0-9\\-]{1,63}(?:\\.[a-zA-Z0-9\\-]{1,63}){0,10}\\.okta(?:preview)?\\.com',
+    true
+  ),
+  makeVaultPattern(
+    'email',
+    ATTR,
+    '[a-zA-Z0-9._%+\\-]{1,64}@[a-zA-Z0-9.\\-]{1,253}\\.[a-zA-Z]{2,24}',
+    true
+  ),
+  // Attribute names pulled from the canonical okta_user profile mapping in
+  // shared/terraform-gen.ts (extractTfAttrs), not guessed — that mapping is
+  // the source of truth for which raw Okta API fields this app already
+  // treats as okta_user profile attributes. Excludes non-identifying
+  // config/preference fields from that same mapping (profileUrl,
+  // preferredLanguage, locale, timezone, userType) since those aren't PII.
+  makeVaultPattern(
+    'hcl_pii_attr',
+    'firstName|lastName|displayName|login|mobilePhone|primaryPhone|secondEmail|nickName|' +
+      'employeeNumber|title|department|division|organization|costCenter|managerId|manager|' +
+      'honorificPrefix|honorificSuffix|streetAddress|city|state|zipCode|countryCode|postalAddress',
+    '[^"]+'
+  ),
 ];
 
 export function vaultProject(files: Record<string, string>): VaultResult {
@@ -154,9 +246,13 @@ export function vaultProject(files: Record<string, string>): VaultResult {
     let masked = content;
     for (const pattern of VAULT_PATTERNS) {
       masked = masked.replace(pattern.regex, (...args) => {
-        const match = args as unknown as RegExpMatchArray;
-        const value = pattern.extractValue(match);
-        const attr = pattern.extractAttr(match);
+        // Every pattern's regex has named capture groups (hclAttr/hclVal vs
+        // jsonAttr/jsonVal), so replace() always passes the groups object as
+        // the last callback argument — the full matched text is args[0].
+        const groups = args[args.length - 1] as AttrValueGroups;
+        const fullMatch = args[0] as string;
+        const value = pattern.extractValue(groups);
+        const attr = pattern.extractAttr(groups);
         // Skip values that were already replaced by an earlier, more specific pattern
         // (e.g. an email matched by hcl_pii_attr's "login" case after email's generic case ran).
         // GENERATED_TOKEN_SHAPE checks whether `value` IS a token we already generated
@@ -166,15 +262,53 @@ export function vaultProject(files: Record<string, string>): VaultResult {
         if (!GENERATED_TOKEN_SHAPE.test(value)) {
           const token = tokenFor(pattern.kind, value, filename, attr);
           // Reconstruct the replacement directly from the known "attr = "value""
-          // structure instead of searching for `value` as a substring inside
-          // match[0] — a substring search can match the wrong occurrence (e.g.
-          // the attribute name itself, when attr and value are equal strings,
-          // as in `client_secret = "client_secret"`), leaving the real secret
-          // unmasked in plaintext.
-          return `${attr} = "${token}"`;
+          // (HCL) or ""attr": "value"" (JSON, e.g. .tfstate) structure instead of
+          // searching for `value` as a substring inside the full match — a
+          // substring search can match the wrong occurrence (e.g. the attribute
+          // name itself, when attr and value are equal strings, as in
+          // `client_secret = "client_secret"`), leaving the real secret unmasked.
+          return groups.jsonAttr !== undefined ? `"${attr}": "${token}"` : `${attr} = "${token}"`;
         }
-        return match[0];
+        return fullMatch;
       });
+
+      masked = masked.replace(pattern.arrayRegex, (...args) => {
+        // Same last-argument-is-groups mechanic as the scalar replace above.
+        const groups = args[args.length - 1] as AttrValueGroups;
+        const fullMatch = args[0] as string;
+        const attr = extractArrAttrGroup(groups);
+        const body = extractArrBodyGroup(groups);
+        const isJson = groups.jsonArrAttr !== undefined;
+
+        // Re-scan the array body for individual quoted elements matching this
+        // pattern's value shape — one array can mix PII and non-PII elements
+        // (or elements of several different PII kinds), so each element is
+        // evaluated independently rather than masking the whole array body.
+        const elementRegex = new RegExp(`"(${pattern.valuePattern})"`, 'g');
+        let changed = false;
+        const newBody = body.replace(elementRegex, (elemMatch: string, capturedValue: string) => {
+          if (GENERATED_TOKEN_SHAPE.test(capturedValue)) return elemMatch;
+          changed = true;
+          const token = tokenFor(pattern.kind, capturedValue, filename, attr);
+          return `"${token}"`;
+        });
+
+        if (!changed) return fullMatch;
+        return isJson ? `"${attr}": [${newBody}]` : `${attr} = [${newBody}]`;
+      });
+
+      if (pattern.bareRegex) {
+        // Catches occurrences the attr="value" and attr=[...] shapes above
+        // can't reach — e.g. an org URL embedded as a substring inside a
+        // larger JSON- or XML-encoded string value (Okta's `links`,
+        // `metadata`, `embed_url` attributes routinely nest URLs this way in
+        // a real .tfstate). No attribute context is available here, so
+        // sourceAttr falls back to the pattern's kind name.
+        masked = masked.replace(pattern.bareRegex, (fullMatch: string) => {
+          if (GENERATED_TOKEN_SHAPE.test(fullMatch)) return fullMatch;
+          return tokenFor(pattern.kind, fullMatch, filename, pattern.kind);
+        });
+      }
     }
     maskedFiles[filename] = masked;
   }
@@ -233,19 +367,21 @@ export function exportProject(
       );
       tfvarsAssignmentsToAdd.push(`${varName} = "${entry.value}"`);
 
-      for (const [filename, content] of Object.entries(files)) {
-        if (filename.endsWith('.tfvars')) continue; // never rewrite tfvars content with var. references
-        if (content.includes(entry.token)) {
-          files[filename] = content.split(entry.token).join(`var.${varName}`);
+      // var. references are only meaningful inside .tf files — rewrite those
+      // and leave every other file type (.tfvars, .tfstate, etc.) alone here.
+      for (const filename of tfFilenames) {
+        if (files[filename].includes(entry.token)) {
+          files[filename] = files[filename].split(entry.token).join(`var.${varName}`);
         }
       }
     }
 
-    // Regardless of promotion, any occurrence of this token in a .tfvars file
-    // gets the real value restored in place — a .tfvars file must never end
-    // up with a var. reference or a leftover literal token.
+    // Regardless of promotion, any occurrence of this token in a non-.tf file
+    // (.tfvars, .tfstate, or anything else) gets the real value restored in
+    // place — those files can't reference a Terraform variable, so they must
+    // never end up with a "var.x" string or a leftover literal token.
     for (const [filename, content] of Object.entries(files)) {
-      if (!filename.endsWith('.tfvars')) continue;
+      if (filename.endsWith('.tf')) continue;
       if (content.includes(entry.token)) {
         files[filename] = content.split(entry.token).join(entry.value);
       }
@@ -328,7 +464,9 @@ OPTIMIZATION suggestions (always severity "suggestion", never "error" or "warnin
 
 Never suggest "skip_users" or "skip_groups" — both are deprecated in the Okta Terraform provider and must not appear in any recommendation.
 
-For each finding, call the report_findings tool with the complete list of findings AND the complete corrected content for every .tf/.tfvars file that needed a change (files with no issues can be omitted from fixedFiles).`;
+For each finding, call the report_findings tool with the complete list of findings AND the complete corrected content for every .tf/.tfvars file that needed a change (files with no issues can be omitted from fixedFiles).
+
+In originalSnippet, copy the EXACT text from the masked file that the fix replaces — verbatim, including whitespace and indentation. It must be a literal substring of the file content so the UI can locate and replace it precisely.`;
 
 export async function analyzeProject(maskedFiles: Record<string, string>): Promise<ValidatorAnalysis> {
   const client = getClient();
@@ -364,9 +502,13 @@ export async function analyzeProject(maskedFiles: Record<string, string>): Promi
                 resourceAddress: { type: 'string' },
                 title: { type: 'string' },
                 explanation: { type: 'string' },
+                originalSnippet: {
+                  type: 'string',
+                  description: 'The exact original masked HCL text being replaced — copy-pasted verbatim from the input file, including indentation. Must be a literal substring of the masked file so String.replace() can locate it.',
+                },
                 fixedSnippet: { type: 'string' },
               },
-              required: ['id', 'category', 'severity', 'file', 'resourceAddress', 'title', 'explanation', 'fixedSnippet'],
+              required: ['id', 'category', 'severity', 'file', 'resourceAddress', 'title', 'explanation', 'originalSnippet', 'fixedSnippet'],
             },
           },
           fixedFiles: {
