@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Finding } from '../../shared/types';
 import { reconstructFiles } from '../../shared/reconstruct';
+import ValidatorDiffView from './ValidatorDiffView';
 
 interface VaultSummaryEntry {
   token: string;
@@ -191,23 +192,20 @@ export default function ValidatorSection() {
       )}
 
       {stage === 'diff-review' && (
-        <div className="space-y-2">
-          <p className="text-xs text-text-muted">Diff review loading...</p>
-          <div className="flex gap-2">
-            <button
-              onClick={() => setStage('reviewed')}
-              className="px-3 py-1.5 text-xs text-text-muted hover:text-text-secondary bg-surface-3 hover:bg-surface-4 rounded-lg transition-colors"
-            >
-              ← Back to Findings
-            </button>
-            <button
-              onClick={handleExport}
-              className="px-4 py-2 text-xs font-medium bg-accent-teal text-surface-0 hover:bg-accent-teal/90 rounded-lg transition-colors"
-            >
-              Export Selected Fixes →
-            </button>
-          </div>
-        </div>
+        <ValidatorDiffView
+          findings={findings}
+          maskedFiles={maskedFiles}
+          acceptedIds={acceptedFindingIds}
+          onToggle={id =>
+            setAcceptedFindingIds(prev => {
+              const next = new Set(prev);
+              if (next.has(id)) next.delete(id); else next.add(id);
+              return next;
+            })
+          }
+          onExport={handleExport}
+          onBack={() => setStage('reviewed')}
+        />
       )}
 
       {stage === 'exported' && (
