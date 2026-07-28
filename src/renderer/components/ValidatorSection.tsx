@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Finding } from '../../shared/types';
+import { reconstructFiles } from '../../shared/reconstruct';
 
 interface VaultSummaryEntry {
   token: string;
@@ -8,7 +9,7 @@ interface VaultSummaryEntry {
   sourceAttr: string;
 }
 
-type Stage = 'upload' | 'ready' | 'analyzing' | 'reviewed' | 'exporting' | 'exported';
+type Stage = 'upload' | 'ready' | 'analyzing' | 'reviewed' | 'diff-review' | 'exporting' | 'exported';
 
 const SEVERITY_STYLES: Record<Finding['severity'], string> = {
   error: 'bg-red-50 text-red-700 border-red-200',
@@ -23,6 +24,8 @@ export default function ValidatorSection() {
   const [vaultExpanded, setVaultExpanded] = useState(false);
   const [findings, setFindings] = useState<Finding[]>([]);
   const [fixedMaskedFiles, setFixedMaskedFiles] = useState<Record<string, string>>({});
+  const [maskedFiles, setMaskedFiles] = useState<Record<string, string>>({});
+  const [acceptedFindingIds, setAcceptedFindingIds] = useState<Set<string>>(new Set());
   const [error, setError] = useState<string | null>(null);
   const [exportedDir, setExportedDir] = useState<string | null>(null);
 
@@ -47,6 +50,7 @@ export default function ValidatorSection() {
     }
     setSessionId(result.data.sessionId);
     setVaultSummary(result.data.vaultSummary);
+    setMaskedFiles(result.data.maskedFiles);
     setStage('ready');
   };
 
@@ -62,6 +66,7 @@ export default function ValidatorSection() {
     }
     setFindings(result.data.findings);
     setFixedMaskedFiles(result.data.fixedMaskedFiles);
+    setAcceptedFindingIds(new Set(result.data.findings.map((f: Finding) => f.id)));
     setStage('reviewed');
   };
 
@@ -69,10 +74,11 @@ export default function ValidatorSection() {
     if (!sessionId) return;
     setError(null);
     setStage('exporting');
-    const result = await window.oktaTerraform.validatorExport(sessionId, fixedMaskedFiles);
+    const reconstructed = reconstructFiles(maskedFiles, findings, acceptedFindingIds);
+    const result = await window.oktaTerraform.validatorExport(sessionId, reconstructed);
     if (!result.success) {
       setError(result.error ?? 'Export failed');
-      setStage('reviewed');
+      setStage('diff-review');
       return;
     }
     setExportedDir(result.data ?? null);
@@ -85,6 +91,8 @@ export default function ValidatorSection() {
     setVaultSummary([]);
     setFindings([]);
     setFixedMaskedFiles({});
+    setAcceptedFindingIds(new Set());
+    setMaskedFiles({});
     setError(null);
     setExportedDir(null);
     setStage('upload');
@@ -174,11 +182,31 @@ export default function ValidatorSection() {
           <FindingsGroup title="Correctness" findings={correctnessFindings} />
           <FindingsGroup title="Optimization" findings={optimizationFindings} />
           <button
-            onClick={handleExport}
+            onClick={() => setStage('diff-review')}
             className="px-4 py-2 text-xs font-medium bg-accent-teal text-surface-0 hover:bg-accent-teal/90 rounded-lg transition-colors"
           >
-            Export Fixed Project
+            Review Changes →
           </button>
+        </div>
+      )}
+
+      {stage === 'diff-review' && (
+        <div className="space-y-2">
+          <p className="text-xs text-text-muted">Diff review loading...</p>
+          <div className="flex gap-2">
+            <button
+              onClick={() => setStage('reviewed')}
+              className="px-3 py-1.5 text-xs text-text-muted hover:text-text-secondary bg-surface-3 hover:bg-surface-4 rounded-lg transition-colors"
+            >
+              ← Back to Findings
+            </button>
+            <button
+              onClick={handleExport}
+              className="px-4 py-2 text-xs font-medium bg-accent-teal text-surface-0 hover:bg-accent-teal/90 rounded-lg transition-colors"
+            >
+              Export Selected Fixes →
+            </button>
+          </div>
         </div>
       )}
 
