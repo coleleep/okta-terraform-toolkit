@@ -81,20 +81,28 @@ function splitLines(text: string): string[] {
 
 // Pushes a context segment, collapsing any run longer than 5 lines to
 // keep the diff readable. Shows first 2 and last 2 lines around the collapse.
+// A leading '\n' in text (from a snippet with no trailing newline) is stripped
+// and startLineNo is bumped by 1 so line numbers stay correct.
 function pushContext(result: DiffLine[], text: string, startLineNo: number): void {
-  const lines = splitLines(text);
+  let adjustedText = text;
+  let adjustedLineNo = startLineNo;
+  if (adjustedText.startsWith('\n')) {
+    adjustedText = adjustedText.slice(1);
+    adjustedLineNo += 1;
+  }
+  const lines = splitLines(adjustedText);
   if (lines.length <= 5) {
-    lines.forEach((t, i) => result.push({ type: 'context', text: t, lineNo: startLineNo + i }));
+    lines.forEach((t, i) => result.push({ type: 'context', text: t, lineNo: adjustedLineNo + i }));
     return;
   }
   // Show first 2
-  result.push({ type: 'context', text: lines[0], lineNo: startLineNo });
-  result.push({ type: 'context', text: lines[1], lineNo: startLineNo + 1 });
+  result.push({ type: 'context', text: lines[0], lineNo: adjustedLineNo });
+  result.push({ type: 'context', text: lines[1], lineNo: adjustedLineNo + 1 });
   // Collapse middle
   const collapsedCount = lines.length - 4;
   result.push({ type: 'collapsed', count: collapsedCount });
   // Show last 2
-  const lastStart = startLineNo + lines.length - 2;
+  const lastStart = adjustedLineNo + lines.length - 2;
   result.push({ type: 'context', text: lines[lines.length - 2], lineNo: lastStart });
   result.push({ type: 'context', text: lines[lines.length - 1], lineNo: lastStart + 1 });
 }
