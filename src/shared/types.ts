@@ -326,6 +326,7 @@ export interface Finding {
   resourceAddress: string;  // e.g. "okta_app_oauth.my_app"
   title: string;
   explanation: string;
+  originalSnippet: string;  // exact original masked HCL that fixedSnippet replaces
   fixedSnippet: string;     // masked HCL after fix
 }
 
