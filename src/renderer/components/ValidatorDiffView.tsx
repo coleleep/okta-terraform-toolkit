@@ -27,9 +27,15 @@ export default function ValidatorDiffView({
 
   const [activeFile, setActiveFile] = useState<string>(changedFiles[0] ?? '');
 
-  const fileFindingCount = (file: string) => findings.filter(f => f.file === file).length;
+  const findingCountByFile = useMemo(
+    () => Object.fromEntries(changedFiles.map(f => [f, findings.filter(x => x.file === f).length])),
+    [findings, changedFiles],
+  );
 
-  const activeFindingsForFile = findings.filter(f => f.file === activeFile);
+  const activeFindingsForFile = useMemo(
+    () => findings.filter(f => f.file === activeFile),
+    [findings, activeFile],
+  );
 
   const diffLines = useMemo(
     () => computeDiffLines(maskedFiles[activeFile] ?? '', activeFindingsForFile, acceptedIds),
@@ -56,7 +62,7 @@ export default function ValidatorDiffView({
             <span className={`text-[9px] px-1.5 py-0.5 rounded font-semibold ${
               file === activeFile ? 'bg-accent-teal/20 text-accent-teal' : 'bg-surface-3 text-text-muted'
             }`}>
-              {fileFindingCount(file)}
+              {findingCountByFile[file] ?? 0}
             </span>
           </button>
         ))}
