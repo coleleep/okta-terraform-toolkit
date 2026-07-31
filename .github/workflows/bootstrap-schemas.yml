@@ -1,0 +1,59 @@
+name: Bootstrap Provider Schemas
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  bootstrap:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: '1.9.0'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Extract schemas for all supported versions
+        run: |
+          VERSIONS=$(node -e "
+            const fs = require('fs');
+            const content = fs.readFileSync('src/shared/versions.ts', 'utf-8');
+            const match = content.match(/SUPPORTED_VERSIONS\s*=\s*\[([^\]]+)\]/);
+            const versions = match[1].match(/'([^']+)'/g).map(v => v.replace(/'/g, ''));
+            console.log(versions.join(' '));
+          ")
+          for v in $VERSIONS; do
+            echo "=== Extracting schema for v$v ==="
+            node scripts/extract-schema.js "$v"
+            node scripts/validate-schema.js "$v"
+          done
+
+      - name: Regenerate schema loader
+        run: node scripts/update-schema-loader.js
+
+      - name: Create PR
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          BRANCH="schema/bootstrap-$(date +%Y%m%d)"
+          git checkout -b "$BRANCH"
+          git add src/shared/provider-schemas/ src/shared/schema-loader.ts src/shared/versions.ts
+          git commit -m "chore: bootstrap provider schema snapshots for all supported versions"
+          git push -u origin "$BRANCH"
+          gh pr create \
+            --auto-merge \
+            --title "chore: bootstrap provider schema snapshots" \
+            --body "Automated bootstrap of Okta TF provider schema snapshots. Validates via \`schema-validate\` CI check before merging."
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}

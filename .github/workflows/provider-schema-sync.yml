@@ -1,0 +1,73 @@
+name: Provider Schema Sync
+
+on:
+  schedule:
+    - cron: '0 9 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  check-and-sync:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Check for new provider version
+        id: check
+        run: |
+          LATEST=$(curl -sf https://api.github.com/repos/okta/terraform-provider-okta/releases/latest \
+            -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" \
+            | node -e "let d=''; process.stdin.on('data',c=>d+=c).on('end',()=>console.log(JSON.parse(d).tag_name.replace(/^v/,'')))")
+          echo "latest=$LATEST" >> $GITHUB_OUTPUT
+          echo "Latest Okta TF provider: v$LATEST"
+          if grep -q "'$LATEST'" src/shared/versions.ts; then
+            echo "known=true" >> $GITHUB_OUTPUT
+            echo "v$LATEST already in SUPPORTED_VERSIONS — nothing to do"
+          else
+            echo "known=false" >> $GITHUB_OUTPUT
+            echo "v$LATEST is NEW — will extract schema"
+          fi
+
+      - uses: hashicorp/setup-terraform@v3
+        if: steps.check.outputs.known == 'false'
+        with:
+          terraform_version: '1.9.0'
+
+      - name: Install dependencies
+        if: steps.check.outputs.known == 'false'
+        run: npm ci
+
+      - name: Extract and validate schema
+        if: steps.check.outputs.known == 'false'
+        run: |
+          node scripts/extract-schema.js ${{ steps.check.outputs.latest }}
+          node scripts/validate-schema.js ${{ steps.check.outputs.latest }}
+
+      - name: Regenerate schema loader
+        if: steps.check.outputs.known == 'false'
+        run: node scripts/update-schema-loader.js
+
+      - name: Create auto-merge PR
+        if: steps.check.outputs.known == 'false'
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git checkout -b schema/${{ steps.check.outputs.latest }}
+          git add src/shared/provider-schemas/${{ steps.check.outputs.latest }}.json \
+                  src/shared/schema-loader.ts \
+                  src/shared/versions.ts
+          git commit -m "chore: add schema snapshot for Okta TF provider v${{ steps.check.outputs.latest }}"
+          git push -u origin schema/${{ steps.check.outputs.latest }}
+          gh pr create \
+            --auto-merge \
+            --title "chore: add schema snapshot for v${{ steps.check.outputs.latest }}" \
+            --body "Automated schema snapshot for Okta TF provider v${{ steps.check.outputs.latest }}. Auto-merges when CI passes."
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
