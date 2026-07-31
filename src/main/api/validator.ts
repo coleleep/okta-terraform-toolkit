@@ -440,7 +440,12 @@ export function clearSession(id: string): void {
 
 function buildResourceNameContext(): string {
   const names = RESOURCE_DICTIONARY.map(r => r.terraformResource).join(', ');
-  return `Valid Okta Terraform resource and data source names (use ONLY these — never invent a resource name not in this list):\n${names}`;
+  return (
+    `Valid Okta Terraform resource and data source names for the current provider version:\n${names}\n\n` +
+    `This list is authoritative. If a resource name appears above, it is valid — do NOT flag it as invalid based on your training data. ` +
+    `Conversely, do NOT accept resource names that are absent from this list, even if your training data suggests they exist. ` +
+    `Never rename a resource that is already in this list.`
+  );
 }
 
 const VALIDATOR_SYSTEM_PROMPT = `You are a senior Okta Terraform reviewer. You will be given one or more masked Terraform files (secrets and identifiers have been replaced with tokens like {{OKTA_ID_1}} — treat these as opaque placeholders, never remove or rewrite the token syntax itself).
