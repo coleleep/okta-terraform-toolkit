@@ -1011,51 +1011,12 @@ The import added in Task 8 (`import { loadSchema, getResourceSchema }`) already 
 
 - [ ] **Step 2: Convert `VALIDATOR_SYSTEM_PROMPT` from a constant to a function**
 
-In `validator.ts`, the current structure is:
+**IMPORTANT: Do NOT copy the prompt text from this plan.** The prompt in `validator.ts` has been updated during active development and may differ from what was recorded here. Instead:
 
-```ts
-const VALIDATOR_SYSTEM_PROMPT = `...${buildResourceNameContext()}...`;
-```
-
-Replace the entire `buildResourceNameContext` function and `VALIDATOR_SYSTEM_PROMPT` constant with:
-
-```ts
-function buildValidatorSystemPrompt(schema: ProviderSchema, version: string): string {
-  return `You are a senior Okta Terraform reviewer. You will be given one or more masked Terraform files (secrets and identifiers have been replaced with tokens like {{OKTA_ID_1}} — treat these as opaque placeholders, never remove or rewrite the token syntax itself).
-
-${buildResourceNameContext_PLACEHOLDER}
-
-Review the combined project across ALL provided files for:
-
-CORRECTNESS issues:
-- Resource or data source types not listed in the schema above — flag as error
-- Missing required attributes (listed above per resource) — flag as error
-- Deprecated attributes (listed above per resource) — flag as warning
-- Resources that reference another resource without a "depends_on" where Terraform cannot infer the ordering automatically
-- Conflicting or ambiguous "priority" values across policy rules or auth server rules
-- Import ID or destroy-behavior mistakes
-
-OPTIMIZATION suggestions (always severity "suggestion", never "error" or "warning"):
-- Near-identical repeated resource blocks that could collapse into a single block using for_each or count
-- SAML/OIDC app resources where "skip_authentication_policy" would reduce unnecessary /policies API calls, when the authentication policy is not independently managed elsewhere in the project
-- Hardcoded value duplication where a "data" source lookup would be more maintainable
-- Provider configuration tuning opportunities (max_retries, parallelism) if a provider.tf is included
-
-Never suggest "skip_users" or "skip_groups" — both are deprecated in the Okta Terraform provider and must not appear in any recommendation.
-
-GRANT TYPE SEVERITY RULES for okta_app_oauth resources:
-- implicit grant on a "browser" type app: flag as severity "warning" (not "error") — implicit is technically functional but RFC 9700 (OAuth 2.0 Security Best Current Practice) recommends against it for browser/SPA clients due to token exposure in the URL fragment; the recommendation is authorization_code + PKCE only. Reference RFC 9700 in the explanation.
-- implicit grant on any other app type: no finding needed — implicit is valid for server-side and native flows.
-
-For each finding, call the report_findings tool with the complete list of findings AND the complete corrected content for every .tf/.tfvars file that needed a change (files with no issues can be omitted from fixedFiles).
-
-In originalSnippet, copy the EXACT text from the masked file that the fix replaces — verbatim, including whitespace and indentation. It must be a literal substring of the file content so the UI can locate and replace it precisely.`;
-}
-```
-
-**Important:** The placeholder `${buildResourceNameContext_PLACEHOLDER}` above is for reference only — replace it with the actual template literal syntax calling `buildSchemaContext`. Here is the complete replacement:
-
-Remove the `buildResourceNameContext` function entirely. Replace `VALIDATOR_SYSTEM_PROMPT` constant with the function below. The full replacement for everything from `function buildResourceNameContext` through the end of `VALIDATOR_SYSTEM_PROMPT`:
+1. Read `src/main/api/validator.ts` to get the EXACT current text of `VALIDATOR_SYSTEM_PROMPT` and `buildResourceNameContext`.
+2. Remove `buildResourceNameContext` entirely.
+3. Remove the `VALIDATOR_SYSTEM_PROMPT` constant.
+4. Replace both with the function below, substituting the prompt body you just read (everything between the opening backtick and closing backtick of `VALIDATOR_SYSTEM_PROMPT`) where indicated by `/* CURRENT PROMPT BODY */`:
 
 ```ts
 function buildValidatorSystemPrompt(schema: ProviderSchema, version: string, maskedFiles: Record<string, string>): string {
@@ -1064,36 +1025,18 @@ function buildValidatorSystemPrompt(schema: ProviderSchema, version: string, mas
     ? `${schemaContext}\n\nThe schema above is authoritative for provider v${version}. Do not rename valid resource types. Flag resource types absent from the schema as errors.`
     : `Provider version: ${version}. Validate resource types against your knowledge of the Okta Terraform provider.`;
 
-  return `You are a senior Okta Terraform reviewer. You will be given one or more masked Terraform files (secrets and identifiers have been replaced with tokens like {{OKTA_ID_1}} — treat these as opaque placeholders, never remove or rewrite the token syntax itself).
-
-${schemaSection}
-
-Review the combined project across ALL provided files for:
-
-CORRECTNESS issues:
-- Resource or data source types not listed in the schema above — flag as error
-- Missing required attributes (listed above per resource) — flag as error
-- Deprecated attributes (listed above per resource) — flag as warning
-- Resources that reference another resource without a "depends_on" where Terraform cannot infer the ordering automatically
-- Conflicting or ambiguous "priority" values across policy rules or auth server rules
-- Import ID or destroy-behavior mistakes
-
-OPTIMIZATION suggestions (always severity "suggestion", never "error" or "warning"):
-- Near-identical repeated resource blocks that could collapse into a single block using for_each or count
-- SAML/OIDC app resources where "skip_authentication_policy" would reduce unnecessary /policies API calls, when the authentication policy is not independently managed elsewhere in the project
-- Hardcoded value duplication where a "data" source lookup would be more maintainable
-- Provider configuration tuning opportunities (max_retries, parallelism) if a provider.tf is included
-
-Never suggest "skip_users" or "skip_groups" — both are deprecated in the Okta Terraform provider and must not appear in any recommendation.
-
-GRANT TYPE SEVERITY RULES for okta_app_oauth resources:
-- implicit grant on a "browser" type app: flag as severity "warning" (not "error") — implicit is technically functional but RFC 9700 (OAuth 2.0 Security Best Current Practice) recommends against it for browser/SPA clients due to token exposure in the URL fragment; the recommendation is authorization_code + PKCE only. Reference RFC 9700 in the explanation.
-- implicit grant on any other app type: no finding needed — implicit is valid for server-side and native flows.
-
-For each finding, call the report_findings tool with the complete list of findings AND the complete corrected content for every .tf/.tfvars file that needed a change (files with no issues can be omitted from fixedFiles).
-
-In originalSnippet, copy the EXACT text from the masked file that the fix replaces — verbatim, including whitespace and indentation. It must be a literal substring of the file content so the UI can locate and replace it precisely.`;
+  // Replace ${buildResourceNameContext()} in the original prompt with ${schemaSection}
+  return /* CURRENT PROMPT BODY with buildResourceNameContext() replaced by schemaSection */;
 }
+```
+
+The transformation is: take the current `VALIDATOR_SYSTEM_PROMPT` string, replace the `${buildResourceNameContext()}` interpolation with `${schemaSection}`, and wrap it as the return value of this function.
+
+Remove the `buildResourceNameContext` function entirely. The full replacement target is everything from `function buildResourceNameContext` through the end of `VALIDATOR_SYSTEM_PROMPT`:
+
+The resulting function signature is:
+```ts
+function buildValidatorSystemPrompt(schema: ProviderSchema, version: string, maskedFiles: Record<string, string>): string
 ```
 
 - [ ] **Step 3: Update `analyzeProject` signature and body**
