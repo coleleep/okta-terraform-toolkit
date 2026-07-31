@@ -216,7 +216,9 @@ interface OttoResourceMetadata {
 }
 ```
 
-Resources not in this reduced dictionary are still valid (schema is authoritative) — they're just not probed by Plan/Sync. This eliminates the need to add new resources to the dictionary when Okta releases them; they'll appear in validation automatically.
+Resources not in this reduced dictionary are still valid (schema is authoritative for resource name validation) — they're just not probed by Plan/Sync.
+
+**Resource search/browse is NOT degraded — it improves.** The `ResourceLookup` component currently reads from `RESOURCE_DICTIONARY` for both the search input and "Browse all" feature. In sub-project 4, this changes to read from `loadSchema(selectedVersion)` instead. Users can now search every resource the provider supports for their specific pinned version (including resources never added to the hand-maintained list), with attribute-level details available. The dictionary no longer gatekeeps which resources are discoverable in the UI.
 
 ---
 
