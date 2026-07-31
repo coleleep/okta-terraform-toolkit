@@ -464,6 +464,10 @@ OPTIMIZATION suggestions (always severity "suggestion", never "error" or "warnin
 
 Never suggest "skip_users" or "skip_groups" — both are deprecated in the Okta Terraform provider and must not appear in any recommendation.
 
+GRANT TYPE SEVERITY RULES for okta_app_oauth resources:
+- implicit grant on a "browser" type app: flag as severity "warning" (not "error") — implicit is technically functional but RFC 9700 (OAuth 2.0 Security Best Current Practice) recommends against it for browser/SPA clients due to token exposure in the URL fragment; the recommendation is authorization_code + PKCE only. Reference RFC 9700 in the explanation.
+- implicit grant on any other app type: no finding needed — implicit is valid for server-side and native flows.
+
 For each finding, call the report_findings tool with the complete list of findings AND the complete corrected content for every .tf/.tfvars file that needed a change (files with no issues can be omitted from fixedFiles).
 
 In originalSnippet, copy the EXACT text from the masked file that the fix replaces — verbatim, including whitespace and indentation. It must be a literal substring of the file content so the UI can locate and replace it precisely.`;
