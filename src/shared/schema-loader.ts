@@ -2,9 +2,23 @@
 // To regenerate: node scripts/update-schema-loader.js
 import type { ProviderSchema, ResourceSchema } from './provider-schemas/schema-types';
 
+import schema_raw_6_6_1 from './provider-schemas/6.6.1.json';
+import schema_raw_6_7_0 from './provider-schemas/6.7.0.json';
+import schema_raw_6_8_0 from './provider-schemas/6.8.0.json';
+import schema_raw_6_9_0 from './provider-schemas/6.9.0.json';
+import schema_raw_6_10_0 from './provider-schemas/6.10.0.json';
+import schema_raw_6_11_0 from './provider-schemas/6.11.0.json';
+import schema_raw_6_12_0 from './provider-schemas/6.12.0.json';
 import schema_raw_6_13_0 from './provider-schemas/6.13.0.json';
 
 const SCHEMAS: Record<string, ProviderSchema> = {
+  '6.6.1': schema_raw_6_6_1 as unknown as ProviderSchema,
+  '6.7.0': schema_raw_6_7_0 as unknown as ProviderSchema,
+  '6.8.0': schema_raw_6_8_0 as unknown as ProviderSchema,
+  '6.9.0': schema_raw_6_9_0 as unknown as ProviderSchema,
+  '6.10.0': schema_raw_6_10_0 as unknown as ProviderSchema,
+  '6.11.0': schema_raw_6_11_0 as unknown as ProviderSchema,
+  '6.12.0': schema_raw_6_12_0 as unknown as ProviderSchema,
   '6.13.0': schema_raw_6_13_0 as unknown as ProviderSchema,
 };
 
