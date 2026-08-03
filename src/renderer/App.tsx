@@ -1,6 +1,12 @@
 import React from 'react';
 import DashboardPage from './pages/DashboardPage';
+import ExportGateModal from './components/ExportGateModal';
 
 export default function App() {
-  return <DashboardPage />;
+  return (
+    <div>
+      <DashboardPage />
+      <ExportGateModal />
+    </div>
+  );
 }
