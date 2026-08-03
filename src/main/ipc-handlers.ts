@@ -22,6 +22,7 @@ import { RESOURCE_DICTIONARY } from '../shared/resource-dictionary';
 import { runTerraform, cancelTerraform } from './api/terraform';
 import { saveTfStateRollbackBundle, checkRollbackBundle, prepareTfStateRollback, clearRollbackBundle } from './api/rollback';
 import * as providerManager from './api/okta-provider-manager';
+import { DEFAULT_VERSION } from '../shared/versions';
 
 export function registerIpcHandlers() {
   // Auth
@@ -580,7 +581,8 @@ export function registerIpcHandlers() {
       touchSession(params.sessionId);
 
       logger.info('validator', 'analyze started', { sessionId: params.sessionId });
-      const version = providerManager.getSelectedVersion();
+      const rawVersion = providerManager.getSelectedVersion();
+      const version = rawVersion === 'system' ? DEFAULT_VERSION : rawVersion;
       const analysis = await analyzeProject(session.vault.maskedFiles, version);
       logger.info('validator', 'analyze complete', { sessionId: params.sessionId, findingCount: analysis.findings.length });
 
