@@ -454,6 +454,30 @@ export function exportProject(
   return { files };
 }
 
+export interface ExportValidationResult {
+  findings: Finding[];
+  error?: string;
+}
+
+export async function validateForExport(
+  files: Record<string, string>,
+  version: string,
+  _analyze: typeof analyzeProject = analyzeProject
+): Promise<ExportValidationResult> {
+  if (Object.keys(files).length === 0) {
+    return { findings: [] };
+  }
+  try {
+    const { maskedFiles } = vaultProject(files);
+    const analysis = await _analyze(maskedFiles, version);
+    return { findings: analysis.findings };
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : String(err);
+    console.error('[validator] validateForExport failed', { error: message });
+    return { findings: [], error: message };
+  }
+}
+
 const IDLE_TIMEOUT_MS = 15 * 60 * 1000;
 
 interface ValidatorSession {
