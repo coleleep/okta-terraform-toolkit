@@ -612,7 +612,7 @@ function generateResourcesTf(selectedResources: ManagedResourceType[], providerV
 type TabId = 'versions' | 'variables' | 'provider' | 'resources' | 'imports' | 'tfvars';
 
 export default function ProviderBlock({ config, orgUrl }: Props) {
-  const { selectedResources, operation, terraformAuthMethod, providerVersion, saveTfFile, saveProjectDir } = useStore();
+  const { selectedResources, operation, terraformAuthMethod, providerVersion, validateThenSaveTfFile, validateThenSaveProjectDir } = useStore();
   const [activeTab, setActiveTab] = useState<TabId>('provider');
   const [copied, setCopied] = useState(false);
   const [saved, setSaved] = useState<string | null>(null);
@@ -656,11 +656,9 @@ export default function ProviderBlock({ config, orgUrl }: Props) {
 
   const handleSaveSingle = async () => {
     if (!currentFile) return;
-    const filePath = await saveTfFile(currentFile.content);
-    if (filePath) {
-      setSaved(filePath);
-      setTimeout(() => setSaved(null), 3000);
-    }
+    await validateThenSaveTfFile(currentFile.content);
+    setSaved('Saved');
+    setTimeout(() => setSaved(null), 3000);
   };
 
   const handleSaveProject = async () => {
@@ -668,11 +666,9 @@ export default function ProviderBlock({ config, orgUrl }: Props) {
     for (const file of Object.values(files)) {
       if (file) projectFiles[file.filename] = file.content;
     }
-    const dir = await saveProjectDir(projectFiles);
-    if (dir) {
-      setSaved(dir);
-      setTimeout(() => setSaved(null), 4000);
-    }
+    await validateThenSaveProjectDir(projectFiles);
+    setSaved('Saved');
+    setTimeout(() => setSaved(null), 4000);
   };
 
   return (

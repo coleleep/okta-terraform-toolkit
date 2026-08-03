@@ -19,7 +19,7 @@ interface SolutionResult {
 }
 
 export default function SolutionBuilder() {
-  const { providerVersion } = useStore();
+  const { providerVersion, validateThenSaveProjectDir } = useStore();
   const [input, setInput] = useState('');
   const [result, setResult] = useState<SolutionResult | null>(null);
   const [loading, setLoading] = useState(false);
@@ -66,7 +66,7 @@ export default function SolutionBuilder() {
     if (result.hcl.imports) {
       files['imports.tf'] = result.hcl.imports;
     }
-    await api.saveProjectDir(files);
+    await validateThenSaveProjectDir(files);
   };
 
   const handleCopy = (content: string, label: string) => {

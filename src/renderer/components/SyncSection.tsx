@@ -78,7 +78,7 @@ const api = (window as unknown as {
 }).oktaTerraform;
 
 export default function SyncSection() {
-  const { connection, probeResult, recommendation, providerVersion, connect: connectTargetOrg, disconnect: disconnectTargetOrg } = useStore();
+  const { connection, probeResult, recommendation, providerVersion, connect: connectTargetOrg, disconnect: disconnectTargetOrg, validateThenSaveProjectDir } = useStore();
 
   // Target org panel state (tf-files mode)
   const [targetUrl, setTargetUrl] = useState('');
@@ -553,11 +553,10 @@ export default function SyncSection() {
       }
     }
 
-    const result = await api.saveProjectDir(exportFiles);
-    if (result.success && result.data) {
-      setExportedDir(result.data);
+    await validateThenSaveProjectDir(exportFiles, (dir) => {
+      setExportedDir(dir);
       setTfStage('idle');
-    }
+    });
   };
 
   const handleRunTerraform = async () => {

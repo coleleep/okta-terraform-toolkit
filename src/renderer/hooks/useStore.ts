@@ -81,7 +81,7 @@ interface AppState {
   openExportGate: (findings: Finding[], pendingAction: () => Promise<void>) => void;
   dismissExportGate: () => void;
   confirmExportGate: () => Promise<void>;
-  validateThenSaveProjectDir: (files: Record<string, string>) => Promise<void>;
+  validateThenSaveProjectDir: (files: Record<string, string>, onSaved?: (dir: string) => void) => Promise<void>;
   validateThenSaveTfFile: (content: string) => Promise<void>;
 }
 
@@ -420,18 +420,22 @@ export const useStore = create<AppState>((set, get) => ({
     await gate.pendingAction();
   },
 
-  validateThenSaveProjectDir: async (files) => {
+  validateThenSaveProjectDir: async (files, onSaved) => {
     const { providerVersion, saveProjectDir, openExportGate } = get();
     const version = (!providerVersion || providerVersion === 'system') ? DEFAULT_VERSION : providerVersion;
+    const doSave = async () => {
+      const dir = await saveProjectDir(files);
+      if (onSaved && dir) onSaved(dir);
+    };
     try {
       const result = await api().validateProjectFiles(files, version) as { success: boolean; data?: ExportValidationResult };
       if (!result.success || !result.data || result.data.findings.length === 0) {
-        await saveProjectDir(files);
+        await doSave();
         return;
       }
-      openExportGate(result.data.findings, async () => { await saveProjectDir(files); });
+      openExportGate(result.data.findings, doSave);
     } catch {
-      await saveProjectDir(files);
+      await doSave();
     }
   },
 
