@@ -6,9 +6,13 @@ import {
   PreventionOptions, DEFAULT_PREVENTION_OPTIONS, TerraformAuthMethod,
   CustomWorkloadEntry,
 } from '../../shared/types';
+import type { Finding } from '../../shared/types';
 import { DEFAULT_VERSION } from '../../shared/versions';
 import { RESOURCE_TYPES } from '../../shared/constants';
 import type { OktaTerraformAPI } from '../../preload';
+
+// Defined inline to avoid cross-bundle import from main process
+type ExportValidationResult = { findings: Finding[]; error?: string };
 
 declare global {
   interface Window {
@@ -68,6 +72,17 @@ interface AppState {
   // File operations
   saveTfFile: (content: string) => Promise<string | null>;
   saveProjectDir: (files: Record<string, string>) => Promise<string | null>;
+
+  // Export validation gate
+  exportValidationGate: {
+    findings: Finding[];
+    pendingAction: () => Promise<void>;
+  } | null;
+  openExportGate: (findings: Finding[], pendingAction: () => Promise<void>) => void;
+  dismissExportGate: () => void;
+  confirmExportGate: () => Promise<void>;
+  validateThenSaveProjectDir: (files: Record<string, string>) => Promise<void>;
+  validateThenSaveTfFile: (content: string) => Promise<void>;
 }
 
 export const useStore = create<AppState>((set, get) => ({
@@ -385,6 +400,54 @@ export const useStore = create<AppState>((set, get) => ({
     const result = await api().saveProjectDir(files);
     if (result.success) return result.data;
     return null;
+  },
+
+  // Export validation gate
+  exportValidationGate: null,
+
+  openExportGate: (findings, pendingAction) => {
+    set({ exportValidationGate: { findings, pendingAction } });
+  },
+
+  dismissExportGate: () => {
+    set({ exportValidationGate: null });
+  },
+
+  confirmExportGate: async () => {
+    const gate = get().exportValidationGate;
+    if (!gate) return;
+    set({ exportValidationGate: null });
+    await gate.pendingAction();
+  },
+
+  validateThenSaveProjectDir: async (files) => {
+    const { providerVersion, saveProjectDir, openExportGate } = get();
+    const version = (!providerVersion || providerVersion === 'system') ? DEFAULT_VERSION : providerVersion;
+    try {
+      const result = await api().validateProjectFiles(files, version) as { success: boolean; data?: ExportValidationResult };
+      if (!result.success || !result.data || result.data.findings.length === 0) {
+        await saveProjectDir(files);
+        return;
+      }
+      openExportGate(result.data.findings, async () => { await saveProjectDir(files); });
+    } catch {
+      await saveProjectDir(files);
+    }
+  },
+
+  validateThenSaveTfFile: async (content) => {
+    const { providerVersion, saveTfFile, openExportGate } = get();
+    const version = (!providerVersion || providerVersion === 'system') ? DEFAULT_VERSION : providerVersion;
+    try {
+      const result = await api().validateProjectFiles({ 'provider.tf': content }, version) as { success: boolean; data?: ExportValidationResult };
+      if (!result.success || !result.data || result.data.findings.length === 0) {
+        await saveTfFile(content);
+        return;
+      }
+      openExportGate(result.data.findings, async () => { await saveTfFile(content); });
+    } catch {
+      await saveTfFile(content);
+    }
   },
 }));
 
