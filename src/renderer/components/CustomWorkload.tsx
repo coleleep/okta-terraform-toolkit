@@ -141,7 +141,6 @@ export default function CustomWorkload() {
                   className="w-full text-left px-3 py-2 text-xs hover:bg-blue-50 border-b border-gray-50 last:border-0"
                 >
                   <code className="font-mono text-gray-700">{r.terraformResource}</code>
-                  <span className="text-gray-400 ml-2">{r.description}</span>
                   {r.endpointLabel && (
                     <span className="ml-2 text-blue-500">→ {r.endpointLabel} ({findRateLimit(r.endpointLabel!) || '?'} req/win)</span>
                   )}

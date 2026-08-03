@@ -50,6 +50,18 @@ const REQUIRED_RESOURCES = new Set([
 describe('resource-dictionary accuracy', () => {
   const allNames = RESOURCE_DICTIONARY.map(r => r.terraformResource);
 
+  test('ResourceDictionaryEntry has no description field', () => {
+    const sample = RESOURCE_DICTIONARY[0] as unknown as Record<string, unknown>;
+    expect(sample['description']).toBeUndefined();
+  });
+
+  test('ResourceDictionaryEntry has no sinceVersion field', () => {
+    const withSince = (RESOURCE_DICTIONARY as unknown as Record<string, unknown>[]).find(
+      r => r['sinceVersion'] !== undefined
+    );
+    expect(withSince).toBeUndefined();
+  });
+
   test('no wrong resource names in RESOURCE_DICTIONARY', () => {
     const found = allNames.filter(n => KNOWN_WRONG_NAMES.has(n));
     expect(found).toEqual([]);
