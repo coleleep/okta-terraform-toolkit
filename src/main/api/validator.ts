@@ -523,6 +523,8 @@ function buildValidatorSystemPrompt(schema: ProviderSchema, version: string, mas
 
 ${schemaSection}
 
+IMPORTANT: Lines starting with # are comments in HCL and are NOT active configuration. Do not flag any issue that exists only inside a commented-out block. If an entire resource block is commented out, ignore it completely.
+
 Review the combined project across ALL provided files for:
 
 CORRECTNESS issues:
