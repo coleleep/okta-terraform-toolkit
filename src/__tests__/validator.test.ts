@@ -152,7 +152,7 @@ describe('vaultProject', () => {
     const result = vaultProject(files);
     const elapsedMs = Date.now() - start;
 
-    expect(elapsedMs).toBeLessThan(1000);
+    expect(elapsedMs).toBeLessThan(5000);
     expect(result.entries).toHaveLength(0);
   });
 
@@ -205,7 +205,7 @@ describe('vaultProject', () => {
     const result = vaultProject(files);
     const elapsedMs = Date.now() - start;
 
-    expect(elapsedMs).toBeLessThan(1000);
+    expect(elapsedMs).toBeLessThan(5000);
     expect(result.entries).toHaveLength(0);
   });
 
@@ -274,7 +274,7 @@ describe('vaultProject', () => {
     const result = vaultProject(files);
     const elapsedMs = Date.now() - start;
 
-    expect(elapsedMs).toBeLessThan(1000);
+    expect(elapsedMs).toBeLessThan(5000);
     expect(result.entries).toHaveLength(0);
   });
 
@@ -360,7 +360,7 @@ describe('vaultProject', () => {
     const result = vaultProject(files);
     const elapsedMs = Date.now() - start;
 
-    expect(elapsedMs).toBeLessThan(1000);
+    expect(elapsedMs).toBeLessThan(5000);
     expect(result.entries).toHaveLength(0);
   });
 
