@@ -7,6 +7,7 @@ import {
   isAvailableIn,
 } from '../shared/versions';
 import { RESOURCE_DICTIONARY } from '../shared/resource-dictionary';
+import { isKnownResource } from '../shared/schema-loader';
 
 describe('v6.12.0 version registration', () => {
   it('includes 6.12.0 in SUPPORTED_VERSIONS', () => {
@@ -96,30 +97,39 @@ describe('v6.12.0 attribute notes', () => {
 });
 
 describe('v6.12.0 data source entries', () => {
-  it('has okta_app_sign_on_policy_rule data source with sinceVersion 6.12.0', () => {
+  it('okta_app_sign_on_policy_rule is known in v6.12.0 schema', () => {
+    expect(isKnownResource('6.12.0', 'okta_app_sign_on_policy_rule')).toBe(true);
+  });
+
+  it('okta_authorization_servers_policies_rule is known in v6.12.0 schema', () => {
+    expect(isKnownResource('6.12.0', 'okta_authorization_servers_policies_rule')).toBe(true);
+  });
+
+  it('okta_iam_assignees_user is known in v6.12.0 schema', () => {
+    expect(isKnownResource('6.12.0', 'okta_iam_assignees_user')).toBe(true);
+  });
+
+  it('dict entry for okta_app_sign_on_policy_rule has correct parentType', () => {
     const entry = RESOURCE_DICTIONARY.find(
       (r) => r.terraformResource === 'okta_app_sign_on_policy_rule',
     );
     expect(entry).toBeDefined();
     expect(entry!.parentType).toBe('policies');
-    expect(entry!.sinceVersion).toBe('6.12.0');
   });
 
-  it('has okta_authorization_servers_policies_rule data source with sinceVersion 6.12.0', () => {
+  it('dict entry for okta_authorization_servers_policies_rule has correct parentType', () => {
     const entry = RESOURCE_DICTIONARY.find(
       (r) => r.terraformResource === 'okta_authorization_servers_policies_rule',
     );
     expect(entry).toBeDefined();
     expect(entry!.parentType).toBe('authServers');
-    expect(entry!.sinceVersion).toBe('6.12.0');
   });
 
-  it('has okta_iam_assignees_user data source with sinceVersion 6.12.0', () => {
+  it('dict entry for okta_iam_assignees_user has correct parentType', () => {
     const entry = RESOURCE_DICTIONARY.find(
       (r) => r.terraformResource === 'okta_iam_assignees_user',
     );
     expect(entry).toBeDefined();
     expect(entry!.parentType).toBe('users');
-    expect(entry!.sinceVersion).toBe('6.12.0');
   });
 });

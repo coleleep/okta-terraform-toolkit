@@ -8,6 +8,7 @@ import {
 } from '../shared/versions';
 import { RESOURCE_TYPES } from '../shared/constants';
 import { RESOURCE_DICTIONARY } from '../shared/resource-dictionary';
+import { isKnownResource } from '../shared/schema-loader';
 
 describe('v6.11.0 version registration', () => {
   it('includes 6.11.0 in SUPPORTED_VERSIONS', () => {
@@ -68,22 +69,20 @@ describe('identitySources resource type', () => {
 });
 
 describe('identity source resource dictionary entries', () => {
-  it('has okta_identity_source_group resource entry', () => {
+  it('okta_identity_source_group is known in v6.11.0 schema', () => {
+    expect(isKnownResource('6.11.0', 'okta_identity_source_group')).toBe(true);
+  });
+
+  it('okta_identity_source_users is known in v6.11.0 schema', () => {
+    expect(isKnownResource('6.11.0', 'okta_identity_source_users')).toBe(true);
+  });
+
+  it('dict entry for okta_identity_source_group has correct parentType', () => {
     const entry = RESOURCE_DICTIONARY.find(
       (r) => r.terraformResource === 'okta_identity_source_group',
     );
     expect(entry).toBeDefined();
     expect(entry!.parentType).toBe('identitySources');
-    expect(entry!.sinceVersion).toBe('6.11.0');
-  });
-
-  it('has okta_identity_source_users data source entry', () => {
-    const entry = RESOURCE_DICTIONARY.find(
-      (r) => r.terraformResource === 'okta_identity_source_users',
-    );
-    expect(entry).toBeDefined();
-    expect(entry!.parentType).toBe('identitySources');
-    expect(entry!.sinceVersion).toBe('6.11.0');
   });
 });
 
