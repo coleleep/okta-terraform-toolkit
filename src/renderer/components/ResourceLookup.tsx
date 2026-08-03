@@ -1,18 +1,45 @@
-import React, { useState } from 'react';
-import { searchResources, RESOURCE_DICTIONARY, ResourceDictionaryEntry } from '../../shared/resource-dictionary';
+import React, { useMemo, useState } from 'react';
+import { RESOURCE_DICTIONARY, ResourceDictionaryEntry } from '../../shared/resource-dictionary';
+import { loadSchema } from '../../shared/schema-loader';
 import { useStore } from '../hooks/useStore';
-import { isAvailableIn } from '../../shared/versions';
+import { DEFAULT_VERSION } from '../../shared/versions';
+
+// Build a lookup map from terraformResource → dict entry (for parentLabel)
+const DICT_BY_NAME = new Map<string, ResourceDictionaryEntry>(
+  RESOURCE_DICTIONARY.map(r => [r.terraformResource, r])
+);
 
 export default function ResourceLookup() {
   const [query, setQuery] = useState('');
   const [showAll, setShowAll] = useState(false);
   const { providerVersion } = useStore();
 
-  const results = query.trim()
-    ? searchResources(query)
-    : showAll
-      ? RESOURCE_DICTIONARY
-      : [];
+  const version = (!providerVersion || providerVersion === 'system') ? DEFAULT_VERSION : providerVersion;
+
+  const allResourceNames = useMemo(() => {
+    try {
+      const schema = loadSchema(version);
+      return [
+        ...Object.keys(schema.resource_schemas),
+        ...Object.keys(schema.data_source_schemas),
+      ].sort();
+    } catch {
+      return [];
+    }
+  }, [version]);
+
+  const results = useMemo(() => {
+    if (query.trim()) {
+      const q = query.toLowerCase();
+      return allResourceNames.filter(name => {
+        if (name.toLowerCase().includes(q)) return true;
+        const entry = DICT_BY_NAME.get(name);
+        return entry ? entry.parentLabel.toLowerCase().includes(q) : false;
+      });
+    }
+    if (showAll) return allResourceNames;
+    return [];
+  }, [query, showAll, allResourceNames]);
 
   const displayResults = results.slice(0, showAll && !query ? 200 : 15);
 
@@ -36,8 +63,8 @@ export default function ResourceLookup() {
       />
       {displayResults.length > 0 && (
         <div className="mt-2 max-h-64 overflow-y-auto border border-gray-100 rounded-lg divide-y divide-gray-50">
-          {displayResults.map((r) => (
-            <ResourceRow key={r.terraformResource} entry={r} providerVersion={providerVersion} />
+          {displayResults.map((name) => (
+            <ResourceRow key={name} resourceName={name} dictEntry={DICT_BY_NAME.get(name)} />
           ))}
         </div>
       )}
@@ -55,25 +82,25 @@ export default function ResourceLookup() {
   );
 }
 
-function ResourceRow({ entry, providerVersion }: { entry: ResourceDictionaryEntry; providerVersion: string }) {
-  const available = !entry.sinceVersion || isAvailableIn(entry.sinceVersion, providerVersion);
-
+function ResourceRow({
+  resourceName,
+  dictEntry,
+}: {
+  resourceName: string;
+  dictEntry: ResourceDictionaryEntry | undefined;
+}) {
   return (
-    <div className={`flex items-center gap-3 px-3 py-2 ${available ? '' : 'opacity-50'}`}>
+    <div className="flex items-center gap-3 px-3 py-2">
       <div className="flex-1 min-w-0">
-        <code className="text-xs font-mono text-gray-700">{entry.terraformResource}</code>
-        <p className="text-xs text-gray-400 truncate">{entry.description}</p>
+        <code className="text-xs font-mono text-gray-700">{resourceName}</code>
       </div>
-      <div className="flex-shrink-0 text-right">
-        <span className="inline-block px-2 py-0.5 text-xs font-medium rounded-full bg-blue-50 text-blue-700">
-          {entry.parentLabel}
-        </span>
-        {entry.sinceVersion && (
-          <span className={`block text-xs mt-0.5 ${available ? 'text-green-600' : 'text-red-400'}`}>
-            {available ? `v${entry.sinceVersion}+` : `requires v${entry.sinceVersion}+`}
+      {dictEntry && (
+        <div className="flex-shrink-0 text-right">
+          <span className="inline-block px-2 py-0.5 text-xs font-medium rounded-full bg-blue-50 text-blue-700">
+            {dictEntry.parentLabel}
           </span>
-        )}
-      </div>
+        </div>
+      )}
     </div>
   );
 }
