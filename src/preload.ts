@@ -100,6 +100,8 @@ const api = {
     ipcRenderer.invoke('file:save-tf', { content }),
   saveProjectDir: (files: Record<string, string>) =>
     ipcRenderer.invoke('file:save-project', { files }),
+  validateProjectFiles: (files: Record<string, string>, version: string) =>
+    ipcRenderer.invoke('file:validate-project', { files, version }),
 
   // Source org connection
   connectSource: (orgUrl: string, token: string) =>

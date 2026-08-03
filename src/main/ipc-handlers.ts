@@ -12,7 +12,7 @@ import { analyzeTargetRuntime } from './api/target-analyzer';
 import { probeSubResourceEndpoint } from './api/deep-probe';
 import { parseLogFile } from './api/log-parser';
 import { interpretLog, buildWorkload, decodeError, generateSolution, convertConfig, getApiKey, setApiKey, getClaudeConfig, setClaudeConfig, removeClaudeConfig, getOcmStatus } from './api/claude';
-import { vaultProject, analyzeProject, exportProject, createSession, getSession, touchSession, clearSession } from './api/validator';
+import { vaultProject, analyzeProject, exportProject, createSession, getSession, touchSession, clearSession, validateForExport } from './api/validator';
 import { convertConfigDeterministic } from './api/sync-convert';
 import { parseStateFile, syncWithSubResources, buildSyncSummary, discoverSourceResources, discoverTargetResources, matchResources, fetchAttributeDiff, parseTfAttributesFromFiles } from './api/sync';
 import { logger, setLevel, getLevel } from './logger';
@@ -726,6 +726,18 @@ export function registerIpcHandlers() {
       const fs = await import('fs');
       fs.writeFileSync(result.filePath, params.content, 'utf8');
       return { success: true, data: result.filePath };
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : String(error);
+      return { success: false, error: message };
+    }
+  });
+
+  // Pre-export validation gate
+  ipcMain.handle('file:validate-project', async (_event, params: { files: Record<string, string>; version: string }) => {
+    try {
+      const version = (!params.version || params.version === 'system') ? DEFAULT_VERSION : params.version;
+      const result = await validateForExport(params.files, version);
+      return { success: true, data: result };
     } catch (error: unknown) {
       const message = error instanceof Error ? error.message : String(error);
       return { success: false, error: message };
