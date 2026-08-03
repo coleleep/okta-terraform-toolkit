@@ -559,17 +559,18 @@ data "okta_auth_server" "default" {
   identitySources: `# ─── Identity Sources ───
 # Identity sources allow Okta to source user profiles from external systems (v6.11.0+)
 
-# Data source: look up an existing identity source
-# data "okta_identity_source" "example" {
-#   id = "<identity_source_id>"
+# Data source: list groups from an identity source
+# data "okta_identity_source_users" "example" {
+#   identity_source_id = "<identity_source_id>"
 # }
 
-# Resource: manage an identity source
-# resource "okta_identity_source" "example" {
-#   name = "My Identity Source"
-#   type = "SAML2"
-#   # protocol and policy settings vary by source type
-#   # See: https://registry.terraform.io/providers/okta/okta/latest/docs/resources/identity_source
+# Resource: manage identity source group membership
+# resource "okta_identity_source_group" "example" {
+#   identity_source_id = "<identity_source_id>"
+#   external_id        = "<external_group_id>"
+#   profile = {
+#     name = "Engineering"
+#   }
 # }
 `,
 };
