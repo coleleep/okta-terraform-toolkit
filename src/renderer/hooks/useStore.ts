@@ -82,7 +82,7 @@ interface AppState {
   dismissExportGate: () => void;
   confirmExportGate: () => Promise<void>;
   validateThenSaveProjectDir: (files: Record<string, string>, onSaved?: (dir: string) => void) => Promise<void>;
-  validateThenSaveTfFile: (content: string) => Promise<void>;
+  validateThenSaveTfFile: (content: string, onSaved?: (path: string) => void) => Promise<void>;
 }
 
 export const useStore = create<AppState>((set, get) => ({
@@ -429,7 +429,7 @@ export const useStore = create<AppState>((set, get) => ({
     };
     try {
       const result = await api().validateProjectFiles(files, version) as { success: boolean; data?: ExportValidationResult };
-      if (!result.success || !result.data || result.data.findings.length === 0) {
+      if (!result.success || !result.data || !result.data.findings || result.data.findings.length === 0) {
         await doSave();
         return;
       }
@@ -439,18 +439,22 @@ export const useStore = create<AppState>((set, get) => ({
     }
   },
 
-  validateThenSaveTfFile: async (content) => {
+  validateThenSaveTfFile: async (content, onSaved) => {
     const { providerVersion, saveTfFile, openExportGate } = get();
     const version = (!providerVersion || providerVersion === 'system') ? DEFAULT_VERSION : providerVersion;
+    const doSave = async () => {
+      const path = await saveTfFile(content);
+      if (onSaved && path) onSaved(path);
+    };
     try {
       const result = await api().validateProjectFiles({ 'provider.tf': content }, version) as { success: boolean; data?: ExportValidationResult };
-      if (!result.success || !result.data || result.data.findings.length === 0) {
-        await saveTfFile(content);
+      if (!result.success || !result.data || !result.data.findings || result.data.findings.length === 0) {
+        await doSave();
         return;
       }
-      openExportGate(result.data.findings, async () => { await saveTfFile(content); });
+      openExportGate(result.data.findings, doSave);
     } catch {
-      await saveTfFile(content);
+      await doSave();
     }
   },
 }));

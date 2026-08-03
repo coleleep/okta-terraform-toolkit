@@ -19,6 +19,14 @@ function FindingItem({ finding }: { finding: Finding }) {
 export default function ExportGateModal() {
   const { exportValidationGate, dismissExportGate, confirmExportGate } = useStore();
 
+  React.useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') dismissExportGate();
+    };
+    document.addEventListener('keydown', handleKeyDown);
+    return () => document.removeEventListener('keydown', handleKeyDown);
+  }, [dismissExportGate]);
+
   if (!exportValidationGate) return null;
 
   const { findings } = exportValidationGate;
@@ -26,8 +34,8 @@ export default function ExportGateModal() {
   const warnings = findings.filter(f => f.severity === 'warning');
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
-      <div className="bg-white rounded-xl shadow-2xl w-full max-w-lg mx-4 p-6">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40" onClick={dismissExportGate}>
+      <div className="bg-white rounded-xl shadow-2xl w-full max-w-lg mx-4 p-6" role="dialog" aria-modal="true" onClick={(e) => e.stopPropagation()}>
         <h2 className="text-base font-semibold text-gray-900 mb-1">
           Validation findings before export
         </h2>

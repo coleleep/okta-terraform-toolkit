@@ -656,9 +656,10 @@ export default function ProviderBlock({ config, orgUrl }: Props) {
 
   const handleSaveSingle = async () => {
     if (!currentFile) return;
-    await validateThenSaveTfFile(currentFile.content);
-    setSaved('Saved');
-    setTimeout(() => setSaved(null), 3000);
+    await validateThenSaveTfFile(currentFile.content, () => {
+      setSaved('Saved');
+      setTimeout(() => setSaved(null), 3000);
+    });
   };
 
   const handleSaveProject = async () => {
@@ -666,9 +667,10 @@ export default function ProviderBlock({ config, orgUrl }: Props) {
     for (const file of Object.values(files)) {
       if (file) projectFiles[file.filename] = file.content;
     }
-    await validateThenSaveProjectDir(projectFiles);
-    setSaved('Saved');
-    setTimeout(() => setSaved(null), 4000);
+    await validateThenSaveProjectDir(projectFiles, () => {
+      setSaved('Saved');
+      setTimeout(() => setSaved(null), 4000);
+    });
   };
 
   return (
