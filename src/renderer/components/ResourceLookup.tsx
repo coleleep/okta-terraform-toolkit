@@ -19,10 +19,10 @@ export default function ResourceLookup() {
   const allResourceNames = useMemo(() => {
     try {
       const schema = loadSchema(version);
-      return [
+      return [...new Set([
         ...Object.keys(schema.resource_schemas),
         ...Object.keys(schema.data_source_schemas),
-      ].sort();
+      ])].sort();
     } catch {
       return [];
     }
