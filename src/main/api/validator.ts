@@ -1,6 +1,8 @@
 import { getClient } from './claude';
 import { RESOURCE_DICTIONARY } from '../../shared/resource-dictionary';
 import { VaultEntry, VaultResult, Finding, ValidatorAnalysis } from '../../shared/types';
+import { loadSchema } from '../../shared/schema-loader';
+import type { ProviderSchema, ResourceSchema } from '../../shared/provider-schemas/schema-types';
 
 type VaultKind = VaultEntry['kind'];
 
@@ -212,6 +214,56 @@ const VAULT_PATTERNS: VaultPattern[] = [
     '[^"]+'
   ),
 ];
+
+function extractResourceTypes(files: Record<string, string>): string[] {
+  const types = new Set<string>();
+  const resourceRegex = /resource\s+"(\w+)"/g;
+  const dataRegex = /data\s+"(\w+)"/g;
+  for (const content of Object.values(files)) {
+    for (const m of content.matchAll(resourceRegex)) if (m[1].startsWith('okta_')) types.add(m[1]);
+    for (const m of content.matchAll(dataRegex)) if (m[1].startsWith('okta_')) types.add(m[1]);
+  }
+  return [...types].sort();
+}
+
+function formatResourceSchema(resourceType: string, schema: ResourceSchema): string {
+  const lines: string[] = [`${resourceType}:`];
+  const attrs = schema.attributes ?? {};
+
+  const required   = Object.entries(attrs).filter(([, a]) => a.required).map(([n]) => n);
+  const optional   = Object.entries(attrs).filter(([, a]) => a.optional && !a.deprecated).map(([n]) => n);
+  const deprecated = Object.entries(attrs).filter(([, a]) => a.deprecated).map(([n]) => n);
+
+  if (required.length)   lines.push(`  Required: ${required.join(', ')}`);
+  if (optional.length)   lines.push(`  Optional: ${optional.join(', ')}`);
+  if (deprecated.length) lines.push(`  Deprecated (do not use — flag as warning): ${deprecated.join(', ')}`);
+
+  for (const [btName, bt] of Object.entries(schema.block_types ?? {})) {
+    const btReq = Object.entries(bt.attributes ?? {}).filter(([, a]) => a.required).map(([n]) => n);
+    const maxNote = bt.max_items === 1 ? ' (max 1)' : '';
+    lines.push(`  Block "${btName}"${maxNote}: required: ${btReq.join(', ') || 'none'}`);
+  }
+
+  return lines.join('\n');
+}
+
+export function buildSchemaContext(schema: ProviderSchema, files: Record<string, string>): string {
+  const resourceTypes = extractResourceTypes(files);
+  if (resourceTypes.length === 0) return '';
+
+  const sections: string[] = [];
+  for (const resourceType of resourceTypes) {
+    const resourceSchema =
+      schema.resource_schemas[resourceType] ?? schema.data_source_schemas[resourceType] ?? null;
+    if (resourceSchema) {
+      sections.push(formatResourceSchema(resourceType, resourceSchema));
+    } else {
+      sections.push(`${resourceType}: NOT FOUND in provider schema — flag as error`);
+    }
+  }
+
+  return `Okta Terraform Provider schema — resources in this project:\n\n${sections.join('\n\n')}`;
+}
 
 export function vaultProject(files: Record<string, string>): VaultResult {
   // Map from real value -> token, so the same value gets one token across the whole project.

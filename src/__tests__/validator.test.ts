@@ -1,4 +1,5 @@
-import { vaultProject, exportProject, createSession, getSession, clearSession, touchSession } from '../main/api/validator';
+import { vaultProject, exportProject, createSession, getSession, clearSession, touchSession, buildSchemaContext } from '../main/api/validator';
+import type { ProviderSchema } from '../shared/provider-schemas/schema-types';
 
 describe('vaultProject', () => {
   it('masks an Okta ID and records a reversible vault entry', () => {
@@ -108,6 +109,29 @@ describe('vaultProject', () => {
     expect(result.entries[0].kind).toBe('hcl_pii_attr');
   });
 
+  it('masks the wider set of Okta user-profile PII attributes flagged as missing from the audit', () => {
+    // Attribute names pulled from the canonical mapping in shared/terraform-gen.ts
+    // (extractTfAttrs' okta_user profile mapping), not guessed — same source used
+    // to expand this allowlist. Excludes non-identifying config/preference fields
+    // like profileUrl, preferredLanguage, locale, timezone, userType.
+    const files = {
+      'main.tf': [
+        'employeeNumber = "E-00123"',
+        'title = "Senior Engineer"',
+        'department = "Platform"',
+        'streetAddress = "123 Main St"',
+        'manager = "Jane Doe"',
+      ].join('\n'),
+    };
+    const result = vaultProject(files);
+
+    for (const value of ['E-00123', 'Senior Engineer', 'Platform', '123 Main St', 'Jane Doe']) {
+      expect(result.maskedFiles['main.tf']).not.toContain(value);
+    }
+    expect(result.entries).toHaveLength(5);
+    expect(result.entries.every((e) => e.kind === 'hcl_pii_attr')).toBe(true);
+  });
+
   it('correctly masks the value, not the attribute name, when client_secret is used as both attr and value', () => {
     const files = { 'main.tf': 'client_secret = "client_secret"' };
     const result = vaultProject(files);
@@ -194,6 +218,190 @@ describe('vaultProject', () => {
       value: '{{not-a-real-token}}',
       kind: 'client_secret',
     });
+  });
+
+  it('masks PII inside an HCL array-valued attribute, tokenizing each matching element', () => {
+    const files = {
+      'main.tf': 'admin_emails = ["jane.doe@example.com", "john.smith@example.com"]\nmanaged_users = ["00u1a2b3c4d5e6f7g8h9"]',
+    };
+    const result = vaultProject(files);
+
+    expect(result.maskedFiles['main.tf']).not.toContain('jane.doe@example.com');
+    expect(result.maskedFiles['main.tf']).not.toContain('john.smith@example.com');
+    expect(result.maskedFiles['main.tf']).not.toContain('00u1a2b3c4d5e6f7g8h9');
+    expect(result.maskedFiles['main.tf']).toBe(
+      'admin_emails = ["{{EMAIL_1}}", "{{EMAIL_2}}"]\nmanaged_users = ["{{OKTA_ID_1}}"]'
+    );
+    expect(result.entries.map(e => e.kind).sort()).toEqual(['email', 'email', 'okta_id'].sort());
+    expect(
+      result.entries.every((e) => e.sourceAttr === 'admin_emails' || e.sourceAttr === 'managed_users')
+    ).toBe(true);
+  });
+
+  it('masks PII inside a JSON (.tfstate-style) array-valued attribute', () => {
+    const tfstate = JSON.stringify({
+      resources: [
+        {
+          type: 'okta_group',
+          instances: [{ attributes: { admin_emails: ['a@example.com', 'b@example.com'] } }],
+        },
+      ],
+    });
+    const files = { 'terraform.tfstate': tfstate };
+    const result = vaultProject(files);
+
+    expect(result.maskedFiles['terraform.tfstate']).not.toContain('a@example.com');
+    expect(result.maskedFiles['terraform.tfstate']).not.toContain('b@example.com');
+    expect(result.entries.map((e) => e.kind)).toEqual(['email', 'email']);
+    expect(JSON.parse(result.maskedFiles['terraform.tfstate'])).toBeTruthy(); // still valid JSON
+  });
+
+  it('leaves non-PII array elements untouched while masking matching ones in a mixed array', () => {
+    const files = { 'main.tf': 'tags = ["team-a", "jane.doe@example.com", "prod"]' };
+    const result = vaultProject(files);
+
+    expect(result.maskedFiles['main.tf']).toContain('"team-a"');
+    expect(result.maskedFiles['main.tf']).toContain('"prod"');
+    expect(result.maskedFiles['main.tf']).not.toContain('jane.doe@example.com');
+    expect(result.entries).toHaveLength(1);
+  });
+
+  it('does not hang on a large malformed array attribute with no closing bracket', () => {
+    const junk = 'A'.repeat(200_000);
+    const files = { 'main.tf': `admin_emails = ["${junk}` };
+
+    const start = Date.now();
+    const result = vaultProject(files);
+    const elapsedMs = Date.now() - start;
+
+    expect(elapsedMs).toBeLessThan(1000);
+    expect(result.entries).toHaveLength(0);
+  });
+
+  it('masks an Okta ID regardless of resource-type prefix, not just 00X/0oa', () => {
+    // Real Okta IDs use many type prefixes beyond 00X (user/group/policy) and
+    // 0oa (app) — e.g. oty=user type, exk=IdP signing key, prm=profile
+    // mapping, rst=policy. A hardcoded prefix enumeration misses these as
+    // Okta adds resource types; the fix matches the fixed 20-char shape
+    // instead.
+    const files = {
+      'terraform.tfstate': [
+        '"a": "oty7rkvgnqr7iCJZV1d7"',
+        '"b": "exk10te75zdmm847V1d8"',
+        '"c": "prm10te75zplukNK51d8"',
+        '"d": "rst7rl7vjt4qmyPuK1d7"',
+      ].join('\n'),
+    };
+    const result = vaultProject(files);
+
+    for (const value of [
+      'oty7rkvgnqr7iCJZV1d7',
+      'exk10te75zdmm847V1d8',
+      'prm10te75zplukNK51d8',
+      'rst7rl7vjt4qmyPuK1d7',
+    ]) {
+      expect(result.maskedFiles['terraform.tfstate']).not.toContain(value);
+    }
+    expect(result.entries.every((e) => e.kind === 'okta_id')).toBe(true);
+    expect(result.entries).toHaveLength(4);
+  });
+
+  it('masks PII embedded as a substring inside a larger JSON- or XML-encoded string value', () => {
+    // Real Okta .tfstate content routinely nests JSON- or XML-encoded blobs
+    // as a single string value (the provider's `links`, `metadata`, and
+    // `embed_url` attributes all do this) — the sensitive value is a
+    // substring of a much larger string, not the whole quoted value, so the
+    // attr="value"-anchored patterns alone never match it.
+    const files = {
+      'terraform.tfstate': JSON.stringify({
+        links:
+          '{"self":{"href":"https://acme-corp.okta.com/api/v1/apps/0oa1A2B3C4D5E6F7G8HI"}}',
+        metadata:
+          '<md:SingleSignOnService Location="https://acme-corp.okta.com/app/saml"/>',
+      }),
+    };
+    const result = vaultProject(files);
+
+    expect(result.maskedFiles['terraform.tfstate']).not.toContain('acme-corp.okta.com');
+    expect(result.maskedFiles['terraform.tfstate']).not.toContain('0oa1A2B3C4D5E6F7G8HI');
+    expect(result.entries.some((e) => e.kind === 'org_url')).toBe(true);
+    expect(result.entries.some((e) => e.kind === 'okta_id')).toBe(true);
+  });
+
+  it('does not let the okta_id scanAnywhere pass clobber a legitimate large JWT payload', () => {
+    // A JWT payload is base64url — a long run of lowercase-alnum characters
+    // is a normal, frequent occurrence within it, and looks exactly like an
+    // Okta ID shape. If okta_id's scanAnywhere pass ran before jwt's
+    // attr-anchored pass tokenized the whole value, it would eat a 20-char
+    // chunk out of the payload and corrupt the JWT beyond recognition.
+    const header = 'eyJhbGciOiJIUzI1NiJ9';
+    const payload = 'a'.repeat(200);
+    const signature = 'dozjgNryP4J3jVmNHl0w5N_XgL0n3I9PlFUP0THsR8U';
+    const jwt = `${header}.${payload}.${signature}`;
+    const files = { 'main.tf': `id_token = "${jwt}"` };
+
+    const result = vaultProject(files);
+
+    expect(result.entries).toHaveLength(1);
+    expect(result.entries[0].kind).toBe('jwt');
+    expect(result.maskedFiles['main.tf']).toBe('id_token = "{{JWT_1}}"');
+  });
+
+  it('does not hang when scanning a large malformed blob with no @ or .okta anywhere in it', () => {
+    // org_url and email's scanAnywhere passes have no cheap-fail prefix
+    // (unlike the attr-anchored patterns, which fail fast on the "attr=\""
+    // shape almost everywhere). Without bounding their internal quantifiers,
+    // a large blob lacking the '@' or ".okta" they're searching for causes
+    // catastrophic backtracking at every scanned position.
+    const junk = 'A'.repeat(200_000);
+    const files = { 'main.tf': `resource "x" "y" { note = "${junk}" }` };
+
+    const start = Date.now();
+    const result = vaultProject(files);
+    const elapsedMs = Date.now() - start;
+
+    expect(elapsedMs).toBeLessThan(1000);
+    expect(result.entries).toHaveLength(0);
+  });
+
+  it('masks PII inside a .tfstate file, which uses JSON "attr": "value" syntax instead of HCL', () => {
+    const tfstate = JSON.stringify({
+      resources: [
+        {
+          type: 'okta_user',
+          instances: [
+            {
+              attributes: {
+                id: '00u1a2b3c4d5e6f7g8h9',
+                login: 'jane.doe@example.com',
+                firstName: 'Jane',
+              },
+            },
+          ],
+        },
+        {
+          type: 'okta_app_oauth',
+          instances: [
+            {
+              attributes: {
+                client_secret: 'supersecretvalue123',
+              },
+            },
+          ],
+        },
+      ],
+    });
+    const files = { 'terraform.tfstate': tfstate };
+
+    const result = vaultProject(files);
+
+    expect(result.maskedFiles['terraform.tfstate']).not.toContain('00u1a2b3c4d5e6f7g8h9');
+    expect(result.maskedFiles['terraform.tfstate']).not.toContain('jane.doe@example.com');
+    expect(result.maskedFiles['terraform.tfstate']).not.toContain('supersecretvalue123');
+    expect(result.entries.map(e => e.kind).sort()).toEqual(
+      ['client_secret', 'hcl_pii_attr', 'okta_id', 'email'].sort()
+    );
+    expect(JSON.parse(result.maskedFiles['terraform.tfstate'])).toBeTruthy(); // still valid JSON
   });
 });
 
@@ -296,6 +504,40 @@ describe('exportProject', () => {
     expect(result.files['main.tf']).toMatch(/var\.app_id_2/);
     expect(result.files['terraform.tfvars']).toContain('app_id_2 = "0oaABCDEFGHIJKLMNOPQ"');
   });
+
+  it('restores the real value in terraform.tfstate when the token appears only there', () => {
+    const original = {
+      'terraform.tfstate': JSON.stringify({ id: '0oaABCDEFGHIJKLMNOPQ' }),
+    };
+    const { maskedFiles, entries } = vaultProject(original);
+
+    const result = exportProject(maskedFiles, entries);
+
+    // .tfstate can't reference Terraform variables — it must get the real
+    // value back, not be left as an unreplaced {{TOKEN}} placeholder.
+    expect(result.files['terraform.tfstate']).not.toMatch(/\{\{OKTA_ID_1\}\}/);
+    expect(result.files['terraform.tfstate']).toContain('0oaABCDEFGHIJKLMNOPQ');
+    expect(result.files['variables.tf']).toBeUndefined();
+  });
+
+  it('promotes a value in .tf but still restores the real value in terraform.tfstate, not a var. reference', () => {
+    const original = {
+      'main.tf': 'app_id = "0oaABCDEFGHIJKLMNOPQ"',
+      'terraform.tfstate': JSON.stringify({ id: '0oaABCDEFGHIJKLMNOPQ' }),
+    };
+    const { maskedFiles, entries } = vaultProject(original);
+
+    const result = exportProject(maskedFiles, entries);
+
+    expect(result.files['main.tf']).toMatch(/var\.app_id_1/);
+
+    // terraform.tfstate is not a template — it must hold the real value, not
+    // a "var.app_id_1" string (invalid/meaningless in state) and not the
+    // leftover masked token.
+    expect(result.files['terraform.tfstate']).toContain('0oaABCDEFGHIJKLMNOPQ');
+    expect(result.files['terraform.tfstate']).not.toContain('var.app_id_1');
+    expect(result.files['terraform.tfstate']).not.toMatch(/\{\{OKTA_ID_1\}\}/);
+  });
 });
 
 describe('validator session store', () => {
@@ -343,5 +585,105 @@ describe('validator session store', () => {
     jest.advanceTimersByTime(10 * 60 * 1000);
 
     expect(getSession(id)).not.toBeNull(); // 20 min total elapsed, but touched at 10 min mark
+  });
+
+  it('a fresh session created after discarding a prior one still captures new vault entries (start-over flow)', () => {
+    const firstVault = vaultProject({ 'main.tf': 'client_secret = "first-secret-value"' });
+    const firstId = createSession(firstVault);
+    clearSession(firstId);
+
+    const secondVault = vaultProject({ 'main.tf': 'client_secret = "second-secret-value"' });
+    const secondId = createSession(secondVault);
+    const session = getSession(secondId);
+
+    expect(getSession(firstId)).toBeNull();
+    expect(session).not.toBeNull();
+    expect(session!.vault.entries).toHaveLength(1);
+    expect(session!.vault.entries[0].value).toBe('second-secret-value');
+    expect(session!.vault.maskedFiles['main.tf']).toContain('{{CLIENT_SECRET_1}}');
+  });
+});
+
+const MOCK_SCHEMA: ProviderSchema = {
+  resource_schemas: {
+    okta_app_oauth: {
+      attributes: {
+        label:       { type: 'string', required: true, description: 'Pretty name' },
+        type:        { type: 'string', required: true },
+        grant_types: { type: ['set', 'string'], required: true },
+        redirect_uris: { type: ['set', 'string'], optional: true },
+        implicit_assignment: { type: 'bool', optional: true, deprecated: true },
+        id:          { type: 'string', computed: true },
+      },
+      block_types: {
+        groups_claim: {
+          nesting_mode: 'list',
+          max_items: 1,
+          attributes: {
+            filter_type: { type: 'string', required: true },
+            name:        { type: 'string', required: true },
+            type:        { type: 'string', required: true },
+            value:       { type: 'string', required: true },
+          },
+        },
+      },
+    },
+  },
+  data_source_schemas: {
+    okta_app: {
+      attributes: {
+        label: { type: 'string', optional: true },
+      },
+    },
+  },
+};
+
+describe('buildSchemaContext', () => {
+  it('returns schema section only for resource types present in the files', () => {
+    const files = { 'main.tf': 'resource "okta_app_oauth" "x" { label = "test" }' };
+    const result = buildSchemaContext(MOCK_SCHEMA, files);
+    expect(result).toContain('okta_app_oauth');
+    expect(result).not.toContain('okta_group');
+  });
+
+  it('marks deprecated attributes clearly', () => {
+    const files = { 'main.tf': 'resource "okta_app_oauth" "x" {}' };
+    const result = buildSchemaContext(MOCK_SCHEMA, files);
+    expect(result).toContain('implicit_assignment');
+    expect(result.toLowerCase()).toContain('deprecated');
+  });
+
+  it('includes block type info with required attributes', () => {
+    const files = { 'main.tf': 'resource "okta_app_oauth" "x" {}' };
+    const result = buildSchemaContext(MOCK_SCHEMA, files);
+    expect(result).toContain('groups_claim');
+    expect(result).toContain('filter_type');
+  });
+
+  it('marks unknown resource types explicitly as not found in schema', () => {
+    const files = { 'main.tf': 'resource "okta_invented_resource" "x" {}' };
+    const result = buildSchemaContext(MOCK_SCHEMA, files);
+    expect(result).toContain('okta_invented_resource');
+    expect(result.toLowerCase()).toContain('not found');
+  });
+
+  it('handles data sources as well as resources', () => {
+    const files = { 'main.tf': 'data "okta_app" "x" {}' };
+    const result = buildSchemaContext(MOCK_SCHEMA, files);
+    expect(result).toContain('okta_app');
+  });
+
+  it('returns empty string when no Okta resources are present', () => {
+    const files = { 'main.tf': 'resource "aws_s3_bucket" "x" {}' };
+    const result = buildSchemaContext(MOCK_SCHEMA, files);
+    expect(result.trim()).toBe('');
+  });
+
+  it('does not include computed-only attributes in the schema context', () => {
+    const files = { 'main.tf': 'resource "okta_app_oauth" "x" {}' };
+    const result = buildSchemaContext(MOCK_SCHEMA, files);
+    // 'id' is computed-only — should not appear in the required/optional/deprecated lines
+    const lines = result.split('\n').filter((l: string) => l.trim().startsWith('id'));
+    expect(lines).toHaveLength(0);
   });
 });
