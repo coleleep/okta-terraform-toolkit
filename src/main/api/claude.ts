@@ -426,7 +426,7 @@ export interface SolutionResult {
 
 function buildFullResourceContext(): string {
   const entries = RESOURCE_DICTIONARY.map(r =>
-    `${r.terraformResource} | ${r.description} | parent=${r.parentType}${r.primaryEndpoint ? ` | endpoint=${r.primaryEndpoint}` : ''}${r.sinceVersion ? ` | since=v${r.sinceVersion}` : ''}`
+    `${r.terraformResource} | parent=${r.parentType}${r.primaryEndpoint ? ` | endpoint=${r.primaryEndpoint}` : ''}`
   ).join('\n');
   return entries;
 }
@@ -435,7 +435,7 @@ const SOLUTION_SYSTEM_PROMPT = `You are an expert Terraform + Okta solution arch
 
 SUPPORTED PROVIDER VERSIONS: ${SUPPORTED_VERSIONS.join(', ')}
 
-RESOURCE DICTIONARY (terraformResource | description | parent | endpoint | sinceVersion):
+RESOURCE DICTIONARY (terraformResource | parent | endpoint):
 ${buildFullResourceContext()}
 
 ${buildScopeContext()}
