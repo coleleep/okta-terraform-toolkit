@@ -150,14 +150,12 @@ data "okta_group" "everyone" {
 #   group_id = okta_group.example.id
 # }
 
-# Group push — pushes Okta group to downstream app (requires provisioning)
-# resource "okta_app_group_push_now" "example" {
-#   app_id                = okta_app_saml.example.id
-#   group_push_id         = "..."  # from okta_app_group_assignments
-#   trigger_new_or_update = "trigger"
+# Push group to downstream app (requires provisioning enabled on the app)
+# resource "okta_push_group" "example" {
+#   app_id    = okta_app_saml.example.id
+#   group_id  = okta_group.example.id
 # }
 # Note: Push groups share the /api/v1/apps rate limit bucket.
-# Only works on apps with provisioning enabled (SCIM, etc.).
 `,
 
   authServers: `# ─── Authorization Servers ───
