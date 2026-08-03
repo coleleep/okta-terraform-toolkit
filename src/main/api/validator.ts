@@ -1,5 +1,4 @@
 import { getClient } from './claude';
-import { RESOURCE_DICTIONARY } from '../../shared/resource-dictionary';
 import { VaultEntry, VaultResult, Finding, ValidatorAnalysis } from '../../shared/types';
 import { loadSchema } from '../../shared/schema-loader';
 import type { ProviderSchema, ResourceSchema } from '../../shared/provider-schemas/schema-types';
@@ -490,19 +489,15 @@ export function clearSession(id: string): void {
   sessions.delete(id);
 }
 
-function buildResourceNameContext(): string {
-  const names = RESOURCE_DICTIONARY.map(r => r.terraformResource).join(', ');
-  return (
-    `Valid Okta Terraform resource and data source names for the current provider version:\n${names}\n\n` +
-    `This list is authoritative. If a resource name appears above, it is valid — do NOT flag it as invalid based on your training data. ` +
-    `Conversely, do NOT accept resource names that are absent from this list, even if your training data suggests they exist. ` +
-    `Never rename a resource that is already in this list.`
-  );
-}
+function buildValidatorSystemPrompt(schema: ProviderSchema, version: string, maskedFiles: Record<string, string>): string {
+  const schemaContext = buildSchemaContext(schema, maskedFiles);
+  const schemaSection = schemaContext
+    ? `${schemaContext}\n\nThe schema above is authoritative for provider v${version}. Do not rename valid resource types. Flag resource types absent from the schema as errors.`
+    : `Provider version: ${version}. Validate resource types against your knowledge of the Okta Terraform provider.`;
 
-const VALIDATOR_SYSTEM_PROMPT = `You are a senior Okta Terraform reviewer. You will be given one or more masked Terraform files (secrets and identifiers have been replaced with tokens like {{OKTA_ID_1}} — treat these as opaque placeholders, never remove or rewrite the token syntax itself).
+  return `You are a senior Okta Terraform reviewer. You will be given one or more masked Terraform files (secrets and identifiers have been replaced with tokens like {{OKTA_ID_1}} — treat these as opaque placeholders, never remove or rewrite the token syntax itself).
 
-${buildResourceNameContext()}
+${schemaSection}
 
 Review the combined project across ALL provided files for:
 
@@ -528,9 +523,12 @@ GRANT TYPE SEVERITY RULES for okta_app_oauth resources:
 For each finding, call the report_findings tool with the complete list of findings AND the complete corrected content for every .tf/.tfvars file that needed a change (files with no issues can be omitted from fixedFiles).
 
 In originalSnippet, copy the EXACT text from the masked file that the fix replaces — verbatim, including whitespace and indentation. It must be a literal substring of the file content so the UI can locate and replace it precisely.`;
+}
 
-export async function analyzeProject(maskedFiles: Record<string, string>): Promise<ValidatorAnalysis> {
+export async function analyzeProject(maskedFiles: Record<string, string>, version: string): Promise<ValidatorAnalysis> {
   const client = getClient();
+  const schema = loadSchema(version);
+  const systemPrompt = buildValidatorSystemPrompt(schema, version, maskedFiles);
 
   const fileBlocks = Object.entries(maskedFiles)
     .map(([name, content]) => `--- ${name} ---\n${content}`)
@@ -539,7 +537,7 @@ export async function analyzeProject(maskedFiles: Record<string, string>): Promi
   const response = await client.messages.create({
     model: 'claude-sonnet-4-6',
     max_tokens: 8192,
-    system: VALIDATOR_SYSTEM_PROMPT,
+    system: systemPrompt,
     messages: [{
       role: 'user',
       content: `Review this Terraform project:\n\n${fileBlocks}`,

@@ -580,7 +580,8 @@ export function registerIpcHandlers() {
       touchSession(params.sessionId);
 
       logger.info('validator', 'analyze started', { sessionId: params.sessionId });
-      const analysis = await analyzeProject(session.vault.maskedFiles);
+      const version = providerManager.getSelectedVersion();
+      const analysis = await analyzeProject(session.vault.maskedFiles, version);
       logger.info('validator', 'analyze complete', { sessionId: params.sessionId, findingCount: analysis.findings.length });
 
       return { success: true, data: analysis };
