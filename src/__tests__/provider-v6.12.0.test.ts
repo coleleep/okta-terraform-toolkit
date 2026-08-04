@@ -14,8 +14,9 @@ describe('v6.12.0 version registration', () => {
     expect(SUPPORTED_VERSIONS).toContain('6.12.0');
   });
 
-  it('sets DEFAULT_VERSION to 6.13.0', () => {
-    expect(DEFAULT_VERSION).toBe('6.13.0');
+  it('DEFAULT_VERSION is the newest supported version', () => {
+    const newest = SUPPORTED_VERSIONS[SUPPORTED_VERSIONS.length - 1];
+    expect(DEFAULT_VERSION).toBe(newest);
   });
 
   it('isAvailableIn returns true for 6.12.0 in 6.12.0', () => {

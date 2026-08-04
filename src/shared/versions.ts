@@ -1,6 +1,6 @@
 export const SUPPORTED_VERSIONS = ['6.6.1', '6.7.0', '6.8.0', '6.9.0', '6.10.0', '6.11.0', '6.12.0', '6.13.0', '6.14.0'] as const;
 export type ProviderVersion = (typeof SUPPORTED_VERSIONS)[number];
-export const DEFAULT_VERSION: ProviderVersion = '6.13.0';
+export const DEFAULT_VERSION: ProviderVersion = '6.14.0';
 
 /**
  * Compare two semver strings. Returns -1 if a < b, 0 if equal, 1 if a > b.
@@ -465,7 +465,11 @@ export const VERSION_ATTRIBUTE_NOTES: Record<ProviderVersion, string[]> = {
     'New data source: okta_catalog_entry_default',
     'New data source: okta_catalog_entry_user_access_request_fields',
   ],
-  '6.14.0': [],
+  '6.14.0': [
+    'okta_app_signon_policy_rule: new attribute office365_client_include (set of string) — filters by Office 365 client type. Valid values: WEB, MODERN_AUTH, EXCHANGE_ACTIVE_SYNC, AAD_JOIN. Only meaningful when the policy is attached to an Office 365 app.',
+    'New resources: okta_oauth2_v1_clients_role_* (13 resources) — assign standard and custom admin roles to OAuth 2.0 service apps (replaces manual role assignment for M2M clients)',
+    'New resource: okta_org_captcha — configure CAPTCHA settings for the org',
+  ],
 };
 
 /**

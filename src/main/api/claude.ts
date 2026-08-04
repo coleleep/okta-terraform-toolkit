@@ -8,7 +8,7 @@ import { readFileSync, writeFileSync, existsSync, unlinkSync } from 'fs';
 import { LogAnalysis, ClaudeInterpretation, CustomWorkloadEntry, ProbeResult } from '../../shared/types';
 import { RESOURCE_DICTIONARY } from '../../shared/resource-dictionary';
 import { SCOPE_REQUIREMENTS, API_KEY_ONLY_ENDPOINTS } from '../../shared/scopes';
-import { SUPPORTED_VERSIONS } from '../../shared/versions';
+import { SUPPORTED_VERSIONS, VERSION_ATTRIBUTE_NOTES, getAdditionsForVersion } from '../../shared/versions';
 import { redact } from './redact';
 
 // --- Claude Configuration Management ---
@@ -431,7 +431,12 @@ function buildFullResourceContext(): string {
   return entries;
 }
 
-const SOLUTION_SYSTEM_PROMPT = `You are an expert Terraform + Okta solution architect. Given a user's description of what they want to accomplish, you generate a complete, production-ready Terraform solution with the Okta provider.
+function buildSolutionSystemPrompt(providerVersion: string): string {
+  const notes = VERSION_ATTRIBUTE_NOTES[providerVersion as keyof typeof VERSION_ATTRIBUTE_NOTES] ?? [];
+  const versionSection = notes.length > 0
+    ? `\nVERSION-SPECIFIC NOTES FOR v${providerVersion}:\n${notes.map(n => `- ${n}`).join('\n')}\n`
+    : '';
+  return `You are an expert Terraform + Okta solution architect. Given a user's description of what they want to accomplish, you generate a complete, production-ready Terraform solution with the Okta provider.
 
 SUPPORTED PROVIDER VERSIONS: ${SUPPORTED_VERSIONS.join(', ')}
 
@@ -484,7 +489,8 @@ RULES:
 7. Include all required OAuth scopes or note if API key is required.
 8. If what the user wants is genuinely not possible with the Okta Terraform provider, set feasible=false and explain why.
 
-When you call the set_solution tool, generate real valid HCL in the hcl fields. Be specific, practical, and production-ready. Don't hedge. If something won't work, say so directly.`;
+When you call the set_solution tool, generate real valid HCL in the hcl fields. Be specific, practical, and production-ready. Don't hedge. If something won't work, say so directly.${versionSection}`;}
+
 
 export async function generateSolution(description: string, providerVersion: string): Promise<SolutionResult> {
   const client = getClient();
@@ -492,7 +498,7 @@ export async function generateSolution(description: string, providerVersion: str
   const response = await client.messages.create({
     model: 'claude-sonnet-4-6',
     max_tokens: 8192,
-    system: SOLUTION_SYSTEM_PROMPT,
+    system: buildSolutionSystemPrompt(providerVersion),
     messages: [{
       role: 'user',
       content: `Provider version: ${providerVersion}\n\nUser request: ${redact(description)}`,

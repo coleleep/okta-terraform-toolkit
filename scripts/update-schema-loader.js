@@ -103,5 +103,13 @@ for (const v of newVersions) {
   console.log(`✓ Added empty '${v}' entries to VERSION_RESOURCE_ADDITIONS and VERSION_ATTRIBUTE_NOTES`);
 }
 
+// Advance DEFAULT_VERSION to the newest schema-backed version.
+const newestVersion = versions[versions.length - 1];
+versionsContent = versionsContent.replace(
+  /export const DEFAULT_VERSION: ProviderVersion = '[^']+';/,
+  `export const DEFAULT_VERSION: ProviderVersion = '${newestVersion}';`
+);
+console.log(`✓ DEFAULT_VERSION advanced to ${newestVersion}`);
+
 writeFileSync(versionsPath, versionsContent);
 console.log(`✓ SUPPORTED_VERSIONS updated in versions.ts (${allVersions.length} versions, ${versions.length} schema-backed)`);
