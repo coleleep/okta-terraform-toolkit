@@ -86,5 +86,22 @@ versionsContent = versionsContent.replace(
   /export const SUPPORTED_VERSIONS = \[.*?\] as const;/,
   newVersionsLine
 );
+// Add empty entries for new versions in VERSION_RESOURCE_ADDITIONS and VERSION_ATTRIBUTE_NOTES.
+// Both are Record<ProviderVersion, ...> so every version in the union needs an entry.
+const newVersions = allVersions.filter(v => !existingVersions.includes(v));
+for (const v of newVersions) {
+  // Insert `  'X.X.X': [],` before the closing `};` of each record.
+  versionsContent = versionsContent
+    .replace(
+      /(export const VERSION_RESOURCE_ADDITIONS[\s\S]*?)(};)/,
+      (_, body, close) => `${body}  '${v}': [],\n\n${close}`
+    )
+    .replace(
+      /(export const VERSION_ATTRIBUTE_NOTES[\s\S]*?)(};)/,
+      (_, body, close) => `${body}  '${v}': [],\n${close}`
+    );
+  console.log(`✓ Added empty '${v}' entries to VERSION_RESOURCE_ADDITIONS and VERSION_ATTRIBUTE_NOTES`);
+}
+
 writeFileSync(versionsPath, versionsContent);
 console.log(`✓ SUPPORTED_VERSIONS updated in versions.ts (${allVersions.length} versions, ${versions.length} schema-backed)`);

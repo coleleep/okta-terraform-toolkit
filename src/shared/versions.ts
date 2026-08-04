@@ -359,6 +359,8 @@ export const VERSION_RESOURCE_ADDITIONS: Record<ProviderVersion, { type: string;
     },
   ],
 
+  '6.14.0': [],
+
   '6.13.0': [
     {
       type: 'customRoles',
@@ -463,6 +465,7 @@ export const VERSION_ATTRIBUTE_NOTES: Record<ProviderVersion, string[]> = {
     'New data source: okta_catalog_entry_default',
     'New data source: okta_catalog_entry_user_access_request_fields',
   ],
+  '6.14.0': [],
 };
 
 /**
