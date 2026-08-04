@@ -1,4 +1,4 @@
-export const SUPPORTED_VERSIONS = ['6.6.1', '6.7.0', '6.8.0', '6.9.0', '6.10.0', '6.11.0', '6.12.0', '6.13.0'] as const;
+export const SUPPORTED_VERSIONS = ['6.6.1', '6.7.0', '6.8.0', '6.9.0', '6.10.0', '6.11.0', '6.12.0', '6.13.0', '6.14.0'] as const;
 export type ProviderVersion = (typeof SUPPORTED_VERSIONS)[number];
 export const DEFAULT_VERSION: ProviderVersion = '6.13.0';
 
