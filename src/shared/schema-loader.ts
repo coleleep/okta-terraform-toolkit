@@ -10,6 +10,7 @@ import schema_raw_6_10_0 from './provider-schemas/6.10.0.json';
 import schema_raw_6_11_0 from './provider-schemas/6.11.0.json';
 import schema_raw_6_12_0 from './provider-schemas/6.12.0.json';
 import schema_raw_6_13_0 from './provider-schemas/6.13.0.json';
+import schema_raw_6_14_0 from './provider-schemas/6.14.0.json';
 
 const SCHEMAS: Record<string, ProviderSchema> = {
   '6.6.1': schema_raw_6_6_1 as unknown as ProviderSchema,
@@ -20,6 +21,7 @@ const SCHEMAS: Record<string, ProviderSchema> = {
   '6.11.0': schema_raw_6_11_0 as unknown as ProviderSchema,
   '6.12.0': schema_raw_6_12_0 as unknown as ProviderSchema,
   '6.13.0': schema_raw_6_13_0 as unknown as ProviderSchema,
+  '6.14.0': schema_raw_6_14_0 as unknown as ProviderSchema,
 };
 
 export function loadSchema(version: string): ProviderSchema {
