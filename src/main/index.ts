@@ -1,7 +1,10 @@
-import { app, BrowserWindow } from 'electron';
+import { app, BrowserWindow, nativeImage } from 'electron';
 import * as path from 'path';
 import { registerIpcHandlers } from './ipc-handlers';
 import { warmUpOcmAuth } from './api/claude';
+
+const APP_ICON_PNG = path.join(__dirname, '..', '..', 'build', 'icon.png');
+const APP_ICON_ICNS = path.join(__dirname, '..', '..', 'build', 'icon.icns');
 
 // Suppress EPIPE errors on stdout/stderr (Electron pipe closes before process exits)
 process.stdout?.on?.('error', (err: NodeJS.ErrnoException) => { if (err.code !== 'EPIPE') throw err; });
@@ -20,6 +23,7 @@ function createWindow() {
     minWidth: 900,
     minHeight: 600,
     title: 'OTTO — Okta Terraform Tuning & Optimization',
+    icon: APP_ICON_PNG,
     webPreferences: {
       preload: path.join(__dirname, '..', 'preload.js'),
       contextIsolation: true,
@@ -47,6 +51,9 @@ function createWindow() {
 
 app.whenReady().then(() => {
   registerIpcHandlers();
+  if (process.platform === 'darwin') {
+    app.dock?.setIcon(nativeImage.createFromPath(APP_ICON_ICNS));
+  }
   createWindow();
 
   app.on('activate', () => {
