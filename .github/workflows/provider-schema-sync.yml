@@ -67,7 +67,7 @@ jobs:
           git push -u origin schema/${{ steps.check.outputs.latest }}
           gh pr create \
             --title "chore: add schema snapshot for v${{ steps.check.outputs.latest }}" \
-            --body "Automated schema snapshot for Okta TF provider v${{ steps.check.outputs.latest }}. Auto-merges when CI passes."
-          gh pr merge --auto --merge
+            --body "Automated schema snapshot for Okta TF provider v${{ steps.check.outputs.latest }}. Auto-merges when CI passes, or merges immediately if no checks are required."
+          gh pr merge --auto --merge || gh pr merge --merge
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
