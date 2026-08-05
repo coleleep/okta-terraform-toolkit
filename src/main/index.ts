@@ -4,7 +4,6 @@ import { registerIpcHandlers } from './ipc-handlers';
 import { warmUpOcmAuth } from './api/claude';
 
 const APP_ICON_PNG = path.join(__dirname, '..', '..', 'build', 'icon.png');
-const APP_ICON_ICNS = path.join(__dirname, '..', '..', 'build', 'icon.icns');
 
 // Suppress EPIPE errors on stdout/stderr (Electron pipe closes before process exits)
 process.stdout?.on?.('error', (err: NodeJS.ErrnoException) => { if (err.code !== 'EPIPE') throw err; });
@@ -52,7 +51,7 @@ function createWindow() {
 app.whenReady().then(() => {
   registerIpcHandlers();
   if (process.platform === 'darwin') {
-    app.dock?.setIcon(nativeImage.createFromPath(APP_ICON_ICNS));
+    app.dock?.setIcon(nativeImage.createFromPath(APP_ICON_PNG));
   }
   createWindow();
 
