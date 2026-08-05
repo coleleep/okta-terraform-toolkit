@@ -74,10 +74,11 @@ interface AppState {
   saveProjectDir: (files: Record<string, string>) => Promise<string | null>;
 
   // Export validation gate
-  exportValidationGate: {
-    findings: Finding[];
-    pendingAction: () => Promise<void>;
-  } | null;
+  exportValidationGate:
+    | { status: 'validating' }
+    | { status: 'findings'; findings: Finding[]; pendingAction: () => Promise<void> }
+    | null;
+  beginExportGateValidation: () => void;
   openExportGate: (findings: Finding[], pendingAction: () => Promise<void>) => void;
   dismissExportGate: () => void;
   confirmExportGate: () => Promise<void>;
@@ -405,55 +406,67 @@ export const useStore = create<AppState>((set, get) => ({
   // Export validation gate
   exportValidationGate: null,
 
+  beginExportGateValidation: () => {
+    set({ exportValidationGate: { status: 'validating' } });
+  },
+
   openExportGate: (findings, pendingAction) => {
-    set({ exportValidationGate: { findings, pendingAction } });
+    set({ exportValidationGate: { status: 'findings', findings, pendingAction } });
   },
 
   dismissExportGate: () => {
+    const gate = get().exportValidationGate;
+    if (gate?.status === 'validating') return;
     set({ exportValidationGate: null });
   },
 
   confirmExportGate: async () => {
     const gate = get().exportValidationGate;
-    if (!gate) return;
+    if (!gate || gate.status !== 'findings') return;
     set({ exportValidationGate: null });
     await gate.pendingAction();
   },
 
   validateThenSaveProjectDir: async (files, onSaved) => {
-    const { providerVersion, saveProjectDir, openExportGate } = get();
+    const { providerVersion, saveProjectDir, beginExportGateValidation, openExportGate } = get();
     const version = (!providerVersion || providerVersion === 'system') ? DEFAULT_VERSION : providerVersion;
     const doSave = async () => {
       const dir = await saveProjectDir(files);
       if (onSaved && dir) onSaved(dir);
     };
+    beginExportGateValidation();
     try {
       const result = await api().validateProjectFiles(files, version) as { success: boolean; data?: ExportValidationResult };
       if (!result.success || !result.data || !result.data.findings || result.data.findings.length === 0) {
+        set({ exportValidationGate: null });
         await doSave();
         return;
       }
       openExportGate(result.data.findings, doSave);
     } catch {
+      set({ exportValidationGate: null });
       await doSave();
     }
   },
 
   validateThenSaveTfFile: async (content, onSaved) => {
-    const { providerVersion, saveTfFile, openExportGate } = get();
+    const { providerVersion, saveTfFile, beginExportGateValidation, openExportGate } = get();
     const version = (!providerVersion || providerVersion === 'system') ? DEFAULT_VERSION : providerVersion;
     const doSave = async () => {
       const path = await saveTfFile(content);
       if (onSaved && path) onSaved(path);
     };
+    beginExportGateValidation();
     try {
       const result = await api().validateProjectFiles({ 'provider.tf': content }, version) as { success: boolean; data?: ExportValidationResult };
       if (!result.success || !result.data || !result.data.findings || result.data.findings.length === 0) {
+        set({ exportValidationGate: null });
         await doSave();
         return;
       }
       openExportGate(result.data.findings, doSave);
     } catch {
+      set({ exportValidationGate: null });
       await doSave();
     }
   },

@@ -26,6 +26,17 @@ function FindingItem({ finding }: { finding: Finding }) {
 
 export default function ExportGateModal() {
   const { exportValidationGate, dismissExportGate, confirmExportGate } = useStore();
+  const isValidating = exportValidationGate?.status === 'validating';
+
+  const [dots, setDots] = React.useState('');
+
+  React.useEffect(() => {
+    if (!isValidating) { setDots(''); return; }
+    const interval = setInterval(() => {
+      setDots(d => (d.length >= 3 ? '' : d + '.'));
+    }, 400);
+    return () => clearInterval(interval);
+  }, [isValidating]);
 
   React.useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -36,6 +47,23 @@ export default function ExportGateModal() {
   }, [dismissExportGate]);
 
   if (!exportValidationGate) return null;
+
+  if (isValidating) {
+    return (
+      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60">
+        <div
+          className="bg-surface-2 border border-border rounded-xl shadow-2xl w-full max-w-lg mx-4 p-6"
+          role="dialog"
+          aria-modal="true"
+        >
+          <div className="flex items-center gap-3 py-2">
+            <div className="animate-spin w-5 h-5 border-2 border-accent-blue border-t-transparent rounded-full" />
+            <span className="text-sm text-text-secondary">Validating your configuration{dots}</span>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   const { findings } = exportValidationGate;
   const errors = findings.filter(f => f.severity === 'error');
