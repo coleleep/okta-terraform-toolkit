@@ -472,7 +472,9 @@ export const VERSION_ATTRIBUTE_NOTES: Record<ProviderVersion, string[]> = {
     'New resources: okta_oauth2_v1_clients_role_* (13 resources) — assign standard and custom admin roles to OAuth 2.0 service apps (replaces manual role assignment for M2M clients)',
     'New resource: okta_org_captcha — configure CAPTCHA settings for the org',
   ],
-  '6.15.0': [],
+  '6.15.0': [
+    'Bug-fix release, no new resources or attributes. Two behavior fixes matter for generated HCL: okta_app_signon_policy_rules `chains` JSON no longer needs manually alphabetized keys in jsonencode() — the provider now normalizes key order during the plan phase (previously could cause "Provider produced inconsistent result after apply"). okta_admin_role_custom with okta.workflows.read/okta.workflows.invoke permissions no longer perpetually drifts on plan/apply (previously required an ignore_changes workaround due to API auto-expanding to extra *.flows.* permissions).',
+  ],
 };
 
 /**
