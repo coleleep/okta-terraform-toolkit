@@ -10,9 +10,9 @@ function formatDuration(seconds: number): string {
 }
 
 const severityColors = {
-  critical: { bg: 'bg-red-50', border: 'border-red-200', title: 'text-red-800', text: 'text-red-600', badge: 'bg-red-100 text-red-700' },
-  warning: { bg: 'bg-amber-50', border: 'border-amber-200', title: 'text-amber-800', text: 'text-amber-600', badge: 'bg-amber-100 text-amber-700' },
-  info: { bg: 'bg-blue-50', border: 'border-blue-200', title: 'text-blue-800', text: 'text-blue-600', badge: 'bg-blue-100 text-blue-700' },
+  critical: { bg: 'bg-accent-red/10', border: 'border-accent-red/30', title: 'text-accent-red', text: 'text-accent-red', badge: 'bg-accent-red/20 text-accent-red' },
+  warning: { bg: 'bg-accent-amber/10', border: 'border-accent-amber/30', title: 'text-accent-amber', text: 'text-accent-amber', badge: 'bg-accent-amber/20 text-accent-amber' },
+  info: { bg: 'bg-accent-blue/10', border: 'border-accent-blue/30', title: 'text-accent-blue', text: 'text-accent-blue', badge: 'bg-accent-blue/20 text-accent-blue' },
 };
 
 export default function LogAnalyzer() {
@@ -25,6 +25,26 @@ export default function LogAnalyzer() {
   const [interpretError, setInterpretError] = useState<string | null>(null);
   const [hasKey, setHasKey] = useState(false);
   const probeResult = useStore(state => state.probeResult);
+
+  const [dots, setDots] = useState('');
+
+  useEffect(() => {
+    if (!loading) { setDots(''); return; }
+    const interval = setInterval(() => {
+      setDots(d => (d.length >= 3 ? '' : d + '.'));
+    }, 400);
+    return () => clearInterval(interval);
+  }, [loading]);
+
+  const [interpretDots, setInterpretDots] = useState('');
+
+  useEffect(() => {
+    if (!interpreting) { setInterpretDots(''); return; }
+    const interval = setInterval(() => {
+      setInterpretDots(d => (d.length >= 3 ? '' : d + '.'));
+    }, 400);
+    return () => clearInterval(interval);
+  }, [interpreting]);
 
   const api = (window as unknown as { oktaTerraform: {
     openLogFile: () => Promise<string | null>;
@@ -74,9 +94,9 @@ export default function LogAnalyzer() {
   if (!analysis && !loading) {
     return (
       <div>
-        <h1 className="text-lg font-bold text-okta-navy mb-2">TF_LOG Analyzer</h1>
-        <p className="text-xs text-gray-500 mb-4">
-          Load a Terraform debug log (<code className="bg-gray-100 px-1 rounded">TF_LOG=DEBUG</code>) to analyze rate limit behavior, identify bottlenecks, and get optimization recommendations.
+        <h1 className="text-lg font-bold text-text-primary mb-2">TF_LOG Analyzer</h1>
+        <p className="text-xs text-text-secondary mb-4">
+          Load a Terraform debug log (<code className="bg-surface-3 px-1 rounded">TF_LOG=DEBUG</code>) to analyze rate limit behavior, identify bottlenecks, and get optimization recommendations.
         </p>
         <div className="flex items-start gap-2.5 bg-amber-950/20 border border-amber-600/30 rounded-lg px-3.5 py-3 mb-5">
           <span className="text-amber-400 text-sm mt-0.5 shrink-0">⚠</span>
@@ -86,15 +106,15 @@ export default function LogAnalyzer() {
         </div>
         <button
           onClick={handleOpen}
-          className="w-full py-12 border-2 border-dashed border-gray-300 rounded-xl hover:border-okta-blue hover:bg-blue-50/30 transition-colors cursor-pointer"
+          className="w-full py-12 border-2 border-dashed border-border hover:border-okta-blue hover:bg-accent-blue/5 transition-colors cursor-pointer rounded-xl"
         >
           <div className="text-center">
             <span className="text-3xl block mb-2">📂</span>
-            <span className="text-sm font-medium text-gray-600">Click to select a log file</span>
-            <span className="text-xs text-gray-400 block mt-1">.log or .txt — typically 10MB+ for large runs</span>
+            <span className="text-sm font-medium text-text-secondary">Click to select a log file</span>
+            <span className="text-xs text-text-muted block mt-1">.log or .txt — typically 10MB+ for large runs</span>
           </div>
         </button>
-        {error && <p className="text-xs text-red-500 mt-3">{error}</p>}
+        {error && <p className="text-xs text-accent-red mt-3">{error}</p>}
       </div>
     );
   }
@@ -102,10 +122,10 @@ export default function LogAnalyzer() {
   if (loading) {
     return (
       <div>
-        <h1 className="text-lg font-bold text-okta-navy mb-4">TF_LOG Analyzer</h1>
-        <div className="flex items-center gap-3 p-8 bg-white rounded-xl border border-gray-200">
+        <h1 className="text-lg font-bold text-text-primary mb-4">TF_LOG Analyzer</h1>
+        <div className="flex items-center gap-3 p-8 bg-surface-2 rounded-xl border border-border">
           <div className="animate-spin w-5 h-5 border-2 border-okta-blue border-t-transparent rounded-full" />
-          <span className="text-sm text-gray-600">Parsing {fileName}...</span>
+          <span className="text-sm text-text-secondary">Parsing {fileName}{dots}</span>
         </div>
       </div>
     );
@@ -118,8 +138,8 @@ export default function LogAnalyzer() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-lg font-bold text-okta-navy">TF_LOG Analyzer</h1>
-          <p className="text-xs text-gray-400">{fileName}</p>
+          <h1 className="text-lg font-bold text-text-primary">TF_LOG Analyzer</h1>
+          <p className="text-xs text-text-muted">{fileName}</p>
         </div>
         <button
           onClick={handleOpen}
@@ -140,9 +160,9 @@ export default function LogAnalyzer() {
       </div>
 
       {/* AI Interpretation */}
-      <div className="bg-white rounded-xl border border-gray-200 p-4">
+      <div className="bg-surface-2 rounded-xl border border-border p-4">
         <div className="flex items-center justify-between mb-3">
-          <h2 className="text-xs font-medium text-gray-400 uppercase tracking-wide">AI Analysis</h2>
+          <h2 className="text-xs font-medium text-text-muted uppercase tracking-wide">AI Analysis</h2>
           {!interpretation && (
             <button
               onClick={handleInterpret}
@@ -156,30 +176,30 @@ export default function LogAnalyzer() {
         {interpreting && (
           <div className="flex items-center gap-2 py-4">
             <div className="animate-spin w-4 h-4 border-2 border-purple-500 border-t-transparent rounded-full" />
-            <span className="text-xs text-gray-500">Claude is analyzing your log...</span>
+            <span className="text-xs text-text-secondary">Claude is analyzing your log{interpretDots}</span>
           </div>
         )}
         {interpretError && (
-          <p className="text-xs text-red-500">{interpretError}</p>
+          <p className="text-xs text-accent-red">{interpretError}</p>
         )}
         {interpretation && (
           <div className="space-y-3">
             <div>
-              <span className="text-xs font-medium text-gray-500 uppercase">Root Cause</span>
-              <p className="text-sm font-medium text-gray-800 mt-0.5">{interpretation.rootCause}</p>
+              <span className="text-xs font-medium text-text-muted uppercase">Root Cause</span>
+              <p className="text-sm font-medium text-text-primary mt-0.5">{interpretation.rootCause}</p>
             </div>
             <div>
-              <span className="text-xs font-medium text-gray-500 uppercase">What Happened</span>
-              <p className="text-sm text-gray-600 mt-0.5">{interpretation.narrative}</p>
+              <span className="text-xs font-medium text-text-muted uppercase">What Happened</span>
+              <p className="text-sm text-text-secondary mt-0.5">{interpretation.narrative}</p>
             </div>
-            <div className="bg-green-50 border border-green-200 rounded-lg p-3">
-              <span className="text-xs font-medium text-green-700 uppercase">Top Fix</span>
-              <p className="text-sm font-medium text-green-800 mt-0.5">{interpretation.topFix}</p>
+            <div className="bg-accent-green/10 border border-accent-green/30 rounded-lg p-3">
+              <span className="text-xs font-medium text-accent-green uppercase">Top Fix</span>
+              <p className="text-sm font-medium text-accent-green mt-0.5">{interpretation.topFix}</p>
             </div>
             {interpretation.configChanges && Object.keys(interpretation.configChanges).length > 0 && (
-              <div className="bg-gray-50 rounded-lg p-3">
-                <span className="text-xs font-medium text-gray-500 uppercase">Suggested Config</span>
-                <pre className="text-xs font-mono text-gray-700 mt-1">
+              <div className="bg-surface-1 rounded-lg p-3">
+                <span className="text-xs font-medium text-text-muted uppercase">Suggested Config</span>
+                <pre className="text-xs font-mono text-text-secondary mt-1">
                   {Object.entries(interpretation.configChanges).map(([k, v]) => `${k} = ${v}`).join('\n')}
                 </pre>
               </div>
@@ -187,16 +207,16 @@ export default function LogAnalyzer() {
           </div>
         )}
         {!interpretation && !interpreting && !interpretError && hasKey && (
-          <p className="text-xs text-gray-400">Click "Explain with AI" to get a plain-English analysis of this run.</p>
+          <p className="text-xs text-text-muted">Click "Explain with AI" to get a plain-English analysis of this run.</p>
         )}
         {!hasKey && !interpreting && (
-          <p className="text-xs text-gray-400">Set a Claude API key to enable AI-powered log interpretation.</p>
+          <p className="text-xs text-text-muted">Set a Claude API key to enable AI-powered log interpretation.</p>
         )}
       </div>
 
       {/* Detected config */}
-      <div className="bg-white rounded-xl border border-gray-200 p-4">
-        <h2 className="text-xs font-medium text-gray-400 uppercase tracking-wide mb-3">Detected Provider Config</h2>
+      <div className="bg-surface-2 rounded-xl border border-border p-4">
+        <h2 className="text-xs font-medium text-text-muted uppercase tracking-wide mb-3">Detected Provider Config</h2>
         <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
           <ConfigItem label="min_wait" value={`${analysis.detectedConfig.minWait}s`} />
           <ConfigItem label="max_wait" value={`${analysis.detectedConfig.maxWait}s`} />
@@ -209,7 +229,7 @@ export default function LogAnalyzer() {
       {/* Issues */}
       {analysis.issues.length > 0 && (
         <div className="space-y-2">
-          <h2 className="text-xs font-medium text-gray-400 uppercase tracking-wide">Findings</h2>
+          <h2 className="text-xs font-medium text-text-muted uppercase tracking-wide">Findings</h2>
           {analysis.issues.map((issue, i) => {
             const colors = severityColors[issue.severity];
             return (
@@ -232,15 +252,15 @@ export default function LogAnalyzer() {
 
       {/* Error breakdown by status */}
       {analysis.errorsByStatus && Object.keys(analysis.errorsByStatus).length > 0 && (
-        <div className="bg-white rounded-xl border border-gray-200 p-4">
-          <h2 className="text-xs font-medium text-gray-400 uppercase tracking-wide mb-3">Error Breakdown by Status</h2>
+        <div className="bg-surface-2 rounded-xl border border-border p-4">
+          <h2 className="text-xs font-medium text-text-muted uppercase tracking-wide mb-3">Error Breakdown by Status</h2>
           <div className="flex flex-wrap gap-3">
             {Object.entries(analysis.errorsByStatus)
               .sort(([, a], [, b]) => b - a)
               .map(([status, count]) => {
                 const statusNum = parseInt(status);
                 const label = statusNum === 401 ? 'Unauthorized' : statusNum === 403 ? 'Forbidden' : statusNum === 404 ? 'Not Found' : statusNum === 409 ? 'Conflict' : statusNum === 429 ? 'Rate Limited' : statusNum >= 500 ? 'Server Error' : `HTTP ${status}`;
-                const color = statusNum === 429 ? 'bg-amber-50 text-amber-700 border-amber-200' : statusNum >= 500 ? 'bg-red-50 text-red-700 border-red-200' : 'bg-red-50 text-red-700 border-red-200';
+                const color = statusNum === 429 ? 'bg-accent-amber/10 text-accent-amber border-accent-amber/30' : 'bg-accent-red/10 text-accent-red border-accent-red/30';
                 return (
                   <div key={status} className={`${color} border rounded-lg px-3 py-2`}>
                     <span className="text-lg font-bold">{count}</span>
@@ -254,13 +274,13 @@ export default function LogAnalyzer() {
 
       {/* Error details table */}
       {analysis.errorDetails && analysis.errorDetails.length > 0 && (
-        <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
-          <div className="px-4 py-3 border-b border-gray-100">
-            <h2 className="text-xs font-medium text-gray-400 uppercase tracking-wide">Error Details</h2>
+        <div className="bg-surface-2 rounded-xl border border-border overflow-hidden">
+          <div className="px-4 py-3 border-b border-border">
+            <h2 className="text-xs font-medium text-text-muted uppercase tracking-wide">Error Details</h2>
           </div>
           <table className="w-full text-xs">
             <thead>
-              <tr className="text-left text-gray-400 uppercase tracking-wide border-b border-gray-50">
+              <tr className="text-left text-text-muted uppercase tracking-wide border-b border-border">
                 <th className="px-4 py-2 font-medium">Endpoint</th>
                 <th className="px-4 py-2 font-medium">Status</th>
                 <th className="px-4 py-2 font-medium">Error Code</th>
@@ -268,25 +288,25 @@ export default function LogAnalyzer() {
                 <th className="px-4 py-2 font-medium text-right">Count</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-gray-50">
+            <tbody className="divide-y divide-border">
               {analysis.errorDetails.slice(0, 25).map((err, i) => (
-                <tr key={i} className="hover:bg-gray-50">
+                <tr key={i} className="hover:bg-surface-3">
                   <td className="px-4 py-2">
-                    <span className="font-medium text-gray-700">{err.label}</span>
-                    <span className="block font-mono text-gray-400">{err.endpoint}</span>
+                    <span className="font-medium text-text-secondary">{err.label}</span>
+                    <span className="block font-mono text-text-muted">{err.endpoint}</span>
                   </td>
                   <td className="px-4 py-2">
-                    <span className={`font-medium ${err.httpStatus >= 500 ? 'text-red-600' : err.httpStatus >= 400 ? 'text-amber-600' : 'text-gray-600'}`}>
+                    <span className={`font-medium ${err.httpStatus >= 500 ? 'text-accent-red' : err.httpStatus >= 400 ? 'text-accent-amber' : 'text-text-secondary'}`}>
                       {err.httpStatus}
                     </span>
                   </td>
-                  <td className="px-4 py-2 font-mono text-gray-600">
+                  <td className="px-4 py-2 font-mono text-text-secondary">
                     {err.oktaErrorCode || '—'}
                   </td>
-                  <td className="px-4 py-2 text-gray-600 max-w-xs truncate">
+                  <td className="px-4 py-2 text-text-secondary max-w-xs truncate">
                     {err.message || '—'}
                   </td>
-                  <td className="px-4 py-2 text-right font-medium text-gray-900">
+                  <td className="px-4 py-2 text-right font-medium text-text-primary">
                     {err.count}
                   </td>
                 </tr>
@@ -298,13 +318,13 @@ export default function LogAnalyzer() {
 
       {/* Endpoint breakdown */}
       {analysis.endpoints.length > 0 && (
-        <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
-          <div className="px-4 py-3 border-b border-gray-100">
-            <h2 className="text-xs font-medium text-gray-400 uppercase tracking-wide">Endpoint Breakdown</h2>
+        <div className="bg-surface-2 rounded-xl border border-border overflow-hidden">
+          <div className="px-4 py-3 border-b border-border">
+            <h2 className="text-xs font-medium text-text-muted uppercase tracking-wide">Endpoint Breakdown</h2>
           </div>
           <table className="w-full text-xs">
             <thead>
-              <tr className="text-left text-gray-400 uppercase tracking-wide border-b border-gray-50">
+              <tr className="text-left text-text-muted uppercase tracking-wide border-b border-border">
                 <th className="px-4 py-2 font-medium">Endpoint</th>
                 <th className="px-4 py-2 font-medium text-right">Calls</th>
                 <th className="px-4 py-2 font-medium text-right">429s</th>
@@ -312,21 +332,21 @@ export default function LogAnalyzer() {
                 <th className="px-4 py-2 font-medium text-right">Rate Limit</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-gray-50">
+            <tbody className="divide-y divide-border">
               {analysis.endpoints.slice(0, 20).map((ep, i) => (
-                <tr key={i} className="hover:bg-gray-50">
+                <tr key={i} className="hover:bg-surface-3">
                   <td className="px-4 py-2">
-                    <span className="font-medium text-gray-700">{ep.label}</span>
-                    <span className="block font-mono text-gray-400 text-xs">{ep.pattern}</span>
+                    <span className="font-medium text-text-secondary">{ep.label}</span>
+                    <span className="block font-mono text-text-muted text-xs">{ep.pattern}</span>
                   </td>
-                  <td className="px-4 py-2 text-right font-medium text-gray-900">{ep.totalCalls.toLocaleString()}</td>
-                  <td className={`px-4 py-2 text-right font-medium ${ep.rateLimited > 0 ? 'text-red-600' : 'text-gray-400'}`}>
+                  <td className="px-4 py-2 text-right font-medium text-text-primary">{ep.totalCalls.toLocaleString()}</td>
+                  <td className={`px-4 py-2 text-right font-medium ${ep.rateLimited > 0 ? 'text-accent-red' : 'text-text-muted'}`}>
                     {ep.rateLimited}
                   </td>
-                  <td className={`px-4 py-2 text-right font-medium ${ep.errors > 0 ? 'text-red-600' : 'text-gray-400'}`}>
+                  <td className={`px-4 py-2 text-right font-medium ${ep.errors > 0 ? 'text-accent-red' : 'text-text-muted'}`}>
                     {ep.errors}
                   </td>
-                  <td className="px-4 py-2 text-right text-gray-600">
+                  <td className="px-4 py-2 text-right text-text-secondary">
                     {ep.minRateLimit > 0 ? `${ep.minRateLimit}/win` : '—'}
                   </td>
                 </tr>
@@ -340,10 +360,10 @@ export default function LogAnalyzer() {
 }
 
 function SummaryCard({ label, value, color }: { label: string; value: string; color?: 'red' | 'green' | 'amber' }) {
-  const valueColor = color === 'red' ? 'text-red-600' : color === 'green' ? 'text-green-600' : color === 'amber' ? 'text-amber-600' : 'text-okta-navy';
+  const valueColor = color === 'red' ? 'text-accent-red' : color === 'green' ? 'text-accent-green' : color === 'amber' ? 'text-accent-amber' : 'text-text-primary';
   return (
-    <div className="bg-white rounded-lg border border-gray-200 p-3">
-      <div className="text-xs text-gray-400 uppercase tracking-wider">{label}</div>
+    <div className="bg-surface-2 rounded-lg border border-border p-3">
+      <div className="text-xs text-text-muted uppercase tracking-wider">{label}</div>
       <div className={`text-lg font-bold mt-0.5 ${valueColor}`}>{value}</div>
     </div>
   );
@@ -352,8 +372,8 @@ function SummaryCard({ label, value, color }: { label: string; value: string; co
 function ConfigItem({ label, value }: { label: string; value: string }) {
   return (
     <div>
-      <span className="text-xs text-gray-400 font-mono">{label}</span>
-      <span className="block text-sm font-medium text-gray-700">{value}</span>
+      <span className="text-xs text-text-muted font-mono">{label}</span>
+      <span className="block text-sm font-medium text-text-secondary">{value}</span>
     </div>
   );
 }
