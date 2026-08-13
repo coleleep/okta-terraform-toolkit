@@ -63,7 +63,7 @@ describe('getClaudeConfig priority', () => {
     mockOcmAuth('eyJtest-jwt-token');
     expect(load().getClaudeConfig()).toEqual({
       apiKey: 'eyJtest-jwt-token',
-      baseUrl: 'https://llm.atko.ai',
+      baseUrl: 'https://llm.es.atko.services',
       source: 'ocm',
     });
   });
@@ -144,7 +144,7 @@ describe('removeClaudeConfig', () => {
 
     expect(mod.getClaudeConfig()).toEqual({
       apiKey: 'eyJocm-token',
-      baseUrl: 'https://llm.atko.ai',
+      baseUrl: 'https://llm.es.atko.services',
       source: 'ocm',
     });
   });
@@ -158,7 +158,7 @@ describe('removeClaudeConfig', () => {
 
     expect(mod.getClaudeConfig()).toEqual({
       apiKey: 'eyJocm-token',
-      baseUrl: 'https://llm.atko.ai',
+      baseUrl: 'https://llm.es.atko.services',
       source: 'ocm',
     });
   });

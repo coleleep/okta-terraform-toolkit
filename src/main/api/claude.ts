@@ -23,7 +23,7 @@ interface ClaudeConfig {
 
 const CONFIG_FILE = 'claude-config.json';
 const LEGACY_KEY_FILE = 'claude-key.json';
-const LITELLM_BASE_URL = 'https://llm.atko.ai';
+const LITELLM_BASE_URL = 'https://llm.es.atko.services';
 // Common OCM install locations across macOS setups.
 const OCM_PATH = [process.env.PATH, '/usr/local/bin', '/opt/homebrew/bin', '/usr/bin'].filter(Boolean).join(':');
 const OCM_TOKEN_TTL_MS = 15 * 60 * 1000;
