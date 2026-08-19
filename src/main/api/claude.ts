@@ -218,9 +218,10 @@ function buildRateLimitContext(analysis: LogAnalysis, probeResult?: ProbeResult)
   const observed = analysis.endpoints.filter(e => e.minRateLimit > 0);
   if (observed.length > 0) {
     const lines = observed.map(e =>
-      `  ${e.pattern}: limit=${e.minRateLimit}/window, lowest_remaining=${e.lowestRemaining}`
+      `  ${e.method} ${e.pattern}: limit=${e.minRateLimit}/window, lowest_remaining=${e.lowestRemaining}`
     );
-    return `ORG RATE LIMITS (source: X-Rate-Limit-Limit headers from this log run — org-specific):\n${lines.join('\n')}`;
+    return `ORG RATE LIMITS (source: X-Rate-Limit-Limit headers from this log run — org-specific).
+Read and write limits are separate buckets, so the same path may appear once per method with different limits:\n${lines.join('\n')}`;
   }
 
   // Tier 2: Probe results for the current org
