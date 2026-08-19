@@ -27,7 +27,8 @@ Separately, the engineer often *already knows* the customer's limits — custom 
 
 - **No curated internal limit table.** There is no master list of rate limits by org type beyond public documentation. Baselines ship as published values only, never inferred or crowd-sourced from cases.
 - **No solution for resource counts.** Counting resources still needs the org. See Known Limitations.
-- **No changes to write probing**, and no new IPC surface for *org* calls. Manual-limit persistence does add one IPC handler pair for reading and writing the local profile file; that is in scope.
+- **No changes to write probing, and no new IPC surface at all.** Manual limits live in renderer state only, so no file-persistence handlers are needed.
+- **No persistence of manual limits across launches.** Session-only by decision — see Session Lifetime.
 - **No method-awareness for `errorDetailMap`.** Worth doing eventually; out of scope here.
 - **No renaming of `ProbeResult`.** The type name stays to avoid churning ~10 consumer files. Only user-facing wording changes to "Rate Limit Source."
 
@@ -35,7 +36,9 @@ Separately, the engineer often *already knows* the customer's limits — custom 
 
 ## Distribution constraint
 
-OTTO runs on Nicole's machine only and is never shared with customers. This is what makes persisting manually-entered limits to local disk acceptable. If OTTO is ever distributed, revisit the persistence decision — internally-sourced customer limits should not travel.
+OTTO runs on Nicole's machine only and is never shared with customers.
+
+Even so, manually-entered limits are **not** persisted to disk. Those values are often sourced from privileged internal lookups against a specific customer's org, and the less durable that footprint the better. Session-only storage means closing OTTO leaves nothing behind, which keeps the feature safe by construction rather than by policy — no decision to revisit if OTTO is ever distributed.
 
 ---
 
@@ -65,7 +68,7 @@ So this feature adds producers, not a parallel engine. Every producer emits `Pro
 `ProbeResult`:
 
 - add `sources: LimitSource[]` — which producers contributed
-- `orgUrl` becomes a display label, not necessarily a URL. Manual profiles use the profile name; log-derived uses the log filename. Consumers already treat it as a display string (e.g. `PlanSection` passes it through), so no logic change.
+- `orgUrl` becomes a display label, not necessarily a URL. Manual entry uses `'Manual entry'`; log-derived uses the log filename. Consumers already treat it as a display string (e.g. `PlanSection` passes it through), so no logic change.
 
 `LogEndpointStats`:
 
@@ -108,7 +111,7 @@ The workhorse, because the engineer typically already knows the answer.
 
 - A row editor: pick a bucket from a dropdown of known labels, choose GET/POST, type the limit. Sparse by design — nobody fills 35 rows.
 - A paste box accepting a raw header blob, extracting `x-rate-limit-limit`, `-remaining`, and `-reset`. Handles both a customer's `curl` output and a snippet lifted from a case, without retyping.
-- Persisted (see Persistence).
+- Held in session state only, with an explicit Clear action (see Session Lifetime).
 
 Guidance to surface in the UI for capturing headers, since `curl -I` sends HEAD and most Okta endpoints reject it with a 405 carrying no rate limit headers:
 
@@ -204,15 +207,22 @@ Also guards an existing bug: `calculateEstimate` does `Math.min(...)` over a pos
 
 **Header** shows the active source instead of assuming a connected org.
 
+**Clear / Start Over** sits next to the active-source indicator, visible whenever any source is loaded. Opens a confirm step, then resets to the source chooser.
+
 ---
 
-## Persistence
+## Session lifetime
 
-Manual limit profiles go to `manual-limits.json` under Electron's `app.getPath('userData')`, keyed by a user-named profile — not org URL, since manual mode often means no org is connected.
+All limit sources live in Zustand store state and die with the process. Nothing is written to disk. This matches the existing treatment of org credentials, which are already not persisted across launches.
 
-Limits only. No tokens, no credentials. Existing behavior of not persisting org credentials across launches is unchanged.
+**Clear action.** Because a session may cover more than one case, the user needs to reset without restarting the app. A `clearLimitSources()` store action drops all four source buckets and the merged `probeResult`, returning the Rate Limits tab to its source-chooser empty state.
 
-Justified by the distribution constraint above: OTTO never leaves this machine.
+Two requirements on it:
+
+- **It must clear derived state too.** `recommendation`, `targetRuntimeAnalysis`, and any custom workload `rateLimit` values were computed from the old limits. Leaving those behind after a clear would show one case's numbers under another case's inputs — the worst possible failure for this feature, since it is silent and the stale figure looks authoritative. Every piece of state downstream of `probeResult` resets together.
+- **It must be confirmed.** Clearing discards manual entry that cannot be recovered, since nothing is persisted. A single confirm step, consistent with the existing modal pattern.
+
+An active org connection is left alone by Clear — disconnecting is already its own separate control.
 
 ---
 
@@ -236,6 +246,8 @@ New unit tests:
 - Manual and baseline entries produce `status: 'unknown'`, never `'critical'`
 - `analyzeTargetRuntime` — coverage counts; summary names missing buckets; baseline-derived bottleneck is flagged; empty-limits case returns no-data instead of `Infinity`
 - Baseline staleness warning fires past six months
+- `clearLimitSources()` resets every source bucket, the merged `probeResult`, `recommendation`, `targetRuntimeAnalysis`, and custom workload `rateLimit` values — asserted field by field, so a later addition of derived state fails the test rather than silently surviving a clear
+- `clearLimitSources()` leaves an active org connection intact
 
 Extending `src/__tests__/log-parser.test.ts`:
 
@@ -251,7 +263,7 @@ Verification: `npx jest` (253 tests passing at time of writing) and `npx tsc --n
 
 1. Log parser bucket keying + `method` on `LogEndpointStats` + `LogAnalyzer.tsx` badge — self-contained, ships value on its own by making the Debug tab's reported limits correct
 2. Type changes, `mergeLimitSources`, `'unknown'` status handling, `RateLimitTable` Source column
-3. Manual entry + persistence
+3. Manual entry + Clear action
 4. Log-derived producer + label mapping table
 5. Published baselines + gap-fill + staleness warning
 6. Coverage reporting in `target-analyzer`
