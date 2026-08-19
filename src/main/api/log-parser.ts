@@ -7,7 +7,7 @@ const OKTA_ID_RE = /\/[0-9a-zA-Z]{18,}/g;
 
 function normalizeEndpoint(url: string): string {
   // Extract path from full URL
-  const match = url.match(/\/api\/v1\/.+/);
+  const match = url.match(/\/api\/v1\/.+/) ?? url.match(/\/oauth2\/.+/);
   if (!match) return url;
   let path = match[0];
   // Remove query params
@@ -35,6 +35,8 @@ function labelForPattern(pattern: string): string {
   if (pattern.includes('/meta/schemas')) return 'Schema';
   if (pattern.includes('/meta/types')) return 'User Types';
   if (pattern.includes('/org')) return 'Org Settings';
+  if (pattern.includes('/oauth2/') && pattern.includes('/token')) return 'Token Endpoint';
+  if (pattern.startsWith('/oauth2/')) return 'OAuth2';
   return pattern.replace('/api/v1/', '');
 }
 
@@ -222,6 +224,27 @@ export async function parseLogFile(filePath: string): Promise<LogAnalysis> {
         const detail = errorDetailMap.get(detailKey);
         if (detail && !detail.message) {
           detail.message = errorSummaryMatch[1];
+        }
+      }
+
+      // OAuth2/DPoP error bodies use a different shape than the standard Okta API:
+      // {"error": "invalid_dpop_proof", "error_description": "..."} instead of
+      // {"errorCode": "E...", "errorSummary": "..."}. Capture both so no error body
+      // format falls through silently.
+      const oauthErrorMatch = line.match(/"error"\s*:\s*"([^"]+)"/);
+      if (oauthErrorMatch && currentEndpoint && currentStatus && currentStatus >= 400) {
+        const detailKey = `${currentEndpoint}|${currentStatus}`;
+        const detail = errorDetailMap.get(detailKey);
+        if (detail && !detail.oktaErrorCode) {
+          detail.oktaErrorCode = oauthErrorMatch[1];
+        }
+      }
+      const oauthErrorDescMatch = line.match(/"error_description"\s*:\s*"([^"]+)"/);
+      if (oauthErrorDescMatch && currentEndpoint && currentStatus && currentStatus >= 400) {
+        const detailKey = `${currentEndpoint}|${currentStatus}`;
+        const detail = errorDetailMap.get(detailKey);
+        if (detail && !detail.message) {
+          detail.message = oauthErrorDescMatch[1];
         }
       }
 
@@ -490,13 +513,27 @@ function detectIssues(
     });
   }
 
-  // Warning: Bad request errors (400)
-  if (errorsByStatus[400] > 0) {
-    const badReqErrors = errorDetails.filter(e => e.httpStatus === 400);
+  // Critical: DPoP proof failures on the OAuth2 token endpoint — every request depends
+  // on getting a token, so this blocks the entire run even though it's "just" a 400.
+  const dpopErrors = errorDetails.filter(e => e.httpStatus === 400 && e.oktaErrorCode === 'invalid_dpop_proof');
+  const dpopCount = dpopErrors.reduce((sum, e) => sum + e.count, 0);
+  if (dpopCount > 0) {
+    issues.push({
+      severity: 'critical',
+      title: `${dpopCount} DPoP proof error${dpopCount > 1 ? 's' : ''} (invalid_dpop_proof)`,
+      detail: `${dpopErrors[0]?.message ?? 'The DPoP proof JWT is missing, malformed, or does not match the bound access token.'} This occurred on the OAuth2 token endpoint, so it blocks authentication for the entire run — no request can succeed until this is fixed.`,
+      recommendation: 'Verify the client is generating and attaching a valid DPoP proof JWT (correct header, matching key, fresh "iat"/"jti") on every token request. If using an OAuth2 client not configured for DPoP, disable DPoP on the app or switch auth methods.',
+    });
+  }
+
+  // Warning: Bad request errors (400), excluding ones already surfaced above
+  const otherBadReq400Count = errorsByStatus[400] - dpopCount;
+  if (otherBadReq400Count > 0) {
+    const badReqErrors = errorDetails.filter(e => e.httpStatus === 400 && e.oktaErrorCode !== 'invalid_dpop_proof');
     const messages = badReqErrors.filter(e => e.message).map(e => e.message!).slice(0, 3);
     issues.push({
       severity: 'warning',
-      title: `${errorsByStatus[400]} validation errors (400)`,
+      title: `${otherBadReq400Count} validation errors (400)`,
       detail: `Invalid request data sent to Okta API.${messages.length > 0 ? ` Samples: ${messages.join('; ')}` : ''}`,
       recommendation: 'Check resource configuration for invalid values, missing required fields, or schema mismatches. This often indicates a provider version incompatibility or incorrect HCL.',
     });

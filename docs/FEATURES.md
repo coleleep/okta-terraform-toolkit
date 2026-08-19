@@ -59,6 +59,7 @@ Comprehensive diagnostic tools for troubleshooting Terraform runs:
 
 - **TF_LOG parsing** — extracts per-endpoint request stats, rate-limit hits, and error breakdowns from `TF_LOG=DEBUG` output
 - **Validation error detection** — identifies provider/schema mismatches even when no HTTP requests were made
+- **OAuth2/DPoP failure detection** — reads the `error`/`error_description` body format used by the token endpoint and flags `invalid_dpop_proof` as critical, since a failed token request blocks the entire run
 - **AI-powered root cause analysis** — explains failures with actionable config fix recommendations, using org-specific rate limits from the log's `X-Rate-Limit-Limit` headers when present (falls back to probe data or documented defaults)
 - **Okta API error decoder** — translates native Okta API errors into remediation suggestions
 - **Request profiling** — visualizes which endpoints consumed the most time and capacity
