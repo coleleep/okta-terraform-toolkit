@@ -127,4 +127,23 @@ describe('parseLogFile — rate limit bucket keying', () => {
     expect(result.endpoints[0].method).toBe('GET');
     expect(result.endpoints[0].minRateLimit).toBe(600);
   });
+
+  it('names the method in the busiest endpoint issue, since counts are now per bucket', async () => {
+    const filePath = writeLog([
+      `${PREFIX} performing request: method=GET url=https://acme.okta.com/api/v1/users?limit=200`,
+      `${PREFIX} HTTP/2.0 200 OK`,
+      `${PREFIX} performing request: method=GET url=https://acme.okta.com/api/v1/users?limit=200`,
+      `${PREFIX} HTTP/2.0 200 OK`,
+      `${PREFIX} performing request: method=POST url=https://acme.okta.com/api/v1/users`,
+      `${PREFIX} HTTP/2.0 201 Created`,
+    ]);
+
+    const result = await parseLogFile(filePath);
+
+    const busiest = result.issues.find(i => i.title.startsWith('Busiest endpoint'));
+    expect(busiest).toBeDefined();
+    // 2 GETs beat 1 POST; without the method the "2 calls" reads as the whole path
+    expect(busiest?.title).toContain('GET');
+    expect(busiest?.detail).toContain('2 GET calls');
+  });
 });

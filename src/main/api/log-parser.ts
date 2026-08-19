@@ -573,8 +573,10 @@ function detectIssues(
     const busiest = endpoints[0];
     issues.push({
       severity: 'info',
-      title: `Busiest endpoint: ${busiest.label}`,
-      detail: `${busiest.totalCalls} calls to ${busiest.pattern}${busiest.minRateLimit ? ` (rate limit: ${busiest.minRateLimit}/window)` : ''}.`,
+      title: `Busiest endpoint: ${busiest.method} ${busiest.label}`,
+      // Counts and limits are both per method — read and write are separate rate
+      // limit buckets, so naming the method keeps the two numbers unambiguous.
+      detail: `${busiest.totalCalls} ${busiest.method} calls to ${busiest.pattern}${busiest.minRateLimit ? ` (rate limit: ${busiest.minRateLimit}/window)` : ''}.`,
       recommendation: busiest.rateLimited > 0
         ? `This endpoint had ${busiest.rateLimited} 429s — consider reducing parallelism or adding capacity throttling.`
         : 'No rate limit issues on this endpoint.',
