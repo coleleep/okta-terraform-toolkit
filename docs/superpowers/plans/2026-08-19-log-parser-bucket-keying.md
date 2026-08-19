@@ -392,7 +392,7 @@ Replace with:
                   <td className="px-4 py-2">
                     <span className="font-medium text-text-secondary">{ep.label}</span>
                     <span className="block font-mono text-text-muted text-xs">
-                      <span className={`inline-block px-1.5 py-0.5 rounded mr-1.5 ${ep.method === 'GET' ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'}`}>
+                      <span className={`inline-block px-1.5 py-0.5 rounded mr-1.5 ${ep.method === 'GET' ? 'bg-accent-green/20 text-accent-green' : 'bg-accent-amber/20 text-accent-amber'}`}>
                         {ep.method}
                       </span>
                       {ep.pattern}
@@ -400,7 +400,9 @@ Replace with:
                   </td>
 ```
 
-The emerald-for-read, amber-for-write pairing matches the existing GET/POST tab badges in `src/renderer/components/RateLimitTable.tsx`, so the two tables read consistently.
+Use the `bg-accent-X/20 text-accent-X` badge idiom already defined at the top of this same file for critical/warning/info severities.
+
+**Do not copy the badge colors from `RateLimitTable.tsx`.** That component is still on the old light Tailwind palette (`bg-green-100`, `text-gray-600`), while `LogAnalyzer.tsx` uses the dark theme tokens from `tailwind.config.js` where `surface-0` is `#0B0E14`. A `bg-emerald-100` chip is pale mint and glares against a `#161B27` row.
 
 - [ ] **Step 2: Typecheck**
 
