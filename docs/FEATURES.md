@@ -57,7 +57,7 @@ Specify a desired Terraform run duration (e.g., 30 minutes) and OTTO identifies 
 
 Comprehensive diagnostic tools for troubleshooting Terraform runs:
 
-- **TF_LOG parsing** — extracts per-endpoint request stats, rate-limit hits, and error breakdowns from `TF_LOG=DEBUG` output
+- **TF_LOG parsing** — extracts per-endpoint request stats, rate-limit hits, and error breakdowns from `TF_LOG=DEBUG` output, tracked per HTTP method so a path's read and write rate limit buckets are reported separately
 - **Validation error detection** — identifies provider/schema mismatches even when no HTTP requests were made
 - **OAuth2/DPoP failure detection** — reads the `error`/`error_description` body format used by the token endpoint and flags `invalid_dpop_proof` as critical, since a failed token request blocks the entire run
 - **AI-powered root cause analysis** — explains failures with actionable config fix recommendations, using org-specific rate limits from the log's `X-Rate-Limit-Limit` headers when present (falls back to probe data or documented defaults)
