@@ -1,0 +1,15 @@
+{
+  "hooks": {
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "echo \"$(date '+%Y-%m-%d %H:%M:%S') SESSION START\" >> /Users/nicole.pendill/okta-terraform-toolkit/.claude/usage-log.txt",
+            "async": true
+          }
+        ]
+      }
+    ]
+  }
+}
