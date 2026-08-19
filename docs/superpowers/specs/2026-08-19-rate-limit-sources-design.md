@@ -72,7 +72,9 @@ So this feature adds producers, not a parallel engine. Every producer emits `Pro
 
 `LogEndpointStats`:
 
-- add `method: 'GET' | 'POST'` (see Log parser fix)
+- add `method: string` (see Log parser fix)
+
+`method` is a plain string rather than a `'GET' | 'POST'` union because Terraform also issues `PUT` and `DELETE`, and those are real, separately-bucketed writes. `EndpointProbeResult` keeps its two-value union; the log-derived producer maps `GET → 'GET'` and every other method → `'POST'`, since the probe shape models only the read and write buckets.
 
 `TargetRuntimeAnalysis`:
 
