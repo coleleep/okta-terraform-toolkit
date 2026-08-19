@@ -337,7 +337,12 @@ export default function LogAnalyzer() {
                 <tr key={i} className="hover:bg-surface-3">
                   <td className="px-4 py-2">
                     <span className="font-medium text-text-secondary">{ep.label}</span>
-                    <span className="block font-mono text-text-muted text-xs">{ep.pattern}</span>
+                    <span className="block font-mono text-text-muted text-xs">
+                      <span className={`inline-block px-1.5 py-0.5 rounded mr-1.5 ${ep.method === 'GET' ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'}`}>
+                        {ep.method}
+                      </span>
+                      {ep.pattern}
+                    </span>
                   </td>
                   <td className="px-4 py-2 text-right font-medium text-text-primary">{ep.totalCalls.toLocaleString()}</td>
                   <td className={`px-4 py-2 text-right font-medium ${ep.rateLimited > 0 ? 'text-accent-red' : 'text-text-muted'}`}>
