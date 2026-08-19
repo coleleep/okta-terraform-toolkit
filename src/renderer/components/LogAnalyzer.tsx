@@ -338,7 +338,7 @@ export default function LogAnalyzer() {
                   <td className="px-4 py-2">
                     <span className="font-medium text-text-secondary">{ep.label}</span>
                     <span className="block font-mono text-text-muted text-xs">
-                      <span className={`inline-block px-1.5 py-0.5 rounded mr-1.5 ${ep.method === 'GET' ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'}`}>
+                      <span className={`inline-block px-1.5 py-0.5 rounded mr-1.5 ${ep.method === 'GET' ? 'bg-accent-green/20 text-accent-green' : 'bg-accent-amber/20 text-accent-amber'}`}>
                         {ep.method}
                       </span>
                       {ep.pattern}
