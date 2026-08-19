@@ -50,6 +50,8 @@ function timestampToMs(ts: string): number {
 }
 
 interface EndpointAccumulator {
+  pattern: string;        // normalized path, without method
+  method: string;         // HTTP method this bucket belongs to
   totalCalls: number;
   rateLimited: number;
   errors: number;
@@ -76,9 +78,13 @@ export async function parseLogFile(filePath: string): Promise<LogAnalysis> {
     let deadlineExceeded = 0;
     let rateLimitExhausted = 0;
 
+    // Keyed by `${method}|${pattern}` — a path's read and write rate limits are
+    // separate buckets and must not be merged.
     const endpointMap = new Map<string, EndpointAccumulator>();
     let currentStatus: number | null = null;
     let currentEndpoint: string | null = null;
+    let currentMethod = 'GET';
+    let currentKey: string | null = null;
     let currentTimestamp: string | null = null;
     const terraformErrors: string[] = [];
 
@@ -126,14 +132,23 @@ export async function parseLogFile(filePath: string): Promise<LogAnalysis> {
         if (urlMatch) {
           totalRequests++;
           currentEndpoint = normalizeEndpoint(urlMatch[1]);
+          // Older provider versions may not log method=; GET is the safe default
+          // because it reproduces the previous single-bucket behavior.
+          const methodMatch = line.match(/method=([A-Za-z]+)/);
+          currentMethod = methodMatch ? methodMatch[1].toUpperCase() : 'GET';
+          currentKey = `${currentMethod}|${currentEndpoint}`;
 
           // Parallelism tracking
           pendingRequests++;
           if (pendingRequests > maxConcurrent) maxConcurrent = pendingRequests;
 
-          const acc = endpointMap.get(currentEndpoint) || { totalCalls: 0, rateLimited: 0, errors: 0, rateLimits: [], remainings: [], errorsByStatus: {} };
+          const acc = endpointMap.get(currentKey) || {
+            pattern: currentEndpoint,
+            method: currentMethod,
+            totalCalls: 0, rateLimited: 0, errors: 0, rateLimits: [], remainings: [], errorsByStatus: {},
+          };
           acc.totalCalls++;
-          endpointMap.set(currentEndpoint, acc);
+          endpointMap.set(currentKey, acc);
         }
       }
 
@@ -146,8 +161,8 @@ export async function parseLogFile(filePath: string): Promise<LogAnalysis> {
 
           if (currentStatus === 429) {
             rateLimited++;
-            if (currentEndpoint) {
-              const acc = endpointMap.get(currentEndpoint);
+            if (currentKey) {
+              const acc = endpointMap.get(currentKey);
               if (acc) acc.rateLimited++;
             }
             if (ts) last429Timestamp = timestampToMs(ts);
@@ -165,12 +180,14 @@ export async function parseLogFile(filePath: string): Promise<LogAnalysis> {
           } else if (currentStatus >= 400) {
             errorCount++;
             errorsByStatus[currentStatus] = (errorsByStatus[currentStatus] || 0) + 1;
-            if (currentEndpoint) {
-              const acc = endpointMap.get(currentEndpoint);
+            if (currentKey) {
+              const acc = endpointMap.get(currentKey);
               if (acc) {
                 acc.errors++;
                 acc.errorsByStatus[currentStatus] = (acc.errorsByStatus[currentStatus] || 0) + 1;
               }
+            }
+            if (currentEndpoint) {
               // Track error detail (will be enriched with error code if found)
               const detailKey = `${currentEndpoint}|${currentStatus}`;
               const existing = errorDetailMap.get(detailKey);
@@ -193,16 +210,16 @@ export async function parseLogFile(filePath: string): Promise<LogAnalysis> {
       // Rate limit headers
       if (line.includes('X-Rate-Limit-Limit:')) {
         const val = parseInt(line.split(':').pop()?.trim() || '0');
-        if (currentEndpoint && val > 0) {
-          const acc = endpointMap.get(currentEndpoint);
+        if (currentKey && val > 0) {
+          const acc = endpointMap.get(currentKey);
           if (acc) acc.rateLimits.push(val);
         }
       }
       if (line.includes('X-Rate-Limit-Remaining:')) {
         const val = parseInt(line.split(':').pop()?.trim() || '-1');
         if (val === 0) rateLimitExhausted++;
-        if (currentEndpoint && val >= 0) {
-          const acc = endpointMap.get(currentEndpoint);
+        if (currentKey && val >= 0) {
+          const acc = endpointMap.get(currentKey);
           if (acc) acc.remainings.push(val);
         }
       }
@@ -278,10 +295,11 @@ export async function parseLogFile(filePath: string): Promise<LogAnalysis> {
     rl.on('close', () => {
       // Build endpoint stats
       const endpoints: LogEndpointStats[] = [];
-      for (const [pattern, acc] of endpointMap) {
+      for (const acc of endpointMap.values()) {
         endpoints.push({
-          pattern,
-          label: labelForPattern(pattern),
+          pattern: acc.pattern,
+          method: acc.method,
+          label: labelForPattern(acc.pattern),
           totalCalls: acc.totalCalls,
           rateLimited: acc.rateLimited,
           errors: acc.errors,

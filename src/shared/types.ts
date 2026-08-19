@@ -214,6 +214,7 @@ export interface LogErrorDetail {
 
 export interface LogEndpointStats {
   pattern: string;
+  method: string;            // HTTP method — read and write buckets have separate limits
   label: string;
   totalCalls: number;
   rateLimited: number;
