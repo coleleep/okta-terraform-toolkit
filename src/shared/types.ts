@@ -179,6 +179,24 @@ export interface EndpointBottleneck {
   percentIncrease: number;
 }
 
+/**
+ * How much of the workload the analysis actually had rate limit data for.
+ *
+ * Manual entry is deliberately sparse, so an unentered bucket could be the real
+ * bottleneck. Reporting this is what keeps an optimistic verdict from reading as
+ * a measured one in a rate limit increase request.
+ */
+export interface LimitCoverage {
+  /** Distinct rate limit buckets this workload touches. */
+  relevant: number;
+  /** Buckets resolved from a probe, a log, or manual entry. */
+  measured: number;
+  /** Buckets resolved from a published baseline — an estimate, not a measurement. */
+  estimated: number;
+  /** Bucket labels with no limit data at all. */
+  missingLabels: string[];
+}
+
 export interface TargetRuntimeAnalysis {
   targetMinutes: number;
   achievable: boolean;
@@ -186,6 +204,7 @@ export interface TargetRuntimeAnalysis {
   requiredThroughput: number; // total API calls per minute needed
   currentThroughput: number; // what current limits support per minute
   bottlenecks: EndpointBottleneck[];
+  coverage: LimitCoverage;
   recommendedConfig?: TerraformProviderConfig; // config if increases granted
   summary: string;
 }

@@ -1,8 +1,56 @@
 import {
   ProbeResult, ResourceWorkload, TargetRuntimeAnalysis,
   EndpointBottleneck, TerraformProviderConfig, RuntimeEstimate,
+  LimitCoverage, LimitSource,
 } from '../../shared/types';
 import { RESOURCE_TYPES, OPERATIONS } from '../../shared/constants';
+
+/** A limit only counts if it was actually resolved — never substitute a default. */
+function resolveLimit(
+  probeResult: ProbeResult,
+  label: string,
+): { limit: number; source: LimitSource; method: 'GET' | 'POST' } | null {
+  const match = probeResult.endpoints.find(ep =>
+    ep.label === label && ep.status !== 'error' && ep.status !== 'skipped' && ep.limit > 0
+  );
+  return match ? { limit: match.limit, source: match.source, method: match.method } : null;
+}
+
+function buildCoverage(probeResult: ProbeResult, labels: string[]): LimitCoverage {
+  const relevant = [...new Set(labels)];
+  let measured = 0;
+  let estimated = 0;
+  const missingLabels: string[] = [];
+
+  for (const label of relevant) {
+    const resolved = resolveLimit(probeResult, label);
+    if (!resolved) missingLabels.push(label);
+    else if (resolved.source === 'baseline') estimated++;
+    else measured++;
+  }
+
+  return { relevant: relevant.length, measured, estimated, missingLabels };
+}
+
+/** Appended to every summary so an optimistic verdict can never read as a measured one. */
+function coverageNote(coverage: LimitCoverage): string {
+  if (coverage.missingLabels.length === 0 && coverage.estimated === 0) return '';
+
+  const parts: string[] = [];
+  if (coverage.missingLabels.length > 0) {
+    parts.push(
+      `${coverage.missingLabels.length} of ${coverage.relevant} buckets have no limit data ` +
+      `(${coverage.missingLabels.join(', ')}) — the bottleneck may be understated.`
+    );
+  }
+  if (coverage.estimated > 0) {
+    parts.push(
+      `${coverage.estimated} bucket${coverage.estimated > 1 ? 's' : ''} used a published default ` +
+      `rather than a measured limit.`
+    );
+  }
+  return ` ${parts.join(' ')}`;
+}
 
 /**
  * Analyze whether a target runtime is achievable with current rate limits.
@@ -42,16 +90,16 @@ export function analyzeTargetRuntime(
     const callsPerResource = writeFactor === 0 ? 1.15 : writeFactor <= 0.5 ? 2.5 : writeFactor <= 0.8 ? 2 : 3;
     for (const cw of workload.customWorkloads) {
       totalApiCalls += Math.ceil(cw.count * callsPerResource);
-      // Find the probed rate limit for this endpoint
-      const probed = probeResult.endpoints.find(ep =>
-        ep.label === cw.endpointLabel && ep.status !== 'error' && ep.status !== 'skipped' && ep.limit > 0
-      );
-      const limit = probed?.limit ?? cw.rateLimit ?? 100;
-      if (bottleneckLimit === 0 || limit < bottleneckLimit) {
-        bottleneckLimit = limit;
+      // No fallback limit. A bucket with no data is reported as missing coverage
+      // rather than silently analysed as 100 — an invented limit produces an
+      // invented bottleneck, and that figure reaches an increase request.
+      const resolved = resolveLimit(probeResult, cw.endpointLabel);
+      if (!resolved) continue;
+      if (bottleneckLimit === 0 || resolved.limit < bottleneckLimit) {
+        bottleneckLimit = resolved.limit;
         bottleneckLabel = cw.endpointLabel;
         bottleneckEndpoint = cw.primaryEndpoint;
-        bottleneckMethod = probed?.method ?? 'GET';
+        bottleneckMethod = resolved.method;
       }
     }
   } else {
@@ -81,15 +129,26 @@ export function analyzeTargetRuntime(
     }
   }
 
+  const relevantLabelsForCoverage = hasCustom
+    ? workload.customWorkloads.map(cw => cw.endpointLabel)
+    : workload.selected
+        .map(type => RESOURCE_TYPES.find(r => r.type === type)?.probeLabel)
+        .filter((l): l is string => !!l);
+  const coverage = buildCoverage(probeResult, relevantLabelsForCoverage);
+
   if (bottleneckLimit === 0) {
     return {
       targetMinutes,
       achievable: false,
-      estimatedMinutes: Infinity,
+      // Was Infinity, which serialises to null over IPC and rendered as a
+      // nonsense runtime. Zero with achievable: false and an explicit summary
+      // is honest and displayable.
+      estimatedMinutes: 0,
       requiredThroughput: 0,
       currentThroughput: 0,
       bottlenecks: [],
-      summary: 'No rate limit data available for selected resources.',
+      coverage,
+      summary: 'No rate limit data available for the selected resources.' + coverageNote(coverage),
     };
   }
 
@@ -140,12 +199,12 @@ export function analyzeTargetRuntime(
   if (achievable) {
     summary = `Target of ${targetMinutes} min is achievable. ` +
       `Estimated runtime: ~${Math.round(estimatedMinutes)} min for ~${totalApiCalls.toLocaleString()} API calls ` +
-      `against ${bottleneckLabel} (${bottleneckLimit} req/window).`;
+      `against ${bottleneckLabel} (${bottleneckLimit} req/window).` + coverageNote(coverage);
   } else {
     summary = `Target of ${targetMinutes} min requires a rate limit increase. ` +
       `Estimated runtime: ~${Math.round(estimatedMinutes)} min. ` +
       `Bottleneck: ${bottleneckLabel} needs ${requiredLimitForTarget} req/window ` +
-      `(currently ${bottleneckLimit}, +${bottlenecks[0]?.percentIncrease ?? 0}%).`;
+      `(currently ${bottleneckLimit}, +${bottlenecks[0]?.percentIncrease ?? 0}%).` + coverageNote(coverage);
   }
 
   return {
@@ -155,6 +214,7 @@ export function analyzeTargetRuntime(
     requiredThroughput: Math.round(requiredCallsPerMin),
     currentThroughput: Math.round(currentCallsPerMin),
     bottlenecks,
+    coverage,
     recommendedConfig: suggestedConfig,
     summary,
   };
@@ -175,8 +235,10 @@ function calculateEstimate(
 
     for (const cw of workload.customWorkloads) {
       const calls = Math.ceil(cw.count * callsPerResource);
-      const limit = cw.rateLimit || 100;
-      const throughput = limit * 0.9;
+      // Skip rather than assume. `|| 100` also swallowed a legitimate cached 0.
+      const resolved = resolveLimit(probeResult, cw.endpointLabel);
+      if (!resolved) continue;
+      const throughput = resolved.limit * 0.9;
       const windows = Math.ceil(calls / throughput);
       // Use probed reset window or default 60s
       const resetWindow = probeResult.endpoints.find(ep =>
@@ -190,11 +252,13 @@ function calculateEstimate(
   }
 
   // Generic model for grid resources
-  const minLimit = Math.min(
-    ...probeResult.endpoints
-      .filter(e => e.status !== 'error' && e.status !== 'skipped' && e.limit > 0)
-      .map(e => e.limit)
-  );
+  const limits = probeResult.endpoints
+    .filter(e => e.status !== 'error' && e.status !== 'skipped' && e.limit > 0)
+    .map(e => e.limit);
+  // Math.min() of an empty list is Infinity, which propagated into the estimate
+  // as a real number and rendered as a nonsense runtime.
+  if (limits.length === 0) return 0;
+  const minLimit = Math.min(...limits);
   const capacityPct = recommendedConfig ? recommendedConfig.max_api_capacity / 100 : 0.8;
   const effectiveLimit = minLimit * capacityPct;
   const totalCalls = workload.totalResources * operationDef.apiCallsPerResource * 0.6;
