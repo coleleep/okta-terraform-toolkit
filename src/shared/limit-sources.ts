@@ -1,7 +1,7 @@
 import {
   ConfigRecommendation, CustomWorkloadEntry, DEFAULT_PREVENTION_OPTIONS, EndpointProbeResult,
-  LimitSource, ManagedResourceType, OperationType, PreventionOptions, ProbeProgress, ProbeResult,
-  ResourceCount, TargetRuntimeAnalysis,
+  LimitSource, LogEndpointStats, ManagedResourceType, OperationType, PreventionOptions,
+  ProbeProgress, ProbeResult, ResourceCount, TargetRuntimeAnalysis,
 } from './types';
 import { PROBE_ENDPOINTS, SUB_RESOURCE_ENDPOINTS } from './constants';
 
@@ -230,4 +230,58 @@ export function clearedCaseState(): {
     preventionOptions: { ...DEFAULT_PREVENTION_OPTIONS },
     countingLabel: null,
   };
+}
+
+/**
+ * log-parser's labelForPattern and the probe's PROBE_ENDPOINTS use different
+ * vocabularies, and target-analyzer matches workloads to limits by label string.
+ * Without translation, log-derived limits merge and render but match nothing in
+ * the runtime analysis, with no error to explain why.
+ *
+ * Labels absent from this table either already match the probe vocabulary
+ * exactly, or are deliberately not mapped:
+ *   'Schema'                    ambiguous across user/group/app schemas
+ *   'Token Endpoint', 'OAuth2'  a different rate limit family from the
+ *                               management API — mapping into a management
+ *                               bucket would attribute a real limit wrongly
+ */
+export const LOG_LABEL_TO_PROBE_LABEL: Record<string, string> = {
+  'Application': 'App (single)',
+  'App User (single)': 'App User Assignments',
+  'App Group (single)': 'App Group Assignments',
+  'Auth Server': 'Auth Server (single)',
+  'Policy': 'Policies',
+  'Network Zone': 'Network Zones',
+  'Current User': 'Users',
+  'User Roles': 'User Admin Roles',
+};
+
+/**
+ * Convert parsed log endpoint stats into limit entries.
+ *
+ * These are real measurements from the customer's own run, so they outrank
+ * published defaults — but they describe the org at capture time, not now, which
+ * is why they sit below a live probe in the merge precedence.
+ */
+export function logDerivedLimits(stats: LogEndpointStats[]): EndpointProbeResult[] {
+  return stats
+    .filter(s => s.minRateLimit > 0)
+    .map(s => {
+      // EndpointProbeResult models only read and write buckets. PUT and DELETE
+      // are writes, so they collapse to POST.
+      const method: 'GET' | 'POST' = s.method.toUpperCase() === 'GET' ? 'GET' : 'POST';
+      // The parser uses -1 for "no remaining header ever seen"; a real 0 means
+      // the bucket was exhausted, and hasLiveCapacity() must tell them apart.
+      const remaining = s.lowestRemaining >= 0 ? s.lowestRemaining : undefined;
+      return {
+        endpoint: s.pattern,
+        label: LOG_LABEL_TO_PROBE_LABEL[s.label] ?? s.label,
+        method,
+        limit: s.minRateLimit,
+        resetWindowSecs: 60,
+        status: remaining === undefined ? 'unknown' as const : deriveStatus(remaining, s.minRateLimit),
+        source: 'log' as const,
+        ...(remaining !== undefined ? { remaining } : {}),
+      };
+    });
 }

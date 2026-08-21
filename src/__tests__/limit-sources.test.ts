@@ -1,8 +1,9 @@
 import {
   mergeLimitSources, hasLiveCapacity, sourceLabel, KNOWN_LIMIT_BUCKETS,
   parseRateLimitHeaders, manualEntry, clearedCaseState,
+  logDerivedLimits, LOG_LABEL_TO_PROBE_LABEL,
 } from '../shared/limit-sources';
-import { DEFAULT_PREVENTION_OPTIONS } from '../shared/types';
+import { DEFAULT_PREVENTION_OPTIONS, LogEndpointStats } from '../shared/types';
 import { EndpointProbeResult, LimitSource } from '../shared/types';
 import { PROBE_ENDPOINTS, SUB_RESOURCE_ENDPOINTS } from '../shared/constants';
 
@@ -278,5 +279,89 @@ describe('parseRateLimitHeaders', () => {
   it('keeps a remaining of zero, which means exhausted rather than missing', () => {
     const result = parseRateLimitHeaders('x-rate-limit-limit: 600\nx-rate-limit-remaining: 0');
     expect(result).toEqual({ limit: 600, remaining: 0 });
+  });
+});
+
+function logStat(
+  label: string,
+  minRateLimit: number,
+  method = 'GET',
+  lowestRemaining = -1,
+): LogEndpointStats {
+  return {
+    pattern: `/api/v1/${label.toLowerCase().replace(/\s+/g, '')}`,
+    method,
+    label,
+    totalCalls: 10,
+    rateLimited: 0,
+    errors: 0,
+    minRateLimit,
+    lowestRemaining,
+  };
+}
+
+describe('logDerivedLimits', () => {
+  it('converts a log row into a log-sourced limit entry', () => {
+    const [entry] = logDerivedLimits([logStat('Users', 600, 'GET', 550)]);
+
+    expect(entry.label).toBe('Users');
+    expect(entry.method).toBe('GET');
+    expect(entry.limit).toBe(600);
+    expect(entry.remaining).toBe(550);
+    expect(entry.source).toBe('log');
+  });
+
+  it('drops rows with no observed limit rather than emitting a zero', () => {
+    expect(logDerivedLimits([logStat('Users', 0)])).toEqual([]);
+  });
+
+  it('omits remaining when the log never showed one', () => {
+    const [entry] = logDerivedLimits([logStat('Users', 600, 'GET', -1)]);
+
+    // -1 is the parser's "never seen" marker, not a real zero
+    expect(entry.remaining).toBeUndefined();
+    expect(entry.status).toBe('unknown');
+  });
+
+  it('collapses non-GET methods to the write bucket', () => {
+    const entries = logDerivedLimits([
+      logStat('Users', 600, 'GET'),
+      logStat('Users', 100, 'POST'),
+      logStat('Users', 60, 'DELETE'),
+    ]);
+
+    const writes = entries.filter(e => e.method === 'POST');
+    // POST and DELETE are both writes; EndpointProbeResult models only GET/POST
+    expect(writes).toHaveLength(2);
+    expect(entries.filter(e => e.method === 'GET')).toHaveLength(1);
+  });
+
+  it('translates log labels to the probe vocabulary so bottlenecks can match', () => {
+    const [entry] = logDerivedLimits([logStat('User Roles', 400)]);
+    expect(entry.label).toBe('User Admin Roles');
+  });
+
+  it('carries an unmapped label through instead of dropping the measurement', () => {
+    const [entry] = logDerivedLimits([logStat('Token Endpoint', 300)]);
+    // Deliberately unmapped — a different rate limit family from the management API
+    expect(entry.label).toBe('Token Endpoint');
+    expect(entry.limit).toBe(300);
+  });
+
+  it('maps every label the log parser can emit, or deliberately declines to', () => {
+    // Guards against a labelForPattern addition silently going unmapped.
+    const known = new Set([
+      ...Object.keys(LOG_LABEL_TO_PROBE_LABEL),
+      'App User Assignments', 'App Group Assignments', 'Group (single)', 'Group Members',
+      'User (single)', 'User Groups', 'Org Settings', 'User Types',
+      'Schema', 'Token Endpoint', 'OAuth2',
+    ]);
+    const emitted = [
+      'App Group (single)', 'App Group Assignments', 'App User (single)', 'App User Assignments',
+      'Application', 'Auth Server', 'Current User', 'Group (single)', 'Group Members',
+      'Network Zone', 'OAuth2', 'Org Settings', 'Policy', 'Schema', 'Token Endpoint',
+      'User (single)', 'User Groups', 'User Roles', 'User Types',
+    ];
+    expect(emitted.filter(l => !known.has(l))).toEqual([]);
   });
 });

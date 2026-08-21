@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { LogAnalysis, ClaudeInterpretation } from '../../shared/types';
 import { useStore } from '../hooks/useStore';
+import { logDerivedLimits } from '../../shared/limit-sources';
 
 function formatDuration(seconds: number): string {
   if (seconds < 60) return `${seconds}s`;
@@ -25,6 +26,7 @@ export default function LogAnalyzer() {
   const [interpretError, setInterpretError] = useState<string | null>(null);
   const [hasKey, setHasKey] = useState(false);
   const probeResult = useStore(state => state.probeResult);
+  const setLimitSource = useStore(state => state.setLimitSource);
 
   const [dots, setDots] = useState('');
 
@@ -317,6 +319,26 @@ export default function LogAnalyzer() {
       )}
 
       {/* Endpoint breakdown */}
+      {analysis.endpoints.some(e => e.minRateLimit > 0) && (
+        <div className="bg-accent-teal/10 border border-accent-teal/30 rounded-xl p-4 flex items-start justify-between gap-4">
+          <div>
+            <p className="text-sm font-medium text-text-primary">
+              This log contains {analysis.endpoints.filter(e => e.minRateLimit > 0).length} measured rate limits
+            </p>
+            <p className="text-xs text-text-muted mt-1">
+              Use them for capacity planning without connecting to the org. They reflect the org at
+              capture time, so a live probe takes precedence if you run one.
+            </p>
+          </div>
+          <button
+            onClick={() => setLimitSource('log', logDerivedLimits(analysis.endpoints), fileName ?? 'TF_LOG')}
+            className="shrink-0 px-3 py-1.5 text-xs font-medium bg-accent-teal text-surface-0 rounded-lg hover:bg-accent-teal/90 transition-colors"
+          >
+            Use these rate limits
+          </button>
+        </div>
+      )}
+
       {analysis.endpoints.length > 0 && (
         <div className="bg-surface-2 rounded-xl border border-border overflow-hidden">
           <div className="px-4 py-3 border-b border-border">
