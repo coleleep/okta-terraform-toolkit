@@ -92,23 +92,45 @@ export default function TargetRuntime() {
       {/* Results */}
       {targetAnalysis && (
         <div className="space-y-4">
-          {/* Summary banner */}
-          <div className={`rounded-lg p-4 ${
-            targetAnalysis.achievable
-              ? 'bg-green-50 border border-green-200'
-              : 'bg-red-50 border border-red-200'
-          }`}>
-            <div className="flex items-start gap-3">
-              <span className="text-2xl">{targetAnalysis.achievable ? '\u2713' : '\u2717'}</span>
-              <div>
-                <p className={`text-sm font-medium ${targetAnalysis.achievable ? 'text-green-800' : 'text-red-800'}`}>
-                  {targetAnalysis.achievable ? 'Target Achievable' : 'Rate Limit Increase Needed'}
-                </p>
-                <p className={`text-xs mt-1 ${targetAnalysis.achievable ? 'text-green-600' : 'text-red-600'}`}>
-                  {targetAnalysis.summary}
-                </p>
+          {/* Summary banner. An achievable verdict built on incomplete coverage is
+              rendered as provisional, not confirmed \u2014 a green check on a guess is
+              how a wrong figure ends up in a customer-facing request. */}
+          {(() => {
+            const incomplete =
+              targetAnalysis.coverage.missingLabels.length > 0 ||
+              targetAnalysis.coverage.estimated > 0;
+            const tone = !targetAnalysis.achievable
+              ? { box: 'bg-red-50 border-red-200', title: 'text-red-800', body: 'text-red-600', icon: '\u2717' }
+              : incomplete
+                ? { box: 'bg-amber-50 border-amber-200', title: 'text-amber-800', body: 'text-amber-700', icon: '!' }
+                : { box: 'bg-green-50 border-green-200', title: 'text-green-800', body: 'text-green-600', icon: '\u2713' };
+            const title = !targetAnalysis.achievable
+              ? 'Rate Limit Increase Needed'
+              : incomplete
+                ? 'Target Appears Achievable \u2014 Incomplete Data'
+                : 'Target Achievable';
+            return (
+              <div className={`rounded-lg p-4 border ${tone.box}`}>
+                <div className="flex items-start gap-3">
+                  <span className="text-2xl">{tone.icon}</span>
+                  <div>
+                    <p className={`text-sm font-medium ${tone.title}`}>{title}</p>
+                    <p className={`text-xs mt-1 ${tone.body}`}>{targetAnalysis.summary}</p>
+                  </div>
+                </div>
               </div>
-            </div>
+            );
+          })()}
+
+          <div className="text-xs text-gray-500">
+            Coverage: {targetAnalysis.coverage.measured} measured
+            {targetAnalysis.coverage.estimated > 0 && `, ${targetAnalysis.coverage.estimated} estimated`}
+            {' '}of {targetAnalysis.coverage.relevant} rate limit bucket{targetAnalysis.coverage.relevant === 1 ? '' : 's'}
+            {targetAnalysis.coverage.missingLabels.length > 0 && (
+              <span className="text-amber-600">
+                {' '}\u2014 no data for {targetAnalysis.coverage.missingLabels.join(', ')}
+              </span>
+            )}
           </div>
 
           {/* Throughput comparison */}
