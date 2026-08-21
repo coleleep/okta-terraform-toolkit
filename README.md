@@ -19,6 +19,8 @@ npm install
 npm run dev
 ```
 
+`npm run dev` watches `src/` and restarts the app whenever a rebuild lands in `dist/`, so both main-process and renderer changes take effect without quitting. Use `npm start` for a one-off build and launch with no watching.
+
 ## Connect to Your Org
 
 1. Launch the app
