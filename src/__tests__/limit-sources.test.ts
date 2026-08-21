@@ -1,5 +1,8 @@
-import { mergeLimitSources, hasLiveCapacity, sourceLabel, clearedLimitState } from '../shared/limit-sources';
+import {
+  mergeLimitSources, hasLiveCapacity, sourceLabel, clearedLimitState, KNOWN_LIMIT_BUCKETS,
+} from '../shared/limit-sources';
 import { EndpointProbeResult, LimitSource } from '../shared/types';
+import { PROBE_ENDPOINTS, SUB_RESOURCE_ENDPOINTS } from '../shared/constants';
 
 function ep(
   label: string,
@@ -147,5 +150,36 @@ describe('clearedLimitState', () => {
       targetMinutes: null,
       customWorkloads: [],
     });
+  });
+});
+
+describe('KNOWN_LIMIT_BUCKETS', () => {
+  it('offers every label the probe uses, so manual entry can match a probed bucket', () => {
+    const labels = new Set(KNOWN_LIMIT_BUCKETS.map(b => b.label));
+    for (const def of PROBE_ENDPOINTS) {
+      expect(labels.has(def.label)).toBe(true);
+    }
+  });
+
+  it('offers every sub-resource label, including the POST write buckets', () => {
+    const keys = new Set(KNOWN_LIMIT_BUCKETS.map(b => `${b.method}|${b.label}`));
+    for (const def of SUB_RESOURCE_ENDPOINTS) {
+      expect(keys.has(`${def.method ?? 'GET'}|${def.label}`)).toBe(true);
+    }
+  });
+
+  it('has no duplicate method+label pairs', () => {
+    const keys = KNOWN_LIMIT_BUCKETS.map(b => `${b.method}|${b.label}`);
+    expect(keys.length).toBe(new Set(keys).size);
+  });
+
+  it('is sorted by label so the dropdown is scannable', () => {
+    const labels = KNOWN_LIMIT_BUCKETS.map(b => b.label);
+    expect(labels).toEqual([...labels].sort((a, b) => a.localeCompare(b)));
+  });
+
+  it('carries the endpoint path for display', () => {
+    const users = KNOWN_LIMIT_BUCKETS.find(b => b.label === 'Users' && b.method === 'GET');
+    expect(users?.endpoint).toContain('/api/v1/users');
   });
 });

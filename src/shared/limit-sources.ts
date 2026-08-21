@@ -2,6 +2,7 @@ import {
   ConfigRecommendation, CustomWorkloadEntry, EndpointProbeResult, LimitSource,
   ProbeProgress, ProbeResult, TargetRuntimeAnalysis,
 } from './types';
+import { PROBE_ENDPOINTS, SUB_RESOURCE_ENDPOINTS } from './constants';
 
 /**
  * Precedence, lowest first — later entries win. Manual outranks a live probe
@@ -72,6 +73,43 @@ const SOURCE_LABELS: Record<LimitSource, string> = {
 export function sourceLabel(source: LimitSource): string {
   return SOURCE_LABELS[source];
 }
+
+export interface LimitBucket {
+  label: string;
+  method: 'GET' | 'POST';
+  endpoint: string;
+}
+
+/**
+ * Every rate limit bucket a limit can be entered for.
+ *
+ * Derived from PROBE_ENDPOINTS and SUB_RESOURCE_ENDPOINTS rather than written by
+ * hand, because target-analyzer.ts matches workload resources to limits by label
+ * string. A hand-maintained list would drift, and the failure is silent: the
+ * limit merges, renders, and then matches nothing in the runtime analysis.
+ */
+export const KNOWN_LIMIT_BUCKETS: LimitBucket[] = (() => {
+  const seen = new Map<string, LimitBucket>();
+
+  for (const def of PROBE_ENDPOINTS) {
+    seen.set(`GET|${def.label}`, {
+      label: def.label,
+      method: 'GET',
+      endpoint: def.endpoint.split('?')[0],
+    });
+  }
+
+  for (const def of SUB_RESOURCE_ENDPOINTS) {
+    const method = def.method ?? 'GET';
+    seen.set(`${method}|${def.label}`, {
+      label: def.label,
+      method,
+      endpoint: def.endpoint.split('?')[0],
+    });
+  }
+
+  return [...seen.values()].sort((a, b) => a.label.localeCompare(b.label));
+})();
 
 /**
  * Every piece of store state computed from rate limits. Returned as one object
