@@ -145,6 +145,44 @@ export const KNOWN_LIMIT_BUCKETS: LimitBucket[] = (() => {
 })();
 
 /**
+ * Mirrors determineStatus in the probe modules. Duplicated rather than imported
+ * because those live in the main process and this file is bundled into the
+ * renderer.
+ */
+function deriveStatus(remaining: number, limit: number): 'ok' | 'warning' | 'critical' {
+  if (limit === 0) return 'critical';
+  const ratio = remaining / limit;
+  if (ratio > 0.5) return 'ok';
+  if (ratio > 0.1) return 'warning';
+  return 'critical';
+}
+
+/**
+ * Build a manual entry for a bucket. Status is 'unknown' unless a paste supplied
+ * live capacity, in which case the ratio-based derivation is meaningful again.
+ * resetWindowSecs defaults to 60, which is the standard Okta window and what
+ * calculateEstimate already assumes when no probed window is available.
+ */
+export function manualEntry(
+  bucket: LimitBucket,
+  limit: number,
+  capacity?: { remaining?: number; resetAt?: number },
+): EndpointProbeResult {
+  const remaining = capacity?.remaining;
+  return {
+    endpoint: bucket.endpoint,
+    label: bucket.label,
+    method: bucket.method,
+    limit,
+    resetWindowSecs: 60,
+    status: remaining === undefined ? 'unknown' : deriveStatus(remaining, limit),
+    source: 'manual',
+    ...(remaining !== undefined ? { remaining } : {}),
+    ...(capacity?.resetAt !== undefined ? { resetAt: capacity.resetAt } : {}),
+  };
+}
+
+/**
  * Every piece of store state computed from rate limits. Returned as one object
  * so `disconnect()` and `clearLimitSources()` cannot drift apart.
  *
@@ -160,6 +198,7 @@ export function clearedLimitState(): {
   targetAnalysis: TargetRuntimeAnalysis | null;
   targetMinutes: number | null;
   customWorkloads: CustomWorkloadEntry[];
+  limitSources: Partial<Record<LimitSource, EndpointProbeResult[]>>;
 } {
   return {
     probeResult: null,
@@ -170,5 +209,6 @@ export function clearedLimitState(): {
     targetMinutes: null,
     // Custom workloads cache a rateLimit per entry, so they are derived state too
     customWorkloads: [],
+    limitSources: {},
   };
 }

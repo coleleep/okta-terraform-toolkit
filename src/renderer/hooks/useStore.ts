@@ -4,10 +4,10 @@ import {
   ProbeProgress, ManagedResourceType, ResourceCount, ResourceWorkload,
   OperationType, EndpointProbeResult, TargetRuntimeAnalysis,
   PreventionOptions, DEFAULT_PREVENTION_OPTIONS, TerraformAuthMethod,
-  CustomWorkloadEntry,
+  CustomWorkloadEntry, LimitSource,
 } from '../../shared/types';
 import type { Finding } from '../../shared/types';
-import { clearedLimitState } from '../../shared/limit-sources';
+import { clearedLimitState, mergeLimitSources } from '../../shared/limit-sources';
 import { DEFAULT_VERSION } from '../../shared/versions';
 import { RESOURCE_TYPES } from '../../shared/constants';
 import type { OktaTerraformAPI } from '../../preload';
@@ -37,6 +37,8 @@ interface AppState {
   baselineProbeResult: ProbeResult | null; // Before deep probe merge
   startProbe: () => Promise<void>;
   clearLimitSources: () => void;
+  limitSources: Partial<Record<LimitSource, EndpointProbeResult[]>>;
+  setLimitSource: (source: LimitSource, endpoints: EndpointProbeResult[], displayLabel: string) => void;
 
   // Resource selection
   selectedResources: ManagedResourceType[];
@@ -128,11 +130,26 @@ export const useStore = create<AppState>((set, get) => ({
     set(clearedLimitState());
   },
 
+  // Replaces one source's entries and recomputes the merged probeResult that
+  // every consumer reads. Derived state is dropped because it was computed from
+  // the previous limits — see clearedLimitState for why that matters.
+  setLimitSource: (source, endpoints, displayLabel) => {
+    const limitSources = { ...get().limitSources, [source]: endpoints };
+    set({
+      limitSources,
+      probeResult: mergeLimitSources(limitSources, displayLabel),
+      recommendation: null,
+      targetAnalysis: null,
+      targetMinutes: null,
+    });
+  },
+
   // Probing
   probing: false,
   probeProgress: null,
   probeResult: null,
   baselineProbeResult: null,
+  limitSources: {},
 
   startProbe: async () => {
     set({ probing: true, probeProgress: null, probeResult: null, baselineProbeResult: null, recommendation: null });

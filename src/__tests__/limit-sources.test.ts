@@ -1,6 +1,6 @@
 import {
   mergeLimitSources, hasLiveCapacity, sourceLabel, clearedLimitState, KNOWN_LIMIT_BUCKETS,
-  parseRateLimitHeaders,
+  parseRateLimitHeaders, manualEntry,
 } from '../shared/limit-sources';
 import { EndpointProbeResult, LimitSource } from '../shared/types';
 import { PROBE_ENDPOINTS, SUB_RESOURCE_ENDPOINTS } from '../shared/constants';
@@ -150,7 +150,35 @@ describe('clearedLimitState', () => {
       targetAnalysis: null,
       targetMinutes: null,
       customWorkloads: [],
+      limitSources: {},
     });
+  });
+});
+
+describe('manualEntry', () => {
+  it('builds an unknown-status entry from a bucket and a limit', () => {
+    const bucket = { label: 'Users', method: 'GET' as const, endpoint: '/api/v1/users' };
+    const entry = manualEntry(bucket, 600);
+
+    expect(entry).toEqual({
+      endpoint: '/api/v1/users',
+      label: 'Users',
+      method: 'GET',
+      limit: 600,
+      resetWindowSecs: 60,
+      status: 'unknown',
+      source: 'manual',
+    });
+  });
+
+  it('carries capacity through when a paste supplied it', () => {
+    const bucket = { label: 'Users', method: 'GET' as const, endpoint: '/api/v1/users' };
+    const entry = manualEntry(bucket, 600, { remaining: 599, resetAt: 1755792000 });
+
+    expect(entry.remaining).toBe(599);
+    expect(entry.resetAt).toBe(1755792000);
+    // capacity is known, so the ratio-based status is meaningful again
+    expect(entry.status).toBe('ok');
   });
 });
 
