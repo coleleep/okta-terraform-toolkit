@@ -10,6 +10,8 @@ import SyncSection from '../components/SyncSection';
 import ValidatorSection from '../components/ValidatorSection';
 import SettingsModal from '../components/SettingsModal';
 import ConnectOrgModal from '../components/ConnectOrgModal';
+import ManualLimitsModal from '../components/ManualLimitsModal';
+import { sourceLabel } from '../../shared/limit-sources';
 import { SUPPORTED_VERSIONS } from '../../shared/versions';
 
 type Section = 'rate-limits' | 'plan' | 'sync' | 'validate' | 'debug' | 'learn';
@@ -81,6 +83,7 @@ export default function DashboardPage() {
   const [activeSection, setActiveSection] = useState<Section>('debug');
   const [showSettings, setShowSettings] = useState(false);
   const [showConnect, setShowConnect] = useState(false);
+  const [showManualLimits, setShowManualLimits] = useState(false);
   const [availableVersions, setAvailableVersions] = useState<string[]>([...SUPPORTED_VERSIONS]);
   const [ocmUnavailable, setOcmUnavailable] = useState(false);
   const hasWorkload = selectedResources.length > 0 && resourceCounts.length > 0;
@@ -262,8 +265,20 @@ export default function DashboardPage() {
             <div className="space-y-6">
               <div className="grid grid-cols-3 gap-4">
                 <StatCard label="Bottleneck" value={probeResult.overallMinLimit > 0 ? String(probeResult.overallMinLimit) : '\u2014'} sub="req/window" />
-                <StatCard label="Endpoints" value={String(probeResult.endpoints.filter(e => e.status !== 'error' && e.status !== 'skipped').length)} sub={`of ${probeResult.endpoints.length} probed`} />
-                <StatCard label="Scan Duration" value={`${(probeResult.probeDurationMs / 1000).toFixed(1)}s`} sub="sequential probing" />
+                <StatCard
+                  label="Endpoints"
+                  value={String(probeResult.endpoints.filter(e => e.status !== 'error' && e.status !== 'skipped').length)}
+                  sub={`of ${probeResult.endpoints.length} ${probeResult.sources.includes('probe') ? 'probed' : 'entered'}`}
+                />
+                {probeResult.sources.includes('probe') ? (
+                  <StatCard label="Scan Duration" value={`${(probeResult.probeDurationMs / 1000).toFixed(1)}s`} sub="sequential probing" />
+                ) : (
+                  <StatCard
+                    label="Source"
+                    value={probeResult.sources.map(sourceLabel).join(' + ') || '—'}
+                    sub={probeResult.orgUrl}
+                  />
+                )}
               </div>
 
               <div className="bg-surface-2 rounded-xl border border-border overflow-hidden">
@@ -278,20 +293,38 @@ export default function DashboardPage() {
           )}
 
           {activeSection === 'rate-limits' && !probeResult && !probing && (
-            <div className="bg-surface-2 rounded-xl border border-border p-8 text-center space-y-3">
-              {connection.connected ? (
-                <p className="text-text-secondary">Click "Re-scan" to probe your org's rate limits.</p>
-              ) : (
-                <>
-                  <p className="text-text-secondary">Connect to an org to probe rate limits.</p>
+            <div className="bg-surface-2 rounded-xl border border-border p-8 text-center space-y-4">
+              <div>
+                <p className="text-text-primary font-medium">Where should rate limits come from?</p>
+                <p className="text-text-secondary text-sm mt-1">
+                  {connection.connected
+                    ? 'Probe the connected org, or enter limits yourself.'
+                    : 'No org connection required — enter limits you already have.'}
+                </p>
+              </div>
+              <div className="flex gap-2 justify-center">
+                {connection.connected ? (
+                  <button
+                    onClick={() => startProbe()}
+                    className="px-4 py-2 text-xs font-medium bg-accent-teal text-surface-0 hover:bg-accent-teal/90 rounded-lg transition-colors"
+                  >
+                    Probe This Org
+                  </button>
+                ) : (
                   <button
                     onClick={() => setShowConnect(true)}
                     className="px-4 py-2 text-xs font-medium bg-accent-teal text-surface-0 hover:bg-accent-teal/90 rounded-lg transition-colors"
                   >
                     Connect Org
                   </button>
-                </>
-              )}
+                )}
+                <button
+                  onClick={() => setShowManualLimits(true)}
+                  className="px-4 py-2 text-xs font-medium border border-border text-text-secondary hover:bg-surface-3 rounded-lg transition-colors"
+                >
+                  Enter Limits Manually
+                </button>
+              </div>
             </div>
           )}
         </main>
@@ -299,6 +332,7 @@ export default function DashboardPage() {
 
       {showSettings && <SettingsModal onClose={() => setShowSettings(false)} />}
       {showConnect && <ConnectOrgModal onClose={() => setShowConnect(false)} />}
+      {showManualLimits && <ManualLimitsModal onClose={() => setShowManualLimits(false)} />}
     </div>
   );
 }
