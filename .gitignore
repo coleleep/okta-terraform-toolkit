@@ -16,3 +16,6 @@ dist/
 # Git worktrees
 .worktrees/
 .claude/usage-log.txt
+
+# One-off rate limit capture output (review, then merge into src/shared/rate-limit-baselines.json)
+rate-limit-capture.json

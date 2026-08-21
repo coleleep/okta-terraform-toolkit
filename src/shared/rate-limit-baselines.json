@@ -154,6 +154,16 @@
       "limit": 1000
     },
     {
+      "label": "Custom Role (single)",
+      "method": "GET",
+      "limit": 1600
+    },
+    {
+      "label": "Custom Role Create (write)",
+      "method": "POST",
+      "limit": 1600
+    },
+    {
       "label": "Custom Roles",
       "method": "GET",
       "limit": 1600
@@ -172,6 +182,16 @@
       "label": "Devices",
       "method": "GET",
       "limit": 150
+    },
+    {
+      "label": "Domain (single)",
+      "method": "GET",
+      "limit": 600
+    },
+    {
+      "label": "Domain Create (write)",
+      "method": "POST",
+      "limit": 50
     },
     {
       "label": "Domains",
@@ -284,6 +304,21 @@
       "limit": 1000
     },
     {
+      "label": "IDP (single)",
+      "method": "GET",
+      "limit": 1000
+    },
+    {
+      "label": "IDP Create (write)",
+      "method": "POST",
+      "limit": 1000
+    },
+    {
+      "label": "IDP Credential Keys",
+      "method": "GET",
+      "limit": 1000
+    },
+    {
       "label": "Inline Hook (single)",
       "method": "GET",
       "limit": 1000
@@ -301,6 +336,16 @@
     {
       "label": "Linked Objects",
       "method": "GET",
+      "limit": 1000
+    },
+    {
+      "label": "Log Stream (single)",
+      "method": "GET",
+      "limit": 1000
+    },
+    {
+      "label": "Log Stream Create (write)",
+      "method": "POST",
       "limit": 1000
     },
     {
@@ -324,9 +369,19 @@
       "limit": 1000
     },
     {
+      "label": "Policy Rules",
+      "method": "GET",
+      "limit": 1000
+    },
+    {
       "label": "Profile Mappings",
       "method": "GET",
       "limit": 1000
+    },
+    {
+      "label": "Push Provider (single)",
+      "method": "GET",
+      "limit": 150
     },
     {
       "label": "Push Providers",
