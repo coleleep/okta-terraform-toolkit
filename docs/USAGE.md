@@ -68,22 +68,41 @@ The header updates to show your org URL once connected. Click **Disconnect** to 
 
 ## Rate Limit Probing
 
-**What it's for** — Measure how much rate limit capacity your org has across Terraform-relevant API endpoints. Use the Rate Limits tab to run and review probe results at any time.
+**What it's for** — Establish how much rate limit capacity an org has across Terraform-relevant API endpoints. Everything downstream — provider config recommendations and the Target Runtime Planner — is computed from these limits.
 
-**Before you start** — Connect to the target org (see [Connecting an Org](#connecting-an-org)).
+**Before you start** — Nothing, if you're entering limits by hand. To probe live, connect to the target org (see [Connecting an Org](#connecting-an-org)).
 
-**Steps**
+**Steps — probing a connected org**
 
-1. Navigate to the **Rate Limits** tab and click **Re-scan** in the top-right header to run the initial probe.
+1. Navigate to the **Rate Limits** tab and click **Probe This Org**, or **Re-scan** in the top-right header.
 2. Review the results table. Endpoints are color-coded by remaining capacity.
-3. Click **Re-scan** again at any time to re-run the probe.
-4. To configure workload details and get provider recommendations, navigate to the **Plan** tab and select the **Workload** sub-tab.
+3. To configure workload details and get provider recommendations, navigate to the **Plan** tab and select the **Workload** sub-tab.
+
+**Steps — entering limits without an org connection**
+
+Use this when you can't connect to the customer's org, which is the common case on support work.
+
+1. Navigate to the **Rate Limits** tab and click **Enter Limits Manually**.
+2. Pick a bucket, type its limit in requests per window, and click **Add**. Repeat for each bucket you care about.
+3. Or paste response headers into the text box and click **Add from headers** — this applies to the bucket selected above it.
+4. Click **Use these limits**.
+
+To capture headers from a customer, ask them to run:
+
+```bash
+curl -sD - -o /dev/null -H "Authorization: SSWS $TOKEN" \
+  "https://their-org.okta.com/api/v1/users?limit=1"
+```
 
 **Tips**
 
+- Every row in the table shows a **Source** badge — `Probed`, `Manual`, `Log`, or `Default` — so a measured limit is never confused with an estimate.
+- Manually entered limits show `—` for Remaining and Reset. The limit is known; live capacity isn't.
+- Manual entry is **sparse on purpose** — enter only the buckets that matter. Be aware that a bucket you skip could be the real bottleneck, so the analysis may be optimistic until you've covered the endpoints your workload actually touches.
+- Read and write limits are separate buckets. The dropdown lists `GET` and `POST` variants separately because Okta's write limits are typically much lower.
+- **Manual limits are never written to disk.** They're gone when OTTO closes. Use **Start Over** to clear them mid-session when you switch cases — it also clears the recommendation and target analysis computed from them.
 - Re-scan after major Terraform runs — remaining capacity changes.
-- Probe during off-peak hours or when no Terraform runs are active for the most accurate baseline.
-- The sidebar summary shows your bottleneck endpoint and probe stats at a glance.
+- The sidebar summary shows your bottleneck endpoint and stats at a glance.
 
 ---
 

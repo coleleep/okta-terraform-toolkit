@@ -14,6 +14,8 @@ OTTO tests 50+ Okta API endpoints (including sub-resource paths) and classifies 
 
 **Deep probe capability:** Tests not just primary endpoints but also sub-resource paths (e.g., users → user roles, app → app users) to catch hidden bottlenecks.
 
+**Limits without an org connection:** A live probe is one source of rate limits, not the only one. Limits can also be entered by hand or extracted from pasted `x-rate-limit-*` response headers, so rate limit analysis works on cases where the customer won't share credentials. Every limit carries its provenance — `Probed`, `Manual`, `Log`, or `Default` — and it's shown on every row, so an estimate is never mistaken for a measurement in a rate limit increase request. Manually entered limits are held in memory only and are cleared when OTTO closes or via **Start Over**.
+
 → [How to use: Rate Limit Probing](USAGE.md#rate-limit-probing)
 
 ### Cross-Org Sync
