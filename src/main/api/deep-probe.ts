@@ -164,6 +164,7 @@ async function probeWithRetry(
         ...rl,
         httpStatus: response.status,
         status: determineStatus(rl.remaining, rl.limit),
+        source: 'probe',
       };
     } catch (err: unknown) {
       const axiosErr = err as { response?: { headers?: Record<string, string>; status?: number; data?: unknown }; message?: string; code?: string };
@@ -191,6 +192,7 @@ async function probeWithRetry(
             ...rl,
             httpStatus,
             status: determineStatus(rl.remaining, rl.limit),
+            source: 'probe',
           };
         }
         console.log(`[deep-probe]   No rate limit headers in ${httpStatus} response`);
@@ -213,6 +215,7 @@ async function probeWithRetry(
           httpStatus,
           status: 'skipped',
           error: `${reason} (x-okta-request-id: ${reqId})`,
+          source: 'probe',
         };
       }
 
@@ -224,6 +227,7 @@ async function probeWithRetry(
         httpStatus,
         status: 'error',
         error: `HTTP ${httpStatus ?? '?'} — ${message} (x-okta-request-id: ${reqId})`,
+        source: 'probe',
       };
     }
   }
@@ -236,6 +240,7 @@ async function probeWithRetry(
     limit: 0, remaining: 0, resetAt: 0, resetWindowSecs: 0,
     status: 'error',
     error: 'Max retries exceeded',
+    source: 'probe',
   };
 }
 
@@ -294,6 +299,7 @@ export async function deepProbeSubResources(
         limit: 0, remaining: 0, resetAt: 0, resetWindowSecs: 0,
         status: 'skipped',
         error: resolved.skip,
+        source: 'probe',
       });
       continue;
     }

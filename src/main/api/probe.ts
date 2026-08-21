@@ -51,6 +51,7 @@ export async function probeEndpoints(
         resetAt,
         resetWindowSecs,
         status: determineStatus(remaining, limit),
+        source: 'probe',
       });
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : String(err);
@@ -80,6 +81,7 @@ export async function probeEndpoints(
             resetAt,
             resetWindowSecs,
             status: determineStatus(remaining, limit),
+            source: 'probe',
           });
           continue;
         }
@@ -104,6 +106,7 @@ export async function probeEndpoints(
         httpStatus,
         status: skipStatus,
         error: skipError,
+        source: 'probe',
       });
     }
   }
@@ -121,5 +124,6 @@ export async function probeEndpoints(
     endpoints: results,
     overallMinLimit,
     probeDurationMs: Date.now() - startTime,
+    sources: ['probe'],
   };
 }

@@ -15,25 +15,40 @@ export interface ConnectionStatus {
 export type TerraformAuthMethod = 'api_token' | 'oauth';
 
 // Probing
+
+/**
+ * Where a rate limit value came from. Precedence when merging, highest first:
+ * manual (entered from a privileged internal lookup) > probe (measured now) >
+ * log (measured at capture time) > baseline (published default, an estimate).
+ */
+export type LimitSource = 'probe' | 'log' | 'manual' | 'baseline';
+
 export interface EndpointProbeResult {
   endpoint: string;
   label: string;
   method: 'GET' | 'POST';
   limit: number;
-  remaining: number;
-  resetAt: number;
+  /** Live capacity. Absent for manual and baseline sources, which know the limit but not current usage. */
+  remaining?: number;
+  /** Absent for manual and baseline sources. */
+  resetAt?: number;
   resetWindowSecs: number;
-  status: 'ok' | 'warning' | 'critical' | 'error' | 'skipped';
+  /** 'unknown' means the limit is known but live capacity is not — never rendered as critical. */
+  status: 'ok' | 'warning' | 'critical' | 'error' | 'skipped' | 'unknown';
+  source: LimitSource;
   httpStatus?: number;
   error?: string;
 }
 
 export interface ProbeResult {
+  /** Display label for the limit set. An org URL for a live probe; a log filename or 'Manual entry' otherwise. */
   orgUrl: string;
   timestamp: string;
   endpoints: EndpointProbeResult[];
   overallMinLimit: number;
   probeDurationMs: number;
+  /** Which producers contributed to this result. */
+  sources: LimitSource[];
 }
 
 // Terraform provider config
