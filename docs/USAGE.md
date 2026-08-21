@@ -94,6 +94,20 @@ curl -sD - -o /dev/null -H "Authorization: SSWS $TOKEN" \
   "https://their-org.okta.com/api/v1/users?limit=1"
 ```
 
+**Steps — using limits from a customer's debug log**
+
+1. Debug tab → TF_LOG Analyzer → select the log.
+2. If the log contains `X-Rate-Limit-Limit` headers, a banner appears above the endpoint breakdown offering them.
+3. Click **Use these rate limits**, then go to the Rate Limits tab.
+
+These are real measurements from the customer's own run and need no credentials. They describe the org at capture time, so a live probe takes precedence if you run one.
+
+**Capturing a standard-org baseline**
+
+Once, from an org with no rate limit multipliers or granted increases: probe it, then click **Save as baseline JSON** on the Rate Limits tab. Review the file and commit it to `src/shared/rate-limit-baselines.json`. It then appears in the source chooser as **Use Standard Defaults** and fills any bucket no other source provided.
+
+The export contains only labels, methods, and limits — no org URL, no timestamps, nothing identifying — because this repository is public. Note these are *not* published Okta values; Okta publishes no per-org-type table. They are measured defaults, always treated as estimates.
+
 **Tips**
 
 - Every row in the table shows a **Source** badge — `Probed`, `Manual`, `Log`, or `Default` — so a measured limit is never confused with an estimate.

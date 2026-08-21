@@ -134,23 +134,31 @@ Two prerequisites, both real work:
 
 **2. Bucket keying.** See below.
 
-### Published baselines (last resort)
+### Standard-org baselines (last resort)
 
-`src/shared/rate-limit-baselines.json`, mirroring the existing `provider-schemas/` convention:
+**Revised 2026-08-21.** This section originally specified *published* per-org-type defaults with a `sourceUrl` and an org-type dropdown. That premise was wrong and the design changed.
+
+Two authoritative Okta pages were checked. `rl-global-mgmt` contains no per-tier table and defers elsewhere. `reference/rate-limits` gives the bucket concept plus three explicitly illustrative examples (`/api/v1/users/*` at 1000/min org-wide, `/oauth2/v1/authorize` at 1200/min, `/api/v1/users/me` at 40 per 10s), states that quotas vary by subscription type, HTTP method, license count, and DynamicScale — and never tabulates any of it. Its guidance is to observe your own org via the dashboard, System Log, or response headers.
+
+So there is nothing citable to bundle, and an org-type dropdown has no data to populate it.
+
+Instead the baseline is **measured**: a probe of an org with no multipliers or granted increases, exported with `baselineCaptureFromProbe` and committed to `src/shared/rate-limit-baselines.json`:
 
 ```json
 {
-  "sourceUrl": "https://developer.okta.com/docs/reference/rl-global-mgmt/",
-  "lastVerified": "2026-08-19",
-  "orgTypes": {
-    "developer": { "/api/v1/users": 100, ... }
-  }
+  "capturedFrom": "standard org, no multipliers",
+  "capturedAt": "2026-08-21",
+  "buckets": [{ "label": "Users", "method": "GET", "limit": 600 }]
 }
 ```
 
-Published values only. Selected by an org-type dropdown, used solely to gap-fill, every row badged as an estimate. OTTO warns when `lastVerified` is more than six months old.
+This is a stronger claim than the docs support — reproducible, and its provenance is stateable — but it must never be described as published by Okta. The capture deliberately omits the org URL, timestamps, remaining counts, and endpoint paths, because this repository is public.
 
-Its value is not accuracy — it's letting the math complete and giving a citable floor a customer can verify themselves.
+Used solely to gap-fill, badged as an estimate, counted as `estimated` in coverage so any analysis leaning on it renders as provisional. Reports stale past six months, and an uncaptured baseline reports stale so an empty file is never trusted.
+
+Its value is not accuracy — it lets the math complete and gives a defensible floor.
+
+**Why not just use manual entry?** Because a baseline is reusable across every case, whereas manual entry is per-case. If the only obtainable numbers were org-specific observations, this phase would collapse into manual entry and should be dropped.
 
 ---
 
