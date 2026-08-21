@@ -1,6 +1,447 @@
 {
-  "_comment": "Standard-org rate limit defaults, captured by probing an org with no rate limit multipliers or granted increases. NOT published by Okta — Okta does not publish a per-org-type limit table, and its docs direct you to observe your own org instead. Used only to gap-fill buckets no other source provided, always badged as an estimate. Deliberately contains no org URL, token, or identifying data: this repo is public. Populate via the Rate Limits tab -> Save as baseline JSON.",
-  "capturedFrom": "",
-  "capturedAt": "",
-  "buckets": []
+  "_comment": "Standard-org rate limit defaults, captured by probing an org with no rate limit multipliers or granted increases. NOT published by Okta - Okta publishes no per-org-type limit table and its docs direct you to observe your own org instead. Used only to gap-fill buckets no other source provided, always badged as an estimate. Deliberately contains no org URL, token, or identifying data: this repo is public. Recapture via the Rate Limits tab -> Save as baseline JSON.",
+  "capturedFrom": "standard org, no multipliers",
+  "capturedAt": "2026-08-21",
+  "buckets": [
+    {
+      "label": "API Tokens",
+      "method": "GET",
+      "limit": 1000
+    },
+    {
+      "label": "App (single)",
+      "method": "GET",
+      "limit": 600
+    },
+    {
+      "label": "App Create (write)",
+      "method": "POST",
+      "limit": 100
+    },
+    {
+      "label": "App Credential Keys",
+      "method": "GET",
+      "limit": 100
+    },
+    {
+      "label": "App Credential Secrets",
+      "method": "GET",
+      "limit": 100
+    },
+    {
+      "label": "App Grants",
+      "method": "GET",
+      "limit": 100
+    },
+    {
+      "label": "App Group Assignments",
+      "method": "GET",
+      "limit": 100
+    },
+    {
+      "label": "App SAML Metadata",
+      "method": "GET",
+      "limit": 100
+    },
+    {
+      "label": "App User Assignments",
+      "method": "GET",
+      "limit": 100
+    },
+    {
+      "label": "App User Schema",
+      "method": "GET",
+      "limit": 1000
+    },
+    {
+      "label": "Applications",
+      "method": "GET",
+      "limit": 100
+    },
+    {
+      "label": "Auth Server (single)",
+      "method": "GET",
+      "limit": 1000
+    },
+    {
+      "label": "Auth Server Claims",
+      "method": "GET",
+      "limit": 1000
+    },
+    {
+      "label": "Auth Server Clients",
+      "method": "GET",
+      "limit": 1000
+    },
+    {
+      "label": "Auth Server Create (write)",
+      "method": "POST",
+      "limit": 1000
+    },
+    {
+      "label": "Auth Server Policies",
+      "method": "GET",
+      "limit": 1000
+    },
+    {
+      "label": "Auth Server Scopes",
+      "method": "GET",
+      "limit": 1000
+    },
+    {
+      "label": "Auth Servers",
+      "method": "GET",
+      "limit": 1000
+    },
+    {
+      "label": "Authenticator (single)",
+      "method": "GET",
+      "limit": 1000
+    },
+    {
+      "label": "Authenticator Create (write)",
+      "method": "POST",
+      "limit": 1000
+    },
+    {
+      "label": "Authenticator Methods",
+      "method": "GET",
+      "limit": 1000
+    },
+    {
+      "label": "Authenticators",
+      "method": "GET",
+      "limit": 1000
+    },
+    {
+      "label": "Behavior (single)",
+      "method": "GET",
+      "limit": 1000
+    },
+    {
+      "label": "Behavior Create (write)",
+      "method": "POST",
+      "limit": 1000
+    },
+    {
+      "label": "Behaviors",
+      "method": "GET",
+      "limit": 1000
+    },
+    {
+      "label": "Brand (single)",
+      "method": "GET",
+      "limit": 1000
+    },
+    {
+      "label": "Brand Domains",
+      "method": "GET",
+      "limit": 1000
+    },
+    {
+      "label": "Brand Themes",
+      "method": "GET",
+      "limit": 1000
+    },
+    {
+      "label": "Brands",
+      "method": "GET",
+      "limit": 1000
+    },
+    {
+      "label": "CAPTCHAs",
+      "method": "GET",
+      "limit": 1000
+    },
+    {
+      "label": "Custom Roles",
+      "method": "GET",
+      "limit": 1600
+    },
+    {
+      "label": "Device (single)",
+      "method": "GET",
+      "limit": 150
+    },
+    {
+      "label": "Device Users",
+      "method": "GET",
+      "limit": 900
+    },
+    {
+      "label": "Devices",
+      "method": "GET",
+      "limit": 150
+    },
+    {
+      "label": "Domains",
+      "method": "GET",
+      "limit": 600
+    },
+    {
+      "label": "Email Domain (single)",
+      "method": "GET",
+      "limit": 1000
+    },
+    {
+      "label": "Email Domain Create (write)",
+      "method": "POST",
+      "limit": 1000
+    },
+    {
+      "label": "Email Domains",
+      "method": "GET",
+      "limit": 1000
+    },
+    {
+      "label": "Event Hook (single)",
+      "method": "GET",
+      "limit": 1000
+    },
+    {
+      "label": "Event Hook Create (write)",
+      "method": "POST",
+      "limit": 1000
+    },
+    {
+      "label": "Event Hooks",
+      "method": "GET",
+      "limit": 1000
+    },
+    {
+      "label": "Feature (single)",
+      "method": "GET",
+      "limit": 1000
+    },
+    {
+      "label": "Feature Dependencies",
+      "method": "GET",
+      "limit": 1000
+    },
+    {
+      "label": "Feature Dependents",
+      "method": "GET",
+      "limit": 1000
+    },
+    {
+      "label": "Features",
+      "method": "GET",
+      "limit": 1000
+    },
+    {
+      "label": "Governance",
+      "method": "GET",
+      "limit": 200
+    },
+    {
+      "label": "Group (single)",
+      "method": "GET",
+      "limit": 1000
+    },
+    {
+      "label": "Group Apps",
+      "method": "GET",
+      "limit": 600
+    },
+    {
+      "label": "Group Create (write)",
+      "method": "POST",
+      "limit": 600
+    },
+    {
+      "label": "Group Members",
+      "method": "GET",
+      "limit": 600
+    },
+    {
+      "label": "Group Owners",
+      "method": "GET",
+      "limit": 600
+    },
+    {
+      "label": "Group Rules",
+      "method": "GET",
+      "limit": 600
+    },
+    {
+      "label": "Group Schema",
+      "method": "GET",
+      "limit": 1000
+    },
+    {
+      "label": "Group Schema (default)",
+      "method": "GET",
+      "limit": 1000
+    },
+    {
+      "label": "Groups",
+      "method": "GET",
+      "limit": 600
+    },
+    {
+      "label": "Identity Providers",
+      "method": "GET",
+      "limit": 1000
+    },
+    {
+      "label": "Inline Hook (single)",
+      "method": "GET",
+      "limit": 1000
+    },
+    {
+      "label": "Inline Hook Create (write)",
+      "method": "POST",
+      "limit": 1000
+    },
+    {
+      "label": "Inline Hooks",
+      "method": "GET",
+      "limit": 1000
+    },
+    {
+      "label": "Linked Objects",
+      "method": "GET",
+      "limit": 1000
+    },
+    {
+      "label": "Log Streams",
+      "method": "GET",
+      "limit": 1000
+    },
+    {
+      "label": "Network Zones",
+      "method": "GET",
+      "limit": 1000
+    },
+    {
+      "label": "Org Settings",
+      "method": "GET",
+      "limit": 1000
+    },
+    {
+      "label": "Policies",
+      "method": "GET",
+      "limit": 1000
+    },
+    {
+      "label": "Profile Mappings",
+      "method": "GET",
+      "limit": 1000
+    },
+    {
+      "label": "Push Providers",
+      "method": "GET",
+      "limit": 150
+    },
+    {
+      "label": "Realm (single)",
+      "method": "GET",
+      "limit": 1000
+    },
+    {
+      "label": "Realm Create (write)",
+      "method": "POST",
+      "limit": 1000
+    },
+    {
+      "label": "Realms",
+      "method": "GET",
+      "limit": 1000
+    },
+    {
+      "label": "Templates",
+      "method": "GET",
+      "limit": 1000
+    },
+    {
+      "label": "Threat Insight",
+      "method": "GET",
+      "limit": 1000
+    },
+    {
+      "label": "Trusted Origin (single)",
+      "method": "GET",
+      "limit": 1000
+    },
+    {
+      "label": "Trusted Origin Create (write)",
+      "method": "POST",
+      "limit": 1000
+    },
+    {
+      "label": "Trusted Origins",
+      "method": "GET",
+      "limit": 1000
+    },
+    {
+      "label": "User (single)",
+      "method": "GET",
+      "limit": 2000
+    },
+    {
+      "label": "User Admin Roles",
+      "method": "GET",
+      "limit": 600
+    },
+    {
+      "label": "User App Links",
+      "method": "GET",
+      "limit": 600
+    },
+    {
+      "label": "User Blocks",
+      "method": "GET",
+      "limit": 600
+    },
+    {
+      "label": "User Create (write)",
+      "method": "POST",
+      "limit": 600
+    },
+    {
+      "label": "User Factor Questions",
+      "method": "GET",
+      "limit": 600
+    },
+    {
+      "label": "User Factors",
+      "method": "GET",
+      "limit": 600
+    },
+    {
+      "label": "User Groups",
+      "method": "GET",
+      "limit": 600
+    },
+    {
+      "label": "User Schema",
+      "method": "GET",
+      "limit": 1000
+    },
+    {
+      "label": "User Schema (default)",
+      "method": "GET",
+      "limit": 1000
+    },
+    {
+      "label": "User Types",
+      "method": "GET",
+      "limit": 1000
+    },
+    {
+      "label": "Users",
+      "method": "GET",
+      "limit": 600
+    },
+    {
+      "label": "Zone (single)",
+      "method": "GET",
+      "limit": 1000
+    },
+    {
+      "label": "Zone Create (write)",
+      "method": "POST",
+      "limit": 1000
+    }
+  ]
 }

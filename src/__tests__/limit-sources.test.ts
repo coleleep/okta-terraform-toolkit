@@ -432,3 +432,42 @@ describe('baseline limits', () => {
     expect(file.buckets.map(b => b.label)).toEqual(['Users']);
   });
 });
+
+describe('baselineCaptureFromProbe deduplication', () => {
+  it('keeps one row per bucket, taking the lowest limit', () => {
+    // 'User Types' is defined in both PROBE_ENDPOINTS and SUB_RESOURCE_ENDPOINTS,
+    // so a real probe emits it twice. A baseline is a floor, so an overstated
+    // limit is the dangerous direction — take the lower.
+    const file = baselineCaptureFromProbe(
+      mergeLimitSources({
+        probe: [{ ...ep('User Types', 1000, 'probe'), endpoint: '/api/v1/meta/types/user' }],
+      }, 'org'),
+      '2026-08-21',
+    );
+    const withDupe = baselineCaptureFromProbe(
+      {
+        ...mergeLimitSources({ probe: [ep('User Types', 1000, 'probe')] }, 'org'),
+        endpoints: [ep('User Types', 1000, 'probe'), ep('User Types', 400, 'probe')],
+      },
+      '2026-08-21',
+    );
+
+    expect(file.buckets).toHaveLength(1);
+    expect(withDupe.buckets).toHaveLength(1);
+    expect(withDupe.buckets[0].limit).toBe(400);
+  });
+
+  it('still keeps read and write buckets for the same label apart', () => {
+    const file = baselineCaptureFromProbe(
+      {
+        ...mergeLimitSources({ probe: [ep('Users', 600, 'probe')] }, 'org'),
+        endpoints: [ep('Users', 600, 'probe', 'GET'), ep('Users', 100, 'probe', 'POST')],
+      },
+      '2026-08-21',
+    );
+
+    expect(file.buckets).toHaveLength(2);
+    expect(file.buckets.find(b => b.method === 'GET')?.limit).toBe(600);
+    expect(file.buckets.find(b => b.method === 'POST')?.limit).toBe(100);
+  });
+});

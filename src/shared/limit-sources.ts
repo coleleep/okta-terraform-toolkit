@@ -345,12 +345,24 @@ export function baselineCaptureFromProbe(
   probeResult: ProbeResult,
   todayIso: string,
 ): BaselineFile {
+  // Some labels appear in both PROBE_ENDPOINTS and SUB_RESOURCE_ENDPOINTS — a real
+  // probe emits 'User Types' twice, for instance — so dedupe by (method, label).
+  // Keep the LOWEST limit: a baseline is a floor, and overstating capacity is the
+  // dangerous direction when it feeds a bottleneck calculation.
+  const lowest = new Map<string, BaselineBucket>();
+  for (const ep of probeResult.endpoints) {
+    if (ep.limit <= 0 || ep.status === 'error' || ep.status === 'skipped') continue;
+    const key = `${ep.method}|${ep.label}`;
+    const existing = lowest.get(key);
+    if (!existing || ep.limit < existing.limit) {
+      lowest.set(key, { label: ep.label, method: ep.method, limit: ep.limit });
+    }
+  }
+
   return {
     capturedFrom: 'standard org, no multipliers',
     capturedAt: todayIso,
-    buckets: probeResult.endpoints
-      .filter(ep => ep.limit > 0 && ep.status !== 'error' && ep.status !== 'skipped')
-      .map(ep => ({ label: ep.label, method: ep.method, limit: ep.limit }))
+    buckets: [...lowest.values()]
       .sort((a, b) => a.label.localeCompare(b.label) || a.method.localeCompare(b.method)),
   };
 }
