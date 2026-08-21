@@ -1,4 +1,5 @@
 import { ManagedResourceType } from './types';
+import { RESOURCE_TYPES } from './constants';
 
 export interface ResourceDictionaryEntry {
   terraformResource: string;
@@ -290,4 +291,34 @@ export function searchResources(query: string): ResourceDictionaryEntry[] {
       r.terraformResource.toLowerCase().includes(q) ||
       r.parentLabel.toLowerCase().includes(q)
   );
+}
+
+/**
+ * The rate limit bucket a resource hits.
+ *
+ * Only 15 of the ~162 dictionary entries carry an explicit primaryEndpoint,
+ * because those fields were added for sub-resources like okta_app_user that hit
+ * a path their parent type doesn't. Every other resource still has a perfectly
+ * well-defined bucket — okta_user hits /api/v1/users — and it is derivable from
+ * parentType via RESOURCE_TYPES.
+ *
+ * Deriving it matters: callers previously filtered on `primaryEndpoint`, which
+ * silently hid okta_user and 146 others from both the workload search and the
+ * AI's resource table. Combined with a prompt telling the model to "pick the
+ * closest match", asking for 1,200 users produced 1,200 okta_app_user instead.
+ */
+export function effectiveEndpoint(
+  entry: ResourceDictionaryEntry,
+): { primaryEndpoint: string; endpointLabel: string } | null {
+  if (entry.primaryEndpoint && entry.endpointLabel) {
+    return { primaryEndpoint: entry.primaryEndpoint, endpointLabel: entry.endpointLabel };
+  }
+
+  const parent = RESOURCE_TYPES.find(t => t.type === entry.parentType);
+  if (!parent) return null;
+
+  return {
+    primaryEndpoint: parent.countEndpoint.split('?')[0],
+    endpointLabel: parent.probeLabel,
+  };
 }

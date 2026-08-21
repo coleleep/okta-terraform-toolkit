@@ -6,7 +6,7 @@ import { spawnSync } from 'child_process';
 import { join } from 'path';
 import { readFileSync, writeFileSync, existsSync, unlinkSync } from 'fs';
 import { LogAnalysis, ClaudeInterpretation, CustomWorkloadEntry, ProbeResult } from '../../shared/types';
-import { RESOURCE_DICTIONARY } from '../../shared/resource-dictionary';
+import { RESOURCE_DICTIONARY, effectiveEndpoint } from '../../shared/resource-dictionary';
 import { SCOPE_REQUIREMENTS, API_KEY_ONLY_ENDPOINTS } from '../../shared/scopes';
 import { SUPPORTED_VERSIONS, VERSION_ATTRIBUTE_NOTES, getAdditionsForVersion } from '../../shared/versions';
 import { redact } from './redact';
@@ -279,10 +279,16 @@ export async function interpretLog(analysis: LogAnalysis, probeResult?: ProbeRes
 
 // --- Natural Language Workload Builder ---
 
+// Every dictionary entry, not just the 15 with an explicit primaryEndpoint. The
+// old filter left okta_user out of the table entirely, so "import 1200 users"
+// had nothing to match and the closest-match instruction produced okta_app_user.
 function buildResourceContext(): string {
   const entries = RESOURCE_DICTIONARY
-    .filter(r => r.primaryEndpoint)
-    .map(r => `${r.terraformResource} | ${r.primaryEndpoint} | ${r.endpointLabel}`)
+    .map(r => {
+      const ep = effectiveEndpoint(r);
+      return ep ? `${r.terraformResource} | ${ep.primaryEndpoint} | ${ep.endpointLabel}` : null;
+    })
+    .filter((line): line is string => line !== null)
     .join('\n');
   return `Available Terraform resources with rate-limit endpoints:\nterraformResource | primaryEndpoint | endpointLabel\n${entries}`;
 }
@@ -293,7 +299,9 @@ ${buildResourceContext()}
 
 When the user describes their workload, call the set_workload tool with the parsed entries. Each entry must use exact values from the table above for terraformResource, primaryEndpoint, and endpointLabel. Infer the count from the user's description.
 
-If the user mentions a resource type not in the table, pick the closest match. If you can't match, skip it and explain in your text response.`;
+Match the resource the user actually named. "1200 users" means okta_user, not okta_app_user — user assignments to an application are a different resource with a different rate limit bucket.
+
+If a resource the user mentions is not in the table, OMIT it and say so in your text response. Do NOT substitute a similar resource. These counts feed rate limit calculations that go into customer-facing capacity requests, so a plausible-but-wrong resource is worse than a missing one.`;
 
 export async function buildWorkload(description: string): Promise<CustomWorkloadEntry[]> {
   const client = getClient();
@@ -340,13 +348,30 @@ export async function buildWorkload(description: string): Promise<CustomWorkload
 
   const input = toolUseBlock.input as { workloads: Array<{ terraformResource: string; count: number; primaryEndpoint: string; endpointLabel: string }> };
 
-  return input.workloads.map(w => ({
-    terraformResource: w.terraformResource,
-    count: w.count,
-    primaryEndpoint: w.primaryEndpoint,
-    endpointLabel: w.endpointLabel,
-    rateLimit: 0, // User can probe after adding
-  }));
+  // The model chooses the resource and count; the endpoint mapping is derived from
+  // the dictionary rather than trusted from the response. target-analyzer matches
+  // workloads to rate limits by endpointLabel, so a hallucinated label would merge,
+  // render, and then silently match nothing. Unknown resources are dropped rather
+  // than passed through — these counts reach customer-facing capacity requests.
+  return input.workloads.flatMap(w => {
+    const entry = RESOURCE_DICTIONARY.find(r => r.terraformResource === w.terraformResource);
+    if (!entry) {
+      console.log(`[workload] Dropping unknown resource from model output: ${w.terraformResource}`);
+      return [];
+    }
+    const ep = effectiveEndpoint(entry);
+    if (!ep) {
+      console.log(`[workload] Dropping resource with no resolvable endpoint: ${w.terraformResource}`);
+      return [];
+    }
+    return [{
+      terraformResource: entry.terraformResource,
+      count: w.count,
+      primaryEndpoint: ep.primaryEndpoint,
+      endpointLabel: ep.endpointLabel,
+      rateLimit: 0, // User can probe after adding, or enter limits manually
+    }];
+  });
 }
 
 // --- Error Decoder ---

@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useStore } from '../hooks/useStore';
-import { searchResources, ResourceDictionaryEntry } from '../../shared/resource-dictionary';
+import { searchResources, effectiveEndpoint, ResourceDictionaryEntry } from '../../shared/resource-dictionary';
 import { CustomWorkloadEntry } from '../../shared/types';
 
 export default function CustomWorkload() {
@@ -45,7 +45,9 @@ export default function CustomWorkload() {
     setNlParsing(false);
   };
 
-  const results = query.length >= 2 ? searchResources(query).filter(r => r.primaryEndpoint) : [];
+  // No primaryEndpoint filter: only 15 of ~162 entries carry one explicitly, and
+  // filtering on it hid okta_user and every other top-level resource from search.
+  const results = query.length >= 2 ? searchResources(query) : [];
 
   // Look up probed rate limit for an endpoint pattern
   const findRateLimit = (endpointLabel: string): number => {
@@ -58,13 +60,14 @@ export default function CustomWorkload() {
 
   const handleAdd = () => {
     if (!selected || !count) return;
-    const rateLimit = findRateLimit(selected.endpointLabel!);
+    const ep = effectiveEndpoint(selected);
+    if (!ep) return;
     const entry: CustomWorkloadEntry = {
       terraformResource: selected.terraformResource,
       count: parseInt(count, 10),
-      primaryEndpoint: selected.primaryEndpoint!,
-      endpointLabel: selected.endpointLabel!,
-      rateLimit,
+      primaryEndpoint: ep.primaryEndpoint,
+      endpointLabel: ep.endpointLabel,
+      rateLimit: findRateLimit(ep.endpointLabel),
     };
     addCustomWorkload(entry);
     setQuery('');
@@ -134,18 +137,21 @@ export default function CustomWorkload() {
           />
           {results.length > 0 && !selected && (
             <div className="absolute z-10 top-full left-0 right-0 mt-1 bg-white border border-gray-200 rounded-lg shadow-lg max-h-40 overflow-y-auto">
-              {results.slice(0, 8).map(r => (
-                <button
-                  key={r.terraformResource}
-                  onClick={() => { setSelected(r); setQuery(''); }}
-                  className="w-full text-left px-3 py-2 text-xs hover:bg-blue-50 border-b border-gray-50 last:border-0"
-                >
-                  <code className="font-mono text-gray-700">{r.terraformResource}</code>
-                  {r.endpointLabel && (
-                    <span className="ml-2 text-blue-500">→ {r.endpointLabel} ({findRateLimit(r.endpointLabel!) || '?'} req/win)</span>
-                  )}
-                </button>
-              ))}
+              {results.slice(0, 8).map(r => {
+                const ep = effectiveEndpoint(r);
+                return (
+                  <button
+                    key={r.terraformResource}
+                    onClick={() => { setSelected(r); setQuery(''); }}
+                    className="w-full text-left px-3 py-2 text-xs hover:bg-blue-50 border-b border-gray-50 last:border-0"
+                  >
+                    <code className="font-mono text-gray-700">{r.terraformResource}</code>
+                    {ep && (
+                      <span className="ml-2 text-blue-500">→ {ep.endpointLabel} ({findRateLimit(ep.endpointLabel) || '?'} req/win)</span>
+                    )}
+                  </button>
+                );
+              })}
             </div>
           )}
         </div>
