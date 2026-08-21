@@ -74,6 +74,39 @@ export function sourceLabel(source: LimitSource): string {
   return SOURCE_LABELS[source];
 }
 
+/**
+ * `\d+` is a single unbounded repetition with no alternation or nesting, so it
+ * scans linearly and cannot backtrack catastrophically on a large paste. Bounding
+ * the digit count instead would silently truncate an over-long value.
+ */
+function headerValue(blob: string, name: string): number | undefined {
+  const m = blob.match(new RegExp(`${name}\\s*:\\s*(\\d+)`, 'i'));
+  return m ? parseInt(m[1], 10) : undefined;
+}
+
+/**
+ * Pull rate limit headers out of pasted text — a curl dump, a snippet from a
+ * support case, or a log line. Returns null when no usable limit is present so
+ * the caller can reject the paste rather than create a zero-limit entry.
+ */
+export function parseRateLimitHeaders(
+  blob: string,
+): { limit: number; remaining?: number; resetAt?: number } | null {
+  const limit = headerValue(blob, 'x-rate-limit-limit');
+  if (limit === undefined || limit === 0) return null;
+
+  const remaining = headerValue(blob, 'x-rate-limit-remaining');
+  const resetAt = headerValue(blob, 'x-rate-limit-reset');
+
+  return {
+    limit,
+    // Omit rather than default — absent means unknown, 0 means exhausted, and
+    // hasLiveCapacity() distinguishes them.
+    ...(remaining !== undefined ? { remaining } : {}),
+    ...(resetAt !== undefined ? { resetAt } : {}),
+  };
+}
+
 export interface LimitBucket {
   label: string;
   method: 'GET' | 'POST';

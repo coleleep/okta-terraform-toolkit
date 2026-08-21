@@ -1,5 +1,6 @@
 import {
   mergeLimitSources, hasLiveCapacity, sourceLabel, clearedLimitState, KNOWN_LIMIT_BUCKETS,
+  parseRateLimitHeaders,
 } from '../shared/limit-sources';
 import { EndpointProbeResult, LimitSource } from '../shared/types';
 import { PROBE_ENDPOINTS, SUB_RESOURCE_ENDPOINTS } from '../shared/constants';
@@ -181,5 +182,50 @@ describe('KNOWN_LIMIT_BUCKETS', () => {
   it('carries the endpoint path for display', () => {
     const users = KNOWN_LIMIT_BUCKETS.find(b => b.label === 'Users' && b.method === 'GET');
     expect(users?.endpoint).toContain('/api/v1/users');
+  });
+});
+
+describe('parseRateLimitHeaders', () => {
+  it('parses a standard curl header dump', () => {
+    const result = parseRateLimitHeaders([
+      'HTTP/2 200',
+      'x-rate-limit-limit: 600',
+      'x-rate-limit-remaining: 599',
+      'x-rate-limit-reset: 1755792000',
+    ].join('\n'));
+
+    expect(result).toEqual({ limit: 600, remaining: 599, resetAt: 1755792000 });
+  });
+
+  it('is case insensitive, since header casing varies by client', () => {
+    const result = parseRateLimitHeaders('X-Rate-Limit-Limit: 100');
+    expect(result?.limit).toBe(100);
+  });
+
+  it('tolerates surrounding log noise', () => {
+    const result = parseRateLimitHeaders(
+      '2026-08-11T12:39:22 [DEBUG] provider.terraform-provider-okta: X-Rate-Limit-Limit: 250'
+    );
+    expect(result?.limit).toBe(250);
+  });
+
+  it('returns the limit alone when capacity headers are absent', () => {
+    const result = parseRateLimitHeaders('x-rate-limit-limit: 600');
+    expect(result).toEqual({ limit: 600 });
+  });
+
+  it('returns null when there is no limit header, so the caller can reject the paste', () => {
+    expect(parseRateLimitHeaders('HTTP/2 200\ncontent-type: application/json')).toBeNull();
+    expect(parseRateLimitHeaders('')).toBeNull();
+  });
+
+  it('returns null for a non-numeric or zero limit rather than a useless entry', () => {
+    expect(parseRateLimitHeaders('x-rate-limit-limit: abc')).toBeNull();
+    expect(parseRateLimitHeaders('x-rate-limit-limit: 0')).toBeNull();
+  });
+
+  it('keeps a remaining of zero, which means exhausted rather than missing', () => {
+    const result = parseRateLimitHeaders('x-rate-limit-limit: 600\nx-rate-limit-remaining: 0');
+    expect(result).toEqual({ limit: 600, remaining: 0 });
   });
 });
