@@ -141,6 +141,16 @@ async function call(method, endpoint, body) {
 
 const buckets = new Map(); // `${method}|${label}` -> limit  (lowest wins)
 const skipped = [];
+const notes = [];
+const viaPlaceholder = [];
+
+/**
+ * Okta attributes a request to its rate limit bucket by path pattern before it
+ * resolves the resource, so a bogus ID still returns the bucket's headers on the
+ * 404. That makes a real sample ID an optimization rather than a requirement —
+ * which matters because several resource types are impractical to create.
+ */
+const PLACEHOLDER_ID = '00000000000000000000';
 
 function record(label, method, limit) {
   if (!limit || limit <= 0) return false;
@@ -165,24 +175,60 @@ async function probe(def, resolvedEndpoint) {
   }
 }
 
-/** Find one resource ID per parent type by listing its collection. */
+/**
+ * Okta collections are not consistently shaped: some return a bare array, others
+ * wrap it — /api/v1/domains returns { domains: [...] } and /api/v1/iam/roles
+ * returns { roles: [...] }. Assuming an array reported orgs as empty when they
+ * were not.
+ */
+function extractList(data) {
+  if (Array.isArray(data)) return data;
+  if (data && typeof data === 'object') {
+    for (const value of Object.values(data)) {
+      if (Array.isArray(value)) return value;
+    }
+  }
+  return null;
+}
+
+/**
+ * Find one resource ID per parent type by listing its collection.
+ *
+ * Best-effort only. A missing sample no longer blocks the probe — see
+ * PLACEHOLDER_ID — so these messages are diagnostic, not fatal, and they
+ * distinguish the actual failure rather than asserting the org is empty.
+ */
 async function findSampleIds(parentTypes, listFor) {
   const samples = {};
   for (const type of parentTypes) {
     const list = listFor[type];
-    if (!list) { skipped.push(`sample for ${type} — no list endpoint known`); continue; }
+    if (!list) { notes.push(`sample for ${type} — no list endpoint known`); continue; }
 
     const res = await call('GET', list);
     await sleep(DELAY_MS);
 
-    if (res.error || !Array.isArray(res.data) || res.data.length === 0) {
-      skipped.push(`sample for ${type} — org has none of this resource`);
+    if (res.error) {
+      notes.push(`sample for ${type} — request failed: ${res.error}`);
       continue;
     }
-    // Some collections key the id differently; id covers every type OTTO probes.
-    const id = res.data[0] && res.data[0].id;
+    if (res.status >= 400) {
+      notes.push(`sample for ${type} — HTTP ${res.status} listing ${list}`);
+      continue;
+    }
+
+    const items = extractList(res.data);
+    if (items === null) {
+      notes.push(`sample for ${type} — unexpected response shape from ${list}`);
+      continue;
+    }
+    if (items.length === 0) {
+      notes.push(`sample for ${type} — collection is empty`);
+      continue;
+    }
+
+    const id = items[0] && items[0].id;
     if (id) samples[type] = id;
-    else skipped.push(`sample for ${type} — first item had no id`);
+    else notes.push(`sample for ${type} — first item had no id field`);
   }
   return samples;
 }
@@ -289,14 +335,12 @@ async function main() {
   try {
     console.log('4/4  Sub-resource endpoints');
     for (const def of sub.filter(d => d.endpoint.includes('{id}'))) {
-      const id = samples[def.parentType];
-      if (!id) { skipped.push(`${def.method} ${def.label} — no sample for ${def.parentType}`); continue; }
-      // These two need a specific app flavour and a key id; the in-app deep probe
-      // handles them and this script does not.
-      if (def.endpoint.includes('/sso/saml/metadata') || def.endpoint.includes('/grants')) {
-        skipped.push(`${def.method} ${def.label} — needs a specific app type, use the in-app probe`);
-        continue;
-      }
+      const real = samples[def.parentType];
+      // Fall back to a bogus ID rather than skipping. The response will be a 404
+      // or 400, but the rate limit header on it belongs to the right bucket, so
+      // the measurement is just as valid.
+      const id = real || PLACEHOLDER_ID;
+      if (!real) viaPlaceholder.push(`${def.method} ${def.label}`);
       await probe(def, def.endpoint.replace('{id}', id));
     }
   } finally {
@@ -333,9 +377,18 @@ async function main() {
   fs.writeFileSync(OUT, serialised + '\n');
 
   console.log(`\nCaptured ${out.buckets.length} buckets in ${requestCount} requests → ${OUT}`);
+
+  if (viaPlaceholder.length) {
+    console.log(`\n${viaPlaceholder.length} measured with a placeholder ID (404/400 response — the bucket header is still authoritative):`);
+    for (const s of viaPlaceholder) console.log(`  - ${s}`);
+  }
   if (skipped.length) {
-    console.log(`\n${skipped.length} not captured:`);
+    console.log(`\n${skipped.length} genuinely not captured — no rate limit header came back:`);
     for (const s of skipped) console.log(`  - ${s}`);
+  }
+  if (notes.length) {
+    console.log(`\nDiagnostics (did not prevent capture):`);
+    for (const s of notes) console.log(`  - ${s}`);
   }
   console.log('\nReview the file before committing it to src/shared/rate-limit-baselines.json.\n');
 }
