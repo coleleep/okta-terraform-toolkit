@@ -300,15 +300,20 @@ async function main() {
   const { primary, sub, listFor } = parseDefs();
   console.log(`Loaded ${primary.length} primary and ${sub.length} sub-resource endpoints from constants.ts\n`);
 
-  console.log('1/4  Primary endpoints');
-  for (const def of primary) await probe(def, def.endpoint);
+  // Every parsed definition must be attempted exactly once. An earlier version
+  // partitioned by (POST && no-id) and (has-id), which silently never probed
+  // sub-resource GETs without an {id} — Group Rules, Group Schema, User Schema,
+  // and Linked Objects were dropped with no indication anything was missed.
+  const attempted = new Set();
+  const attemptKey = (def) => `${def.method}|${def.label}|${def.endpoint}`;
 
-  console.log('2/4  Collection write buckets (empty POST — creates nothing)');
-  for (const def of sub.filter(d => d.method === 'POST' && !d.endpoint.includes('{id}'))) {
+  console.log('1/3  Primary endpoints');
+  for (const def of primary) {
+    attempted.add(attemptKey(def));
     await probe(def, def.endpoint);
   }
 
-  console.log('3/4  Finding sample IDs');
+  console.log('2/3  Finding sample IDs');
   const parentTypes = [...new Set(sub.filter(d => d.endpoint.includes('{id}')).map(d => d.parentType))];
   const samples = await findSampleIds(parentTypes, listFor);
   console.log(`     found samples for ${Object.keys(samples).length} of ${parentTypes.length} parent types`);
@@ -333,8 +338,17 @@ async function main() {
   }
 
   try {
-    console.log('4/4  Sub-resource endpoints');
-    for (const def of sub.filter(d => d.endpoint.includes('{id}'))) {
+    console.log('3/3  Sub-resource endpoints, including write buckets');
+    for (const def of sub) {
+      attempted.add(attemptKey(def));
+
+      if (!def.endpoint.includes('{id}')) {
+        // Collection paths: GETs go straight through, POSTs send an empty body,
+        // which returns 400 plus the write bucket's header and creates nothing.
+        await probe(def, def.endpoint);
+        continue;
+      }
+
       const real = samples[def.parentType];
       // Fall back to a bogus ID rather than skipping. The response will be a 404
       // or 400, but the rate limit header on it belongs to the right bucket, so
@@ -342,6 +356,16 @@ async function main() {
       const id = real || PLACEHOLDER_ID;
       if (!real) viaPlaceholder.push(`${def.method} ${def.label}`);
       await probe(def, def.endpoint.replace('{id}', id));
+    }
+
+    const expected = primary.length + sub.length;
+    if (attempted.size !== expected) {
+      console.error(`\n  WARNING: attempted ${attempted.size} of ${expected} definitions — some were never probed.`);
+      for (const def of [...primary, ...sub]) {
+        if (!attempted.has(attemptKey(def))) console.error(`    never attempted: ${def.method} ${def.label}`);
+      }
+    } else {
+      console.log(`     all ${expected} definitions attempted`);
     }
   } finally {
     // Always clean up, even if the probe loop threw.
