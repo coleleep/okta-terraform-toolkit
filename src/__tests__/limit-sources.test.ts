@@ -1,7 +1,8 @@
 import {
-  mergeLimitSources, hasLiveCapacity, sourceLabel, clearedLimitState, KNOWN_LIMIT_BUCKETS,
-  parseRateLimitHeaders, manualEntry,
+  mergeLimitSources, hasLiveCapacity, sourceLabel, KNOWN_LIMIT_BUCKETS,
+  parseRateLimitHeaders, manualEntry, clearedCaseState,
 } from '../shared/limit-sources';
+import { DEFAULT_PREVENTION_OPTIONS } from '../shared/types';
 import { EndpointProbeResult, LimitSource } from '../shared/types';
 import { PROBE_ENDPOINTS, SUB_RESOURCE_ENDPOINTS } from '../shared/constants';
 
@@ -135,13 +136,13 @@ describe('sourceLabel', () => {
   });
 });
 
-describe('clearedLimitState', () => {
-  it('resets every piece of state derived from rate limits', () => {
-    const cleared = clearedLimitState();
+describe('clearedCaseState', () => {
+  it('resets every piece of state belonging to the case', () => {
+    const cleared = clearedCaseState();
 
-    // Asserted key by key on purpose: if new derived state is added to the
-    // store and not added here, this test fails instead of the stale value
-    // silently surviving a clear and appearing under a different org's inputs.
+    // Asserted key by key on purpose: if new case state is added to the store
+    // and not added here, this test fails instead of the stale value silently
+    // surviving a clear and appearing under a different org's inputs.
     expect(cleared).toEqual({
       probeResult: null,
       baselineProbeResult: null,
@@ -151,7 +152,29 @@ describe('clearedLimitState', () => {
       targetMinutes: null,
       customWorkloads: [],
       limitSources: {},
+      selectedResources: [],
+      resourceCounts: [],
+      operation: 'import',
+      preventionOptions: DEFAULT_PREVENTION_OPTIONS,
+      countingLabel: null,
     });
+  });
+
+  it('returns a fresh preventionOptions object so callers cannot mutate the default', () => {
+    const a = clearedCaseState();
+    a.preventionOptions.skipAppUsers = true;
+    expect(clearedCaseState().preventionOptions.skipAppUsers).toBe(false);
+    expect(DEFAULT_PREVENTION_OPTIONS.skipAppUsers).toBe(false);
+  });
+
+  it('clears the whole workload, not half of it — a partial clear breaks the target planner', () => {
+    const cleared = clearedCaseState();
+    // TargetRuntime requires (selectedResources && resourceCounts) || customWorkloads.
+    // All three must go together or the planner shows its empty state while stale
+    // grid selections remain visible.
+    expect(cleared.selectedResources).toEqual([]);
+    expect(cleared.resourceCounts).toEqual([]);
+    expect(cleared.customWorkloads).toEqual([]);
   });
 });
 

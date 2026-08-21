@@ -7,7 +7,7 @@ import {
   CustomWorkloadEntry, LimitSource,
 } from '../../shared/types';
 import type { Finding } from '../../shared/types';
-import { clearedLimitState, mergeLimitSources } from '../../shared/limit-sources';
+import { clearedCaseState, mergeLimitSources } from '../../shared/limit-sources';
 import { DEFAULT_VERSION } from '../../shared/versions';
 import { RESOURCE_TYPES } from '../../shared/constants';
 import type { OktaTerraformAPI } from '../../preload';
@@ -117,22 +117,20 @@ export const useStore = create<AppState>((set, get) => ({
     api().disconnect();
     set({
       connection: { connected: false },
-      ...clearedLimitState(),
-      selectedResources: [],
-      resourceCounts: [],
-      operation: 'import',
+      ...clearedCaseState(),
     });
   },
 
-  // Drops every limit source and everything derived from it, without touching
-  // the org connection — disconnecting is already a separate control.
+  // Drops the whole case — limit sources, everything derived from them, and the
+  // workload they were computed against — without touching the org connection,
+  // since disconnecting is already a separate control.
   clearLimitSources: () => {
-    set(clearedLimitState());
+    set(clearedCaseState());
   },
 
   // Replaces one source's entries and recomputes the merged probeResult that
   // every consumer reads. Derived state is dropped because it was computed from
-  // the previous limits — see clearedLimitState for why that matters.
+  // the previous limits — see clearedCaseState for why that matters.
   setLimitSource: (source, endpoints, displayLabel) => {
     const limitSources = { ...get().limitSources, [source]: endpoints };
     set({

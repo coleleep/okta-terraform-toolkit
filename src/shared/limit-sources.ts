@@ -1,6 +1,7 @@
 import {
-  ConfigRecommendation, CustomWorkloadEntry, EndpointProbeResult, LimitSource,
-  ProbeProgress, ProbeResult, TargetRuntimeAnalysis,
+  ConfigRecommendation, CustomWorkloadEntry, DEFAULT_PREVENTION_OPTIONS, EndpointProbeResult,
+  LimitSource, ManagedResourceType, OperationType, PreventionOptions, ProbeProgress, ProbeResult,
+  ResourceCount, TargetRuntimeAnalysis,
 } from './types';
 import { PROBE_ENDPOINTS, SUB_RESOURCE_ENDPOINTS } from './constants';
 
@@ -183,14 +184,23 @@ export function manualEntry(
 }
 
 /**
- * Every piece of store state computed from rate limits. Returned as one object
- * so `disconnect()` and `clearLimitSources()` cannot drift apart.
+ * Every piece of store state belonging to the case being analysed — the rate
+ * limits themselves, everything computed from them, and the workload they were
+ * computed against. Returned as one object so `disconnect()` and
+ * `clearLimitSources()` cannot drift apart.
  *
  * Leaving any of this behind is the worst failure mode for limit sources: the
  * numbers look authoritative but describe a previous org or case, and a stale
  * bottleneck figure can reach a rate limit increase justification unnoticed.
+ *
+ * The workload is included rather than preserved because clearing only half of
+ * it is worse than either extreme. Custom workloads cache a rateLimit per entry,
+ * so dropping them while keeping the resource grid leaves the target runtime
+ * planner without a workload while stale selections stay on screen. Preserving
+ * them with a zeroed rateLimit is worse still: target-analyzer reads a zero as
+ * `|| 100`, silently substituting an invented limit into a bottleneck figure.
  */
-export function clearedLimitState(): {
+export function clearedCaseState(): {
   probeResult: ProbeResult | null;
   baselineProbeResult: ProbeResult | null;
   probeProgress: ProbeProgress | null;
@@ -199,6 +209,11 @@ export function clearedLimitState(): {
   targetMinutes: number | null;
   customWorkloads: CustomWorkloadEntry[];
   limitSources: Partial<Record<LimitSource, EndpointProbeResult[]>>;
+  selectedResources: ManagedResourceType[];
+  resourceCounts: ResourceCount[];
+  operation: OperationType;
+  preventionOptions: PreventionOptions;
+  countingLabel: string | null;
 } {
   return {
     probeResult: null,
@@ -207,8 +222,12 @@ export function clearedLimitState(): {
     recommendation: null,
     targetAnalysis: null,
     targetMinutes: null,
-    // Custom workloads cache a rateLimit per entry, so they are derived state too
     customWorkloads: [],
     limitSources: {},
+    selectedResources: [],
+    resourceCounts: [],
+    operation: 'import',
+    preventionOptions: { ...DEFAULT_PREVENTION_OPTIONS },
+    countingLabel: null,
   };
 }
