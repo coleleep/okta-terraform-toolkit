@@ -285,3 +285,72 @@ export function logDerivedLimits(stats: LogEndpointStats[]): EndpointProbeResult
       };
     });
 }
+
+export interface BaselineBucket {
+  label: string;
+  method: 'GET' | 'POST';
+  limit: number;
+}
+
+export interface BaselineFile {
+  /** How the capture was obtained, e.g. "standard org, no multipliers". */
+  capturedFrom: string;
+  /** ISO date (YYYY-MM-DD) the capture was taken. Empty means never captured. */
+  capturedAt: string;
+  buckets: BaselineBucket[];
+}
+
+/** Six months. Past this, a capture is old enough that Okta may have changed defaults. */
+const BASELINE_STALE_DAYS = 183;
+
+/**
+ * Standard-org defaults, as limit entries.
+ *
+ * These are NOT published by Okta — Okta publishes no per-org-type limit table
+ * and its docs direct you to observe your own org. They are measured from an org
+ * with no multipliers or granted increases, which makes them a defensible floor
+ * but still an estimate for any other org. Used only to gap-fill, and Phase 6
+ * coverage counts them as estimated rather than measured.
+ */
+export function baselineLimits(file: BaselineFile): EndpointProbeResult[] {
+  return file.buckets.map(b => ({
+    endpoint: '',
+    label: b.label,
+    method: b.method,
+    limit: b.limit,
+    resetWindowSecs: 60,
+    // A capture records the limit, never live capacity.
+    status: 'unknown' as const,
+    source: 'baseline' as const,
+  }));
+}
+
+/** Uncaptured counts as stale, so an empty baseline is never trusted silently. */
+export function baselineIsStale(file: BaselineFile, todayIso: string): boolean {
+  if (!file.capturedAt) return true;
+  const captured = Date.parse(`${file.capturedAt}T00:00:00Z`);
+  const today = Date.parse(`${todayIso}T00:00:00Z`);
+  if (Number.isNaN(captured) || Number.isNaN(today)) return true;
+  return (today - captured) / 86_400_000 > BASELINE_STALE_DAYS;
+}
+
+/**
+ * Build a baseline capture from a probe of a standard org.
+ *
+ * Deliberately drops the org URL, timestamps, remaining counts, and endpoint
+ * paths — this file is committed to a public repository, so it carries the
+ * generic limit numbers and nothing that identifies where they came from.
+ */
+export function baselineCaptureFromProbe(
+  probeResult: ProbeResult,
+  todayIso: string,
+): BaselineFile {
+  return {
+    capturedFrom: 'standard org, no multipliers',
+    capturedAt: todayIso,
+    buckets: probeResult.endpoints
+      .filter(ep => ep.limit > 0 && ep.status !== 'error' && ep.status !== 'skipped')
+      .map(ep => ({ label: ep.label, method: ep.method, limit: ep.limit }))
+      .sort((a, b) => a.label.localeCompare(b.label) || a.method.localeCompare(b.method)),
+  };
+}

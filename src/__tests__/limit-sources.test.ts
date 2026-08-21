@@ -2,6 +2,7 @@ import {
   mergeLimitSources, hasLiveCapacity, sourceLabel, KNOWN_LIMIT_BUCKETS,
   parseRateLimitHeaders, manualEntry, clearedCaseState,
   logDerivedLimits, LOG_LABEL_TO_PROBE_LABEL,
+  baselineLimits, baselineIsStale, baselineCaptureFromProbe,
 } from '../shared/limit-sources';
 import { DEFAULT_PREVENTION_OPTIONS, LogEndpointStats } from '../shared/types';
 import { EndpointProbeResult, LimitSource } from '../shared/types';
@@ -363,5 +364,71 @@ describe('logDerivedLimits', () => {
       'User (single)', 'User Groups', 'User Roles', 'User Types',
     ];
     expect(emitted.filter(l => !known.has(l))).toEqual([]);
+  });
+});
+
+describe('baseline limits', () => {
+  const captured = {
+    capturedFrom: 'standard org, no multipliers',
+    capturedAt: '2026-08-21',
+    buckets: [
+      { label: 'Users', method: 'GET' as const, limit: 600 },
+      { label: 'User Create (write)', method: 'POST' as const, limit: 100 },
+    ],
+  };
+
+  it('loads captured buckets as baseline-sourced entries', () => {
+    const entries = baselineLimits(captured);
+
+    expect(entries).toHaveLength(2);
+    expect(entries[0].source).toBe('baseline');
+    expect(entries[0].label).toBe('Users');
+    expect(entries[0].limit).toBe(600);
+    // A capture records the limit, never live capacity
+    expect(entries[0].remaining).toBeUndefined();
+    expect(entries[0].status).toBe('unknown');
+  });
+
+  it('returns nothing when the baseline has not been captured yet', () => {
+    expect(baselineLimits({ capturedFrom: '', capturedAt: '', buckets: [] })).toEqual([]);
+  });
+
+  it('is stale once the capture is more than six months old', () => {
+    expect(baselineIsStale(captured, '2026-10-01')).toBe(false);
+    expect(baselineIsStale(captured, '2027-03-01')).toBe(true);
+  });
+
+  it('treats an uncaptured baseline as stale so it is never trusted silently', () => {
+    expect(baselineIsStale({ capturedFrom: '', capturedAt: '', buckets: [] }, '2026-08-21')).toBe(true);
+  });
+
+  it('builds a capture from a probe result without any identifying data', () => {
+    const file = baselineCaptureFromProbe(
+      mergeLimitSources({
+        probe: [ep('Users', 600, 'probe'), ep('Applications', 100, 'probe')],
+      }, 'https://acme.okta.com'),
+      '2026-08-21',
+    );
+
+    expect(file.capturedAt).toBe('2026-08-21');
+    expect(file.buckets).toHaveLength(2);
+    // the org URL must not survive into a file committed to a public repo
+    expect(JSON.stringify(file)).not.toContain('acme');
+    expect(JSON.stringify(file)).not.toContain('okta.com');
+  });
+
+  it('omits zero-limit and skipped buckets from a capture', () => {
+    const file = baselineCaptureFromProbe(
+      mergeLimitSources({
+        probe: [
+          ep('Users', 600, 'probe'),
+          ep('Governance', 0, 'probe'),
+          { ...ep('Realms', 0, 'probe'), status: 'skipped' as const },
+        ],
+      }, 'org'),
+      '2026-08-21',
+    );
+
+    expect(file.buckets.map(b => b.label)).toEqual(['Users']);
   });
 });

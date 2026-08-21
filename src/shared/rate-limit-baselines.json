@@ -1,0 +1,6 @@
+{
+  "_comment": "Standard-org rate limit defaults, captured by probing an org with no rate limit multipliers or granted increases. NOT published by Okta — Okta does not publish a per-org-type limit table, and its docs direct you to observe your own org instead. Used only to gap-fill buckets no other source provided, always badged as an estimate. Deliberately contains no org URL, token, or identifying data: this repo is public. Populate via the Rate Limits tab -> Save as baseline JSON.",
+  "capturedFrom": "",
+  "capturedAt": "",
+  "buckets": []
+}
