@@ -7,6 +7,7 @@ import {
   CustomWorkloadEntry,
 } from '../../shared/types';
 import type { Finding } from '../../shared/types';
+import { clearedLimitState } from '../../shared/limit-sources';
 import { DEFAULT_VERSION } from '../../shared/versions';
 import { RESOURCE_TYPES } from '../../shared/constants';
 import type { OktaTerraformAPI } from '../../preload';
@@ -35,6 +36,7 @@ interface AppState {
   probeResult: ProbeResult | null;
   baselineProbeResult: ProbeResult | null; // Before deep probe merge
   startProbe: () => Promise<void>;
+  clearLimitSources: () => void;
 
   // Resource selection
   selectedResources: ManagedResourceType[];
@@ -113,14 +115,17 @@ export const useStore = create<AppState>((set, get) => ({
     api().disconnect();
     set({
       connection: { connected: false },
-      probeResult: null,
-      baselineProbeResult: null,
-      recommendation: null,
-      probeProgress: null,
+      ...clearedLimitState(),
       selectedResources: [],
       resourceCounts: [],
       operation: 'import',
     });
+  },
+
+  // Drops every limit source and everything derived from it, without touching
+  // the org connection — disconnecting is already a separate control.
+  clearLimitSources: () => {
+    set(clearedLimitState());
   },
 
   // Probing

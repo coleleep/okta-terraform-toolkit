@@ -1,4 +1,7 @@
-import { EndpointProbeResult, LimitSource, ProbeResult } from './types';
+import {
+  ConfigRecommendation, CustomWorkloadEntry, EndpointProbeResult, LimitSource,
+  ProbeProgress, ProbeResult, TargetRuntimeAnalysis,
+} from './types';
 
 /**
  * Precedence, lowest first — later entries win. Manual outranks a live probe
@@ -68,4 +71,33 @@ const SOURCE_LABELS: Record<LimitSource, string> = {
 /** Short badge text for where a limit came from. */
 export function sourceLabel(source: LimitSource): string {
   return SOURCE_LABELS[source];
+}
+
+/**
+ * Every piece of store state computed from rate limits. Returned as one object
+ * so `disconnect()` and `clearLimitSources()` cannot drift apart.
+ *
+ * Leaving any of this behind is the worst failure mode for limit sources: the
+ * numbers look authoritative but describe a previous org or case, and a stale
+ * bottleneck figure can reach a rate limit increase justification unnoticed.
+ */
+export function clearedLimitState(): {
+  probeResult: ProbeResult | null;
+  baselineProbeResult: ProbeResult | null;
+  probeProgress: ProbeProgress | null;
+  recommendation: ConfigRecommendation | null;
+  targetAnalysis: TargetRuntimeAnalysis | null;
+  targetMinutes: number | null;
+  customWorkloads: CustomWorkloadEntry[];
+} {
+  return {
+    probeResult: null,
+    baselineProbeResult: null,
+    probeProgress: null,
+    recommendation: null,
+    targetAnalysis: null,
+    targetMinutes: null,
+    // Custom workloads cache a rateLimit per entry, so they are derived state too
+    customWorkloads: [],
+  };
 }

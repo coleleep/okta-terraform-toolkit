@@ -1,4 +1,4 @@
-import { mergeLimitSources, hasLiveCapacity, sourceLabel } from '../shared/limit-sources';
+import { mergeLimitSources, hasLiveCapacity, sourceLabel, clearedLimitState } from '../shared/limit-sources';
 import { EndpointProbeResult, LimitSource } from '../shared/types';
 
 function ep(
@@ -128,5 +128,24 @@ describe('sourceLabel', () => {
     expect(sourceLabel('manual')).toBe('Manual');
     // must read as an estimate — this value can reach an increase justification
     expect(sourceLabel('baseline')).toBe('Default');
+  });
+});
+
+describe('clearedLimitState', () => {
+  it('resets every piece of state derived from rate limits', () => {
+    const cleared = clearedLimitState();
+
+    // Asserted key by key on purpose: if new derived state is added to the
+    // store and not added here, this test fails instead of the stale value
+    // silently surviving a clear and appearing under a different org's inputs.
+    expect(cleared).toEqual({
+      probeResult: null,
+      baselineProbeResult: null,
+      probeProgress: null,
+      recommendation: null,
+      targetAnalysis: null,
+      targetMinutes: null,
+      customWorkloads: [],
+    });
   });
 });
