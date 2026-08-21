@@ -106,6 +106,19 @@ These are real measurements from the customer's own run and need no credentials.
 
 Once, from an org with no rate limit multipliers or granted increases: probe it, then click **Save as baseline JSON** on the Rate Limits tab. Review the file and commit it to `src/shared/rate-limit-baselines.json`. It then appears in the source chooser as **Use Standard Defaults** and fills any bucket no other source provided.
 
+For a more complete capture, use the standalone script instead. It finds a sample ID by listing each collection directly rather than depending on the resource-count phase, and can optionally create then delete a throwaway resource for types your org has none of:
+
+```bash
+export OKTA_ORG_URL="https://your-org.okta.com"
+export OKTA_API_TOKEN="00..."
+node scripts/capture-rate-limits.js                    # read-only
+node scripts/capture-rate-limits.js --create-samples   # also fills empty resource types
+```
+
+Pass the token via the environment, never as an argument — arguments land in your shell history. With `--create-samples` the script creates a custom role, an unverified domain, and an OIDC IdP named `otto-baseline-<timestamp>`, probes them, and deletes them in a `finally` block; it warns loudly if a delete fails. Log streams and push providers are deliberately excluded since they need a live external target or real push credentials.
+
+The script reads its endpoint list from `src/shared/constants.ts` at runtime rather than keeping a copy, and aborts if it parses implausibly few — a stale capture is worse than no capture.
+
 The export contains only labels, methods, and limits — no org URL, no timestamps, nothing identifying — because this repository is public. Note these are *not* published Okta values; Okta publishes no per-org-type table. They are measured defaults, always treated as estimates.
 
 **Tips**
