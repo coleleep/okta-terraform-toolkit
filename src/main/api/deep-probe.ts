@@ -1,7 +1,7 @@
 import { AxiosInstance } from 'axios';
 import { getClient, getGrantedScopes } from './auth';
 import { EndpointProbeResult, ResourceCount, ProbeProgress } from '../../shared/types';
-import { SUB_RESOURCE_ENDPOINTS, PROBE_TIMEOUT_MS, STATUS_OK_THRESHOLD, STATUS_WARNING_THRESHOLD } from '../../shared/constants';
+import { PROBE_TIMEOUT_MS, STATUS_OK_THRESHOLD, STATUS_WARNING_THRESHOLD, subResourcesToProbe } from '../../shared/constants';
 import { diagnoseProbeFailure } from '../../shared/scopes';
 
 const COOLDOWN_MS = 2000;   // Pause after counting before deep probe
@@ -258,9 +258,11 @@ export async function deepProbeSubResources(
     }
   }
 
-  const endpointsToProbe = SUB_RESOURCE_ENDPOINTS.filter(ep =>
-    sampleIds.has(ep.parentType)
-  );
+  // Collection endpoints (the POST write probes) have no {id} to substitute, so
+  // they are probeable even in an org with none of that resource. Requiring a
+  // sample ID for them silently dropped the write buckets for custom roles,
+  // domains, IDPs, and log streams from every capture.
+  const endpointsToProbe = subResourcesToProbe(new Set(sampleIds.keys()));
 
   // Cooldown after counting phase — the counting pagination can exhaust connections
   // and Okta's WAF may drop subsequent requests if they come too fast
@@ -282,7 +284,9 @@ export async function deepProbeSubResources(
 
   for (let i = 0; i < endpointsToProbe.length; i++) {
     const def = endpointsToProbe[i];
-    const sampleId = sampleIds.get(def.parentType)!;
+    // Empty for collection endpoints, which have no {id} to substitute — the
+    // replace is a no-op for them.
+    const sampleId = sampleIds.get(def.parentType) ?? '';
 
     onProgress({ completed: i, total, currentEndpoint: def.label });
 

@@ -369,6 +369,27 @@ export const SUB_RESOURCE_ENDPOINTS: SubResourceEndpointDef[] = [
   { parentType: 'realms', endpoint: '/api/v1/realms', label: 'Realm Create (write)', probeLabel: 'Realms', method: 'POST' },
 ];
 
+/**
+ * Whether probing this endpoint requires a real resource ID from the org.
+ *
+ * Collection paths — the POST write probes in particular — have no {id} to
+ * substitute, so they are probeable in an org that contains none of that
+ * resource. Gating them on a sample ID silently dropped the write buckets for
+ * custom roles, domains, IDPs, and log streams from every capture.
+ */
+export function needsResourceSample(endpoint: string): boolean {
+  return endpoint.includes('{id}');
+}
+
+/** Sub-resource endpoints worth probing, given the parent types we hold a sample ID for. */
+export function subResourcesToProbe(
+  sampledParentTypes: Set<string>,
+): SubResourceEndpointDef[] {
+  return SUB_RESOURCE_ENDPOINTS.filter(
+    ep => sampledParentTypes.has(ep.parentType) || !needsResourceSample(ep.endpoint),
+  );
+}
+
 // Terraform resource type mappings for import block generation (v6.6.1)
 export interface TerraformResourceMapping {
   managedType: ManagedResourceType;
