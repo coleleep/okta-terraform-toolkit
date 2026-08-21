@@ -98,7 +98,7 @@ curl -sD - -o /dev/null -H "Authorization: SSWS $TOKEN" \
 
 - Every row in the table shows a **Source** badge — `Probed`, `Manual`, `Log`, or `Default` — so a measured limit is never confused with an estimate.
 - Manually entered limits show `—` for Remaining and Reset. The limit is known; live capacity isn't.
-- Manual entry is **sparse on purpose** — enter only the buckets that matter. Be aware that a bucket you skip could be the real bottleneck, so the analysis may be optimistic until you've covered the endpoints your workload actually touches.
+- Manual entry is **sparse on purpose** — enter only the buckets that matter. The Target Runtime Planner reports its own coverage, names any bucket it had no data for, and downgrades an "achievable" verdict to "Appears Achievable — Incomplete Data" rather than assuming a limit it was never given.
 - Read and write limits are separate buckets. The dropdown lists `GET` and `POST` variants separately because Okta's write limits are typically much lower.
 - **Manual limits are never written to disk.** They're gone when OTTO closes. Use **Start Over** to clear them mid-session when you switch cases — it also clears the recommendation and target analysis computed from them.
 - Re-scan after major Terraform runs — remaining capacity changes.

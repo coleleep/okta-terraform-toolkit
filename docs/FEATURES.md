@@ -53,6 +53,8 @@ Replicate Terraform-managed Okta configurations between orgs (e.g., dev → stag
 
 Specify a desired Terraform run duration (e.g., 30 minutes) and OTTO identifies which endpoints are bottlenecks, whether the target is achievable, and what limit increases would be needed.
 
+Coverage is reported alongside the verdict: how many rate limit buckets had measured limits, how many fell back to published defaults, and which had no data at all. A bucket with no limit is never assigned an assumed value — an achievable verdict built on partial data is labelled as provisional, because these figures are used to justify rate limit increase requests.
+
 → [How to use: Target Runtime Planner](USAGE.md#target-runtime-planner)
 
 ### Debug & Log Analysis
