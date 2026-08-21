@@ -19,7 +19,11 @@ A step-by-step guide for each OTTO feature. If you are new to OTTO, start with [
 
 ## Connecting an Org
 
-**What it's for** — Required before running probes, generating code, or syncing resources. You can launch OTTO and use the Debug tab without connecting first.
+**What it's for** — Measuring an org's live rate limits, counting its resources, and syncing between orgs. It is **not** required for most of OTTO.
+
+Works with no org connection: **Debug** (log analysis, error decoder), **Validate**, **Learn**, and **Rate Limits** — the last of these accepts limits entered by hand, pulled from a customer's `TF_LOG`, or filled from the bundled standard-org baseline, so capacity planning works on cases where the customer won't share credentials.
+
+Still needs a connection: probing an org's live limits, **Count & Optimize** for resource counts, and **Sync**.
 
 **Before you start** — Have your org URL and a Super Admin API token ready.
 

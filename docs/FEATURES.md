@@ -95,7 +95,7 @@ Upload `.tf`, `.tfstate`, or `.tfvars` files and validate them for correctness a
 
 ## Supported Provider Versions
 
-6.6.1 through 6.13.0 (default). Version-specific resource additions and attribute changes are tracked automatically.
+6.6.1 through 6.15.0 (6.15.0 is the default). Version-specific resource additions and attribute changes are tracked automatically.
 
 ## Architecture
 
@@ -128,6 +128,9 @@ src/
 │   │   └── DashboardPage.tsx  # Main application view with tabbed sections
 │   ├── components/
 │   │   ├── ConnectOrgModal.tsx       # Org connection dialog
+│   │   ├── ManualLimitsModal.tsx     # Enter rate limits by hand or paste response headers
+│   │   ├── ClearSourcesButton.tsx    # Start Over — drops the case and everything derived from it
+│   │   ├── BaselineControls.tsx      # Capture a standard-org baseline, or use the bundled one
 │   │   ├── ProbeProgress.tsx         # Rate limit probe UI with live progress
 │   │   ├── RateLimitTable.tsx        # Endpoint capacity visualization
 │   │   ├── ProviderBlock.tsx         # Generated provider.tf preview
@@ -155,16 +158,20 @@ src/
 │       └── useStore.ts # Zustand state management
 ├── shared/             # Types, constants, & utilities
 │   ├── terraform-gen.ts   # HCL generation with type-aware field mapping
-│   ├── resource-dictionary.ts  # 30+ Okta resource type definitions
+│   ├── resource-dictionary.ts  # 30+ Okta resource type definitions, and each one's rate limit bucket
+│   ├── limit-sources.ts   # Rate limit provenance: merge precedence, header parsing, baselines, case reset
+│   ├── rate-limit-baselines.json  # Standard-org limit defaults, captured (not published by Okta)
 │   ├── types.ts        # Shared TypeScript interfaces
 │   ├── versions.ts     # Provider version metadata
 │   ├── scopes.ts       # OAuth scope definitions
-│   └── constants.ts    # Configuration constants
+│   └── constants.ts    # Configuration constants and probe endpoint definitions
 ├── preload.ts          # Secure IPC bridge with whitelisted commands
-└── __tests__/          # Jest unit tests
+└── __tests__/          # Jest unit tests (node environment — no jsdom, so no component tests)
     ├── claude-config.test.ts       # AI config management
     ├── provider-v6.*.test.ts       # Version-specific provider tests
     └── redact.test.ts              # Sensitive data redaction
+scripts/
+└── capture-rate-limits.js  # Standalone rate limit capture for building a baseline
 test-data/              # Reusable Terraform fixtures
 ├── sync-priority/      # Policy rule priority ordering test
 └── sync-comprehensive/ # Groups, apps, auth servers test
