@@ -11,6 +11,7 @@ import ValidatorSection from '../components/ValidatorSection';
 import SettingsModal from '../components/SettingsModal';
 import ConnectOrgModal from '../components/ConnectOrgModal';
 import ManualLimitsModal from '../components/ManualLimitsModal';
+import ClearSourcesButton from '../components/ClearSourcesButton';
 import { sourceLabel } from '../../shared/limit-sources';
 import { SUPPORTED_VERSIONS } from '../../shared/versions';
 
@@ -279,6 +280,10 @@ export default function DashboardPage() {
                     sub={probeResult.orgUrl}
                   />
                 )}
+              </div>
+
+              <div className="flex justify-end">
+                <ClearSourcesButton />
               </div>
 
               <div className="bg-surface-2 rounded-xl border border-border overflow-hidden">
