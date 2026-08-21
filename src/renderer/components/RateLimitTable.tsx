@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { EndpointProbeResult } from '../../shared/types';
+import { hasLiveCapacity } from '../../shared/limit-sources';
 
 interface Props {
   endpoints: EndpointProbeResult[];
@@ -11,6 +12,8 @@ const statusColors: Record<string, string> = {
   critical: 'bg-red-100 text-red-700',
   error: 'bg-red-50 text-red-500',
   skipped: 'bg-gray-100 text-gray-400',
+  // Limit is known, live capacity is not — neutral, never alarming
+  unknown: 'bg-gray-100 text-gray-500',
 };
 
 function isSubResource(endpoint: string): boolean {
@@ -53,10 +56,10 @@ function EndpointRow({ ep }: { ep: EndpointProbeResult }) {
         {noData(ep) ? '—' : ep.limit}
       </td>
       <td className="px-4 py-3 text-right text-gray-600">
-        {noData(ep) ? '—' : ep.remaining}
+        {noData(ep) || !hasLiveCapacity(ep) ? '—' : ep.remaining}
       </td>
       <td className="px-4 py-3 text-right text-gray-600">
-        {noData(ep) ? '—' : `${ep.resetWindowSecs}s`}
+        {noData(ep) || !hasLiveCapacity(ep) ? '—' : `${ep.resetWindowSecs}s`}
       </td>
       <td className="px-4 py-3">
         <div className="flex flex-col items-center gap-1">

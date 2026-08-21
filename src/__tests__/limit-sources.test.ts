@@ -1,4 +1,4 @@
-import { mergeLimitSources } from '../shared/limit-sources';
+import { mergeLimitSources, hasLiveCapacity } from '../shared/limit-sources';
 import { EndpointProbeResult, LimitSource } from '../shared/types';
 
 function ep(
@@ -105,5 +105,18 @@ describe('mergeLimitSources', () => {
     expect(result.sources).toEqual([]);
     expect(result.overallMinLimit).toBe(0);
     expect(result.orgUrl).toBe('Manual entry');
+  });
+});
+
+describe('hasLiveCapacity', () => {
+  it('is false when remaining is absent, so status is never derived from a missing value', () => {
+    expect(hasLiveCapacity(ep('Users', 600, 'manual'))).toBe(false);
+    expect(hasLiveCapacity(ep('Users', 600, 'baseline'))).toBe(false);
+  });
+
+  it('is true when remaining is present, including a genuine zero', () => {
+    expect(hasLiveCapacity({ ...ep('Users', 600, 'probe'), remaining: 599 })).toBe(true);
+    // exhausted is real data, not missing data
+    expect(hasLiveCapacity({ ...ep('Users', 600, 'probe'), remaining: 0 })).toBe(true);
   });
 });

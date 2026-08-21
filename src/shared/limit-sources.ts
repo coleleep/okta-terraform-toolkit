@@ -48,3 +48,12 @@ export function mergeLimitSources(
     sources: contributed,
   };
 }
+
+/**
+ * Whether this entry carries live capacity data. Manual and baseline entries
+ * know the limit but not current usage. A remaining of 0 is real data (the
+ * bucket is exhausted), so test for presence rather than truthiness.
+ */
+export function hasLiveCapacity(ep: EndpointProbeResult): boolean {
+  return ep.remaining !== undefined;
+}
