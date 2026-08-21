@@ -57,3 +57,15 @@ export function mergeLimitSources(
 export function hasLiveCapacity(ep: EndpointProbeResult): boolean {
   return ep.remaining !== undefined;
 }
+
+const SOURCE_LABELS: Record<LimitSource, string> = {
+  probe: 'Probed',
+  log: 'Log',
+  manual: 'Manual',
+  baseline: 'Default',
+};
+
+/** Short badge text for where a limit came from. */
+export function sourceLabel(source: LimitSource): string {
+  return SOURCE_LABELS[source];
+}

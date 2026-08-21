@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { EndpointProbeResult } from '../../shared/types';
-import { hasLiveCapacity } from '../../shared/limit-sources';
+import { hasLiveCapacity, sourceLabel } from '../../shared/limit-sources';
 
 interface Props {
   endpoints: EndpointProbeResult[];
@@ -14,6 +14,14 @@ const statusColors: Record<string, string> = {
   skipped: 'bg-gray-100 text-gray-400',
   // Limit is known, live capacity is not — neutral, never alarming
   unknown: 'bg-gray-100 text-gray-500',
+};
+
+const sourceColors: Record<string, string> = {
+  probe: 'bg-blue-50 text-blue-600',
+  log: 'bg-indigo-50 text-indigo-600',
+  manual: 'bg-purple-50 text-purple-600',
+  // amber so an estimate reads as provisional next to measured values
+  baseline: 'bg-amber-50 text-amber-700',
 };
 
 function isSubResource(endpoint: string): boolean {
@@ -61,6 +69,11 @@ function EndpointRow({ ep }: { ep: EndpointProbeResult }) {
       <td className="px-4 py-3 text-right text-gray-600">
         {noData(ep) || !hasLiveCapacity(ep) ? '—' : `${ep.resetWindowSecs}s`}
       </td>
+      <td className="px-4 py-3 text-center">
+        <span className={`inline-block px-2 py-0.5 rounded text-xs font-medium ${sourceColors[ep.source]}`}>
+          {sourceLabel(ep.source)}
+        </span>
+      </td>
       <td className="px-4 py-3">
         <div className="flex flex-col items-center gap-1">
           <span className={`inline-block px-2 py-0.5 rounded text-xs font-medium ${statusColors[ep.status]}`}>
@@ -94,6 +107,7 @@ function EndpointTable({ endpoints, footer }: { endpoints: EndpointProbeResult[]
           <th className="px-4 py-3 font-medium text-right">Limit</th>
           <th className="px-4 py-3 font-medium text-right">Remaining</th>
           <th className="px-4 py-3 font-medium text-right">Reset</th>
+          <th className="px-4 py-3 font-medium text-center">Source</th>
           <th className="px-4 py-3 font-medium text-center">Status</th>
         </tr>
       </thead>
@@ -105,7 +119,7 @@ function EndpointTable({ endpoints, footer }: { endpoints: EndpointProbeResult[]
       {footer && (
         <tfoot>
           <tr>
-            <td colSpan={6} className="px-4 py-2 text-xs text-gray-400">{footer}</td>
+            <td colSpan={7} className="px-4 py-2 text-xs text-gray-400">{footer}</td>
           </tr>
         </tfoot>
       )}

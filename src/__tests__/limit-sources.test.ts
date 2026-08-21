@@ -1,4 +1,4 @@
-import { mergeLimitSources, hasLiveCapacity } from '../shared/limit-sources';
+import { mergeLimitSources, hasLiveCapacity, sourceLabel } from '../shared/limit-sources';
 import { EndpointProbeResult, LimitSource } from '../shared/types';
 
 function ep(
@@ -118,5 +118,15 @@ describe('hasLiveCapacity', () => {
     expect(hasLiveCapacity({ ...ep('Users', 600, 'probe'), remaining: 599 })).toBe(true);
     // exhausted is real data, not missing data
     expect(hasLiveCapacity({ ...ep('Users', 600, 'probe'), remaining: 0 })).toBe(true);
+  });
+});
+
+describe('sourceLabel', () => {
+  it('labels every source, marking baseline as an estimate', () => {
+    expect(sourceLabel('probe')).toBe('Probed');
+    expect(sourceLabel('log')).toBe('Log');
+    expect(sourceLabel('manual')).toBe('Manual');
+    // must read as an estimate — this value can reach an increase justification
+    expect(sourceLabel('baseline')).toBe('Default');
   });
 });
