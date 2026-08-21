@@ -12,6 +12,7 @@ import SettingsModal from '../components/SettingsModal';
 import ConnectOrgModal from '../components/ConnectOrgModal';
 import ManualLimitsModal from '../components/ManualLimitsModal';
 import ClearSourcesButton from '../components/ClearSourcesButton';
+import { BaselineCaptureButton, UseBaselineButton } from '../components/BaselineControls';
 import { sourceLabel } from '../../shared/limit-sources';
 import { SUPPORTED_VERSIONS } from '../../shared/versions';
 
@@ -282,7 +283,8 @@ export default function DashboardPage() {
                 )}
               </div>
 
-              <div className="flex justify-end">
+              <div className="flex justify-end items-center gap-2">
+                <BaselineCaptureButton />
                 <ClearSourcesButton />
               </div>
 
@@ -329,6 +331,7 @@ export default function DashboardPage() {
                 >
                   Enter Limits Manually
                 </button>
+                <UseBaselineButton />
               </div>
             </div>
           )}
