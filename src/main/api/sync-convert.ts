@@ -1,4 +1,5 @@
 import { getOrgInfo } from '../../shared/terraform-gen';
+import { getBreakingChangesForVersion } from '../../shared/versions';
 
 export interface ConvertedConfig {
   portableHcl: string;
@@ -143,10 +144,18 @@ export function convertConfigDeterministic(
   tfContent: string,
   resourceMatches: ResourceMatch[],
   targetOrgUrl: string,
+  targetVersion?: string,
 ): ConvertedConfig {
   const warnings: string[] = [];
 
-  const portableHcl = substituteOrgAndIds(tfContent, resourceMatches, targetOrgUrl);
+  let portableHcl = substituteOrgAndIds(tfContent, resourceMatches, targetOrgUrl);
+
+  if (targetVersion) {
+    const migration = migrateAttributesForVersion(portableHcl, targetVersion);
+    portableHcl = migration.content;
+    warnings.push(...migration.warnings);
+  }
+
   const importBlocks = buildImportBlocks(resourceMatches, warnings);
 
   // Warn about policy rule priority chaining — handled automatically by the AI path
@@ -181,4 +190,127 @@ export function convertConfigDeterministic(
   }
 
   return { portableHcl, importBlocks, instructions, warnings };
+}
+
+export interface MigrationResult {
+  content: string;
+  warnings: string[];
+}
+
+// Post-processing step for convert paths (namely the AI path) that don't apply
+// migrateAttributesForVersion internally. convertConfigDeterministic already
+// applies it internally, so callers should only invoke this for other paths —
+// applying it twice would be harmless (idempotent rewrites) but wasteful.
+export function applyMigrationToConvertedConfig(
+  config: ConvertedConfig,
+  targetVersion: string,
+): ConvertedConfig {
+  const migration = migrateAttributesForVersion(config.portableHcl, targetVersion);
+  return {
+    ...config,
+    portableHcl: migration.content,
+    warnings: [...config.warnings, ...migration.warnings],
+  };
+}
+
+// Blanks full-line HCL comments (mirrors validator.ts's stripCommentedLines)
+// so a commented-out block or attribute is never rewritten or warned about.
+// Preserves line/offset structure (replaces with a same-length blank line)
+// so start/end offsets computed against the original content stay valid.
+function stripCommentedLinesForMigration(content: string): string {
+  return content.replace(/^([ \t]*)#.*$/gm, (m, indent) => indent + ' '.repeat(m.length - indent.length));
+}
+
+// Same block-extraction approach as validator.ts's extractResourceBlocks:
+// scopes every attribute rewrite to the correct resource type AND block kind
+// (resource vs data source) so a rename never touches an unrelated resource
+// that happens to share an attribute name, and never applies a change scoped
+// to one block kind (e.g. blockKind: 'resource') inside the other kind of
+// block sharing the same type name.
+//
+// Known limitation: an unbalanced `{`/`}` inside a string attribute value can
+// cause this depth counter to over-extend past the real closing brace,
+// potentially absorbing a following same-type block. Rare in practice; not
+// defended against.
+function extractResourceBlocksForMigration(
+  content: string
+): { blockKind: 'resource' | 'data_source'; type: string; name: string; start: number; end: number; body: string }[] {
+  const scanContent = stripCommentedLinesForMigration(content);
+  const blocks: { blockKind: 'resource' | 'data_source'; type: string; name: string; start: number; end: number; body: string }[] = [];
+  const blockRegex = /\b(resource|data)\s+"(\w+)"\s+"(\w+)"\s*\{/g;
+  let match: RegExpExecArray | null;
+  while ((match = blockRegex.exec(scanContent)) !== null) {
+    const blockKind = match[1] === 'data' ? 'data_source' : 'resource';
+    const [type, name] = [match[2], match[3]];
+    let depth = 1;
+    let i = blockRegex.lastIndex;
+    while (i < scanContent.length && depth > 0) {
+      if (scanContent[i] === '{') depth += 1;
+      if (scanContent[i] === '}') depth -= 1;
+      i += 1;
+    }
+    // Offsets/body are sliced from the ORIGINAL content (not scanContent) so
+    // the returned start/end can be spliced back into the real tfContent —
+    // stripping comments is only for matching, not for the text we rewrite.
+    blocks.push({ blockKind, type, name, start: match.index, end: i, body: content.slice(match.index, i) });
+  }
+  return blocks;
+}
+
+export function migrateAttributesForVersion(tfContent: string, targetVersion: string): MigrationResult {
+  const changes = getBreakingChangesForVersion(targetVersion);
+  if (changes.length === 0) return { content: tfContent, warnings: [] };
+
+  const warnings: string[] = [];
+  let result = tfContent;
+  // Process blocks in reverse order so earlier splice offsets aren't
+  // invalidated by replacements made to later blocks in the string.
+  const blocks = extractResourceBlocksForMigration(tfContent).reverse();
+
+  for (const block of blocks) {
+    const relevant = changes.filter(c =>
+      c.resource === block.type && (!c.blockKind || c.blockKind === block.blockKind)
+    );
+    if (relevant.length === 0) continue;
+
+    const addressLabel = block.blockKind === 'data_source'
+      ? `data.${block.type}.${block.name}`
+      : `${block.type}.${block.name}`;
+
+    let newBlockText = block.body;
+    for (const change of relevant) {
+      const attrLineRegex = new RegExp(`^(\\s*)${change.attribute}(\\s*=\\s*)`, 'm');
+      if (!attrLineRegex.test(newBlockText)) continue;
+
+      if (change.kind === 'renamed' && change.replacement) {
+        newBlockText = newBlockText.replace(attrLineRegex, `$1${change.replacement}$2`);
+      } else if (change.kind === 'removed') {
+        // Drop the whole attribute line.
+        newBlockText = newBlockText.replace(
+          new RegExp(`^\\s*${change.attribute}\\s*=.*$\\n?`, 'm'),
+          ''
+        );
+        warnings.push(
+          `"${addressLabel}": ${change.attribute} was removed. ${change.note}`
+        );
+      } else if (change.kind === 'type_changed') {
+        // Never auto-transform an unsafe shape change — leave it and warn loudly.
+        warnings.push(
+          `"${addressLabel}": ${change.attribute} must be updated manually. ${change.note}`
+        );
+      } else if (change.kind === 'requiredness_changed') {
+        // No mechanical rewrite — but still surface a warning so the user
+        // knows this attribute's semantics changed (e.g. became computed-only).
+        warnings.push(
+          `"${addressLabel}": ${change.attribute} — ${change.note}`
+        );
+      }
+    }
+
+    if (newBlockText !== block.body) {
+      result = result.slice(0, block.start) + newBlockText + result.slice(block.end);
+    }
+  }
+
+  return { content: result, warnings };
 }

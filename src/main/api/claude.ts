@@ -10,6 +10,7 @@ import { RESOURCE_DICTIONARY, effectiveEndpoint } from '../../shared/resource-di
 import { SCOPE_REQUIREMENTS, API_KEY_ONLY_ENDPOINTS } from '../../shared/scopes';
 import { SUPPORTED_VERSIONS, VERSION_ATTRIBUTE_NOTES, getAdditionsForVersion } from '../../shared/versions';
 import { redact } from './redact';
+import { vaultProject } from './redact-vault';
 
 // --- Claude Configuration Management ---
 
@@ -199,6 +200,8 @@ PROVIDER-SPECIFIC:
 - Version incompatibilities: resource type not available in provider version being used
 - OIE vs Classic Okta: some resources/endpoints only work on one or the other
 
+The log data below has had secrets and identifiers replaced with tokens like {{OKTA_ID_1}} — treat these as opaque placeholders standing in for a real value, never as unresolved template variables or a bug in the user's config.
+
 Respond with a JSON object matching this schema exactly:
 {
   "narrative": "2-4 sentence plain-English explanation of what happened",
@@ -246,7 +249,13 @@ export async function interpretLog(analysis: LogAnalysis, probeResult?: ProbeRes
   const scopeContext = buildScopeContext();
   const rateLimitContext = buildRateLimitContext(analysis, probeResult);
 
-  const cleanAnalysis = redact(JSON.stringify(analysis, null, 2));
+  // Unlike the other 3 redact() call sites in this file (buildWorkload,
+  // decodeError, generateSolution), this one uses vaultProject: its
+  // fixed-shape Okta ID matching (20-char alphanumeric, not a prefix list)
+  // catches ID types redact()'s prefix list misses (oty, exk, prm, rst, ...)
+  // — see redact-vault.ts.
+  const { maskedFiles } = vaultProject({ 'log-analysis': JSON.stringify(analysis, null, 2) });
+  const cleanAnalysis = maskedFiles['log-analysis'];
   const response = await client.messages.create({
     model: 'claude-sonnet-4-6',
     max_tokens: 1024,

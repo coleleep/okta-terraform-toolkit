@@ -68,8 +68,8 @@ const api = {
   syncOpenFiles: () => ipcRenderer.invoke('sync:open-files'),
   syncAnalyze: (tfFiles: Record<string, string>, stateContent?: string) =>
     ipcRenderer.invoke('sync:analyze', { tfFiles, stateContent }),
-  syncConvert: (tfContent: string, matches: unknown[], targetOrgUrl: string) =>
-    ipcRenderer.invoke('sync:convert', { tfContent, matches, targetOrgUrl }),
+  syncConvert: (tfContent: string, matches: unknown[], targetOrgUrl: string, targetVersion?: string) =>
+    ipcRenderer.invoke('sync:convert', { tfContent, matches, targetOrgUrl, targetVersion }),
   stageTfFiles: (tfFiles: Record<string, string>, stateContent?: string) =>
     ipcRenderer.invoke('sync:stage-files', { tfFiles, stateContent }),
 

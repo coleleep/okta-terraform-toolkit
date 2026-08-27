@@ -34,7 +34,7 @@ Both must pass before any commit. There is no CI enforcing this.
 
 Conventional commits with a substantive body explaining **why**, not just what. The bodies are long on purpose — they're the durable record of reasoning. See `6118ead` or `7ec8bdb` for the expected shape.
 
-**Never add `Co-Authored-By` or any AI attribution trailer.** Some commits in the history do carry one; do not infer consent from that. An Okta-issued `prepare-commit-msg` hook (`okta-ai-attribution`) was injecting them and has been disabled via `git config --unset core.hooksPath`. If trailers reappear, that hook is active again in your clone.
+**AI attribution trailers depend on which remote you're working against.** An Okta-issued `prepare-commit-msg` hook (`okta-ai-attribution`) appends `Co-authored-by: Claude` automatically. In the Okta work repo, leave it active — the disclosure is the point. In a personal clone it's unwanted; disable it with `git config --unset core.hooksPath`. The hook is reinstalled per-machine by Okta tooling, so `.githooks/` is gitignored rather than deleted. Never hand-write an attribution trailer either way; let the hook be the only thing that adds one.
 
 Signing is disabled repo-locally (`commit.gpgsign false`) because gpg's pinentry can't prompt from an agent shell. Global signing is deliberately left on for org repos with signature-requiring branch protection.
 
@@ -83,9 +83,8 @@ A mismatch merges fine, renders fine, and then matches nothing — reporting "no
 
 ## Where the design lives
 
-- `docs/superpowers/specs/2026-08-19-rate-limit-sources-design.md` — the rate limit source design, all six phases
-- `docs/superpowers/plans/` — per-phase implementation plans, with full code
 - `docs/FEATURES.md`, `docs/USAGE.md` — what it does and how to use it
+- `docs/planning/specs/` and `docs/planning/plans/` — design docs and per-phase implementation plans. **Not in the repo** — gitignored and kept locally only. Ask the author if you need them.
 
 ## Open items
 

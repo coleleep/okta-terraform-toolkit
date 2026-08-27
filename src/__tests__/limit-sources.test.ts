@@ -342,6 +342,17 @@ describe('logDerivedLimits', () => {
     expect(entry.label).toBe('User Admin Roles');
   });
 
+  it('collapses single-resource reads into the collection bucket the workload uses', () => {
+    // GET /apps/{id}, /authorizationServers/{id}, /users/{id}, /groups/{id}
+    // share their collection's rate limit bucket in Okta, so they must resolve
+    // to the label a custom workload/dictionary asks for — not a '(single)'
+    // label no workload references.
+    expect(logDerivedLimits([logStat('Application', 600)])[0].label).toBe('Applications');
+    expect(logDerivedLimits([logStat('Auth Server', 600)])[0].label).toBe('Auth Servers');
+    expect(logDerivedLimits([logStat('User (single)', 600)])[0].label).toBe('Users');
+    expect(logDerivedLimits([logStat('Group (single)', 600)])[0].label).toBe('Groups');
+  });
+
   it('carries an unmapped label through instead of dropping the measurement', () => {
     const [entry] = logDerivedLimits([logStat('Token Endpoint', 300)]);
     // Deliberately unmapped — a different rate limit family from the management API
@@ -353,8 +364,8 @@ describe('logDerivedLimits', () => {
     // Guards against a labelForPattern addition silently going unmapped.
     const known = new Set([
       ...Object.keys(LOG_LABEL_TO_PROBE_LABEL),
-      'App User Assignments', 'App Group Assignments', 'Group (single)', 'Group Members',
-      'User (single)', 'User Groups', 'Org Settings', 'User Types',
+      'App User Assignments', 'App Group Assignments', 'Group Members',
+      'User Groups', 'Org Settings', 'User Types',
       'Schema', 'Token Endpoint', 'OAuth2',
     ]);
     const emitted = [

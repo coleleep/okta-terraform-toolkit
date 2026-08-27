@@ -49,13 +49,17 @@ export default function CustomWorkload() {
   // filtering on it hid okta_user and every other top-level resource from search.
   const results = query.length >= 2 ? searchResources(query) : [];
 
-  // Look up probed rate limit for an endpoint pattern
+  // Look up probed rate limit for an endpoint pattern. A TF_LOG can label a
+  // path's read and write with the same collection label (differing only by
+  // method), so pick the tightest limit — same rule target-analyzer uses — to
+  // avoid showing a write limit as the resource's rate limit.
   const findRateLimit = (endpointLabel: string): number => {
     if (!probeResult) return 0;
-    const match = probeResult.endpoints.find(
+    const matches = probeResult.endpoints.filter(
       ep => ep.label === endpointLabel && ep.status !== 'error' && ep.status !== 'skipped' && ep.limit > 0
     );
-    return match?.limit ?? 0;
+    if (matches.length === 0) return 0;
+    return matches.reduce((a, b) => (b.limit < a.limit ? b : a)).limit;
   };
 
   const handleAdd = () => {

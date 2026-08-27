@@ -53,6 +53,8 @@ Replicate Terraform-managed Okta configurations between orgs (e.g., dev → stag
 
 Specify a desired Terraform run duration (e.g., 30 minutes) and OTTO identifies which endpoints are bottlenecks, whether the target is achievable, and what limit increases would be needed.
 
+Works from any rate limit source, including a `TF_LOG` upload with no org connection — add Custom Workloads for the expected resource counts (Count & Optimize is the connected-org shortcut, not a requirement). Log-derived limits are matched to the workload by rate limit bucket, and where a log carried both a read and a write for one bucket the planner uses the tighter limit so a bottleneck is never understated.
+
 Coverage is reported alongside the verdict: how many rate limit buckets had measured limits, how many fell back to published defaults, and which had no data at all. A bucket with no limit is never assigned an assumed value — an achievable verdict built on partial data is labelled as provisional, because these figures are used to justify rate limit increase requests.
 
 → [How to use: Target Runtime Planner](USAGE.md#target-runtime-planner)
@@ -62,6 +64,7 @@ Coverage is reported alongside the verdict: how many rate limit buckets had meas
 Comprehensive diagnostic tools for troubleshooting Terraform runs:
 
 - **TF_LOG parsing** — extracts per-endpoint request stats, rate-limit hits, and error breakdowns from `TF_LOG=DEBUG` output, tracked per HTTP method so a path's read and write rate limit buckets are reported separately
+- **Automatic PII redaction** — the parsed analysis is scrubbed before it is shown on screen or sent to the AI: org URLs, emails, Okta IDs, tokens, and secrets embedded in endpoint paths and error bodies are tokenised. When OTTO runs `terraform` in-app, the raw `terraform-debug.log` it produces is scrubbed in place after the run so no plaintext token or PII persists on disk
 - **Validation error detection** — identifies provider/schema mismatches even when no HTTP requests were made
 - **OAuth2/DPoP failure detection** — reads the `error`/`error_description` body format used by the token endpoint and flags `invalid_dpop_proof` as critical, since a failed token request blocks the entire run
 - **AI-powered root cause analysis** — explains failures with actionable config fix recommendations, using org-specific rate limits from the log's `X-Rate-Limit-Limit` headers when present (falls back to probe data or documented defaults)
@@ -95,7 +98,15 @@ Upload `.tf`, `.tfstate`, or `.tfvars` files and validate them for correctness a
 
 ## Supported Provider Versions
 
-6.6.1 through 6.15.0 (6.15.0 is the default). Version-specific resource additions and attribute changes are tracked automatically.
+6.6.1 through 7.0.0 (7.0.0 is the default). Version-specific resource additions and attribute changes are tracked automatically. Provider v7.0.0 includes breaking changes (see below) — OTTO's Validate and Sync tabs surface migration hints for affected attributes automatically.
+
+**v7.0.0 breaking changes:**
+
+- `okta_threat_insight_settings`: `network_excludes` renamed to `exclude_zones`
+- `okta_role_subscription`: `role_type` renamed to `role_ref` (resource and data source)
+- `okta_role_subscription`: `status` became a computed (read-only) attribute on the resource — no longer settable in config
+- `okta_role_subscription` data source: `notification_type` became computed (read-only); `id` became required
+- `okta_template_sms`: `translations` changed from a repeated `{language, template}` block to a single `map(string)` attribute (manual migration required)
 
 ## Architecture
 
@@ -117,7 +128,8 @@ src/
 │   │   ├── rollback.ts          # Tfstate rollback bundle management
 │   │   ├── okta-provider-manager.ts  # Provider version download & mirror
 │   │   ├── log-parser.ts        # TF_LOG debug file parser & interpreter
-│   │   ├── redact.ts            # Sensitive data redaction
+│   │   ├── redact.ts            # Lightweight regex-based redaction (used by buildWorkload, decodeError, generateSolution)
+│   │   ├── redact-vault.ts      # Stronger tokenizing redaction engine (vaultProject) — used by the Validate tab, TF_LOG analysis (on-screen + AI), and the on-disk terraform-debug.log scrub
 │   │   ├── validator.ts         # Terraform file validation, PII masking, and export with secret promotion
 │   │   └── write-probe-test.ts  # Test fixture generation
 │   ├── logger.ts       # Structured audit logging with rotation
@@ -297,7 +309,8 @@ See [API Token Rate Limit Violation](https://support.okta.com/help/s/article/API
 
 ### Sensitive Data Handling
 
-- API tokens, OAuth secrets, and org URLs are never logged to disk
+- API tokens, OAuth secrets, and org URLs are never persisted in plaintext — the `terraform-debug.log` an in-app run produces is scrubbed in place immediately after the run
+- Parsed `TF_LOG` analysis is redacted before it is displayed on screen or sent to the AI
 - All sensitive data is automatically redacted in exported diagnostics
 - Use OS-level credential managers (macOS Keychain, Windows Credential Manager) for long-term token storage
 - OTTO stores credentials in memory only; restart the app to clear session data

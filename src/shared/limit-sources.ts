@@ -238,6 +238,14 @@ export function clearedCaseState(): {
  * Without translation, log-derived limits merge and render but match nothing in
  * the runtime analysis, with no error to explain why.
  *
+ * A single-resource read (GET /apps/{id}) shares its rate limit bucket with the
+ * collection (GET /apps) in Okta, so those single-read labels map to the
+ * collection label the workload/dictionary uses ('Applications', 'Users', ...)
+ * rather than to a probe-only '(single)' label that no workload ever asks for.
+ * Writes stay separate: log writes land under the same label but carry method
+ * POST, and resolveLimit picks the tightest same-label limit so a write can
+ * never understate a read bottleneck.
+ *
  * Labels absent from this table either already match the probe vocabulary
  * exactly, or are deliberately not mapped:
  *   'Schema'                    ambiguous across user/group/app schemas
@@ -246,10 +254,12 @@ export function clearedCaseState(): {
  *                               bucket would attribute a real limit wrongly
  */
 export const LOG_LABEL_TO_PROBE_LABEL: Record<string, string> = {
-  'Application': 'App (single)',
+  'Application': 'Applications',
   'App User (single)': 'App User Assignments',
   'App Group (single)': 'App Group Assignments',
-  'Auth Server': 'Auth Server (single)',
+  'Auth Server': 'Auth Servers',
+  'User (single)': 'Users',
+  'Group (single)': 'Groups',
   'Policy': 'Policies',
   'Network Zone': 'Network Zones',
   'Current User': 'Users',

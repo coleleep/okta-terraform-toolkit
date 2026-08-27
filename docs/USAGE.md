@@ -67,6 +67,7 @@ The header updates to show your org URL once connected. Click **Disconnect** to 
 - Always use `TF_LOG=DEBUG` (not `INFO`) — at DEBUG level, Okta returns `X-Rate-Limit-Limit` headers in every response. OTTO extracts these for org-specific rate limit analysis. With `INFO` logs, the AI falls back to probe data or documented defaults.
 - AI interpretation requires a configured AI key — see [AI Features](#ai-features).
 - The Error Decoder works without an org connection and without an AI key for common errors.
+- Sensitive data is scrubbed from the parsed analysis before it is shown on screen or sent to the AI — org URLs, emails, Okta IDs, tokens, and secrets are tokenised, so what you see and what leaves the app are already redacted. When OTTO runs `terraform` in-app, the raw `terraform-debug.log` it writes is scrubbed in place after the run so no plaintext token or PII persists on disk.
 
 ---
 
@@ -163,13 +164,15 @@ The export contains only labels, methods, and limits — no org URL, no timestam
 
 **What it's for** — Find out if a desired Terraform run duration is achievable with your current rate limits, and identify which endpoints are the bottleneck if not.
 
-**Before you start** — Connect to the target org (see [Connecting an Org](#connecting-an-org)).
+**Before you start** — Have rate limits from any source (a live probe, manual entry, a `TF_LOG`, or the bundled baseline) plus a workload. No org connection is required when limits come from a `TF_LOG` or manual entry — use Custom Workloads for the counts.
 
 **Steps**
 
 1. Navigate to the **Plan** tab, then select **Target Planner**.
 2. Select a preset duration or enter a custom value (in minutes).
-3. Ensure your workload is configured — go to the **Workload** sub-tab and run **Count & Optimize** (or **Optimize** if using only custom workloads) if you haven't already.
+3. Ensure your workload is configured on the **Workload** sub-tab:
+   - **With an org connection:** run **Count & Optimize** to inventory the org automatically.
+   - **Without a connection (e.g. limits from a `TF_LOG`):** add **Custom Workloads** — the resource types you expect and their counts. Count & Optimize needs a live connection, but Custom Workloads do not.
 4. Click **Analyze for [N] min target** where [N] is your chosen duration.
 5. Review the bottleneck report: which endpoints are limiting you and what rate limit increases would be needed to hit your target.
 
@@ -177,6 +180,7 @@ The export contains only labels, methods, and limits — no org URL, no timestam
 
 - The bottleneck report gives specific endpoint-level numbers to include in a JIRA for a rate limit increase request.
 - If the target duration is achievable without changes, the report confirms it.
+- `TF_LOG`-derived limits are matched to your workload by rate limit bucket — a single-resource read a log captured (e.g. `GET /apps/{id}`) resolves to the same bucket your app workload asks about. Where a log carried both a read and a write for one bucket, the planner uses the tighter limit so a bottleneck is never understated.
 
 ---
 

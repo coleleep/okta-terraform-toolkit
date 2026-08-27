@@ -86,6 +86,21 @@ describe('analyzeTargetRuntime coverage', () => {
     expect(result.bottlenecks.every(b => b.currentLimit !== 100)).toBe(true);
   });
 
+  it('picks the tightest limit when a log labels read and write the same', () => {
+    // A TF_LOG labels GET and PUT /apps/{id} both as 'Applications', differing
+    // only by method. The lower (write) limit must win so the bottleneck is
+    // never understated in an increase request.
+    const result = analyzeTargetRuntime(
+      probe([ep('Applications', 600, 'log', 'GET'), ep('Applications', 100, 'log', 'POST')]),
+      customWorkload([{ resource: 'okta_app_saml', count: 500, label: 'Applications' }]),
+      1, // tight target so the bottleneck is surfaced
+    );
+
+    expect(result.coverage.measured).toBe(1);
+    expect(result.bottlenecks.some(b => b.currentLimit === 100)).toBe(true);
+    expect(result.bottlenecks.every(b => b.currentLimit !== 600)).toBe(true);
+  });
+
   it('counts a baseline-sourced limit as estimated, not measured', () => {
     const result = analyzeTargetRuntime(
       probe([ep('Users', 600, 'manual'), ep('Applications', 100, 'baseline')]),

@@ -10,10 +10,17 @@ function resolveLimit(
   probeResult: ProbeResult,
   label: string,
 ): { limit: number; source: LimitSource; method: 'GET' | 'POST' } | null {
-  const match = probeResult.endpoints.find(ep =>
+  const matches = probeResult.endpoints.filter(ep =>
     ep.label === label && ep.status !== 'error' && ep.status !== 'skipped' && ep.limit > 0
   );
-  return match ? { limit: match.limit, source: match.source, method: match.method } : null;
+  if (matches.length === 0) return null;
+  // A log labels a path's read and write the same (e.g. GET and PUT /apps/{id}
+  // both become 'Applications'), differing only by method — distinct Okta
+  // buckets under one label. Probe results never collide this way (writes get
+  // their own '... (write)' label). Pick the tightest limit so a duplicate can
+  // never let the analysis understate the bottleneck in an increase request.
+  const tightest = matches.reduce((a, b) => (b.limit < a.limit ? b : a));
+  return { limit: tightest.limit, source: tightest.source, method: tightest.method };
 }
 
 function buildCoverage(probeResult: ProbeResult, labels: string[]): LimitCoverage {

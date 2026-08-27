@@ -9,6 +9,11 @@ export function reconstructFiles(
   for (const finding of findings) {
     if (!acceptedIds.has(finding.id)) continue;
     if (result[finding.file] === undefined) continue;
+    // Findings with an empty originalSnippet are informational-only (e.g.
+    // breaking-change hints describing a manual migration, not a mechanical
+    // snippet swap) — there is nothing to locate and replace, so skip them
+    // rather than relying on String.replace('', '') being a harmless no-op.
+    if (finding.originalSnippet === '') continue;
     result[finding.file] = result[finding.file].replace(
       finding.originalSnippet,
       finding.fixedSnippet,
@@ -31,6 +36,10 @@ export function computeDiffLines(
   // Locate each finding's originalSnippet in the file
   const regions: Array<{ finding: Finding; start: number; end: number }> = [];
   for (const f of findings) {
+    // Skip informational-only findings (empty originalSnippet) — fileContent
+    // .indexOf('') would otherwise match at position 0 and manufacture a
+    // bogus zero-length diff region for every such finding.
+    if (f.originalSnippet === '') continue;
     const idx = fileContent.indexOf(f.originalSnippet);
     if (idx !== -1) regions.push({ finding: f, start: idx, end: idx + f.originalSnippet.length });
   }

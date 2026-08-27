@@ -19,3 +19,12 @@ dist/
 
 # One-off rate limit capture output (review, then merge into src/shared/rate-limit-baselines.json)
 rate-limit-capture.json
+
+# Local-only: design docs, presentation material, internal one-pager
+docs/planning/
+docs/ONE-PAGER.md
+demo-video/
+
+# Okta-issued prepare-commit-msg hook, reinstalled per-machine by Okta tooling.
+# Machine-local, not project config — git does not activate committed hooks anyway.
+.githooks/

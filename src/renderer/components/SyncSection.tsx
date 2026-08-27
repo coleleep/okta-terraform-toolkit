@@ -54,7 +54,7 @@ const api = (window as unknown as {
     syncOpenFiles: () => Promise<{ success: boolean; data?: Record<string, string> } | null>;
     syncAnalyze: (tfFiles: Record<string, string>, stateContent?: string) =>
       Promise<{ success: boolean; data?: { summary: SyncSummary; diff: DiffResult | null }; error?: string }>;
-    syncConvert: (tfContent: string, matches: ResourceMatch[], targetOrgUrl: string) =>
+    syncConvert: (tfContent: string, matches: ResourceMatch[], targetOrgUrl: string, targetVersion?: string) =>
       Promise<{ success: boolean; data?: ConvertedConfig; error?: string }>;
     stageTfFiles: (tfFiles: Record<string, string>, stateContent?: string) =>
       Promise<{ success: boolean; data?: string; error?: string }>;
@@ -402,7 +402,11 @@ export default function SyncSection() {
       .join('\n\n');
 
     const targetOrgUrl = swapped ? sourceConnectedUrl : (connection.orgUrl ?? '');
-    const result = await api.syncConvert(tfContent, matches, targetOrgUrl);
+    // Unlike exactVersion (which falls back to undefined, letting generateVersionsTf use
+    // the range constraint), migration needs a concrete version to diff against — so this
+    // falls back to providerVersion instead of leaving it unset.
+    const targetVersion = managedProviderVersion !== 'system' ? managedProviderVersion : providerVersion;
+    const result = await api.syncConvert(tfContent, matches, targetOrgUrl, targetVersion);
 
     if (result.success && result.data) {
       setConverted({

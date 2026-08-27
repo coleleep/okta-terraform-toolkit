@@ -13,16 +13,24 @@ const presets = [
 export default function TargetRuntime() {
   const {
     targetMinutes, targetAnalysis, selectedResources, resourceCounts, customWorkloads,
-    setTargetMinutes, analyzeTarget,
+    connection, setTargetMinutes, analyzeTarget,
   } = useStore();
 
   const [customMinutes, setCustomMinutes] = useState('');
   const hasWorkload = (selectedResources.length > 0 && resourceCounts.length > 0) || customWorkloads.length > 0;
 
   if (!hasWorkload) {
+    // Count & Optimize inventories the org over the API, so it needs a live
+    // connection. When limits came from a TF_LOG (or manual/baseline) with no
+    // org connected, Custom Workloads is the way in — point there explicitly
+    // rather than to a disabled button.
     return (
       <div className="p-5 text-sm text-gray-400">
-        Select resources and run "Count & Optimize", or add custom workloads, to enable target runtime analysis.
+        {connection.connected ? (
+          <>Select resources and run "Count &amp; Optimize", or add custom workloads, to enable target runtime analysis.</>
+        ) : (
+          <>Add <span className="text-gray-300">Custom Workloads</span> (expected resource counts) to run the planner against your rate limits — no org connection required. "Count &amp; Optimize" needs a live connection to inventory the org.</>
+        )}
       </div>
     );
   }

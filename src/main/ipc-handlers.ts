@@ -13,7 +13,8 @@ import { probeSubResourceEndpoint } from './api/deep-probe';
 import { parseLogFile } from './api/log-parser';
 import { interpretLog, buildWorkload, decodeError, generateSolution, convertConfig, getApiKey, setApiKey, getClaudeConfig, setClaudeConfig, removeClaudeConfig, getOcmStatus } from './api/claude';
 import { vaultProject, analyzeProject, exportProject, createSession, getSession, touchSession, clearSession, validateForExport } from './api/validator';
-import { convertConfigDeterministic } from './api/sync-convert';
+import { redactLogAnalysis, redactLogText } from './api/redact-vault';
+import { convertConfigDeterministic, applyMigrationToConvertedConfig } from './api/sync-convert';
 import { parseStateFile, syncWithSubResources, buildSyncSummary, discoverSourceResources, discoverTargetResources, matchResources, fetchAttributeDiff, parseTfAttributesFromFiles } from './api/sync';
 import { logger, setLevel, getLevel } from './logger';
 import { getMainWindow } from './index';
@@ -193,7 +194,7 @@ export function registerIpcHandlers() {
   ipcMain.handle('log:analyze', async (_event, filePath: string) => {
     try {
       console.log(`[log-parser] Analyzing: ${filePath}`);
-      const analysis = await parseLogFile(filePath);
+      const analysis = redactLogAnalysis(await parseLogFile(filePath));
       console.log(`[log-parser] Done: ${analysis.totalRequests} requests, ${analysis.rateLimited} 429s, ${analysis.deadlineExceeded} deadline errors`);
       return { success: true, data: analysis };
     } catch (error: unknown) {
@@ -472,15 +473,24 @@ export function registerIpcHandlers() {
     tfContent: string;
     matches: Array<{ sourceAddress: string; sourceId: string; sourceName: string; targetId: string | null; status: string; level?: number; parentSourceId?: string | null; parentTargetId?: string | null }>;
     targetOrgUrl: string;
+    targetVersion?: string;
   }) => {
     try {
       logger.info('sync', 'convert started', { matchCount: params.matches.length, targetOrg: params.targetOrgUrl });
       // Use deterministic convert for large payloads (>50 matches) to avoid API timeouts.
       // AI convert is reserved for smaller, file-based syncs where it adds value.
       const useAi = getApiKey() && params.matches.length <= 50;
-      const result = useAi
+      let result = useAi
         ? await convertConfig(params.tfContent, params.matches, params.targetOrgUrl)
-        : convertConfigDeterministic(params.tfContent, params.matches, params.targetOrgUrl);
+        : convertConfigDeterministic(params.tfContent, params.matches, params.targetOrgUrl, params.targetVersion);
+
+      // The deterministic path already applies breaking-change migration internally
+      // (see convertConfigDeterministic). The AI path never learned version-aware
+      // rewriting, so apply the same migration as a uniform post-processing step here
+      // instead of teaching the AI to do it (regex-based rewrite is more reliable).
+      if (useAi && params.targetVersion) {
+        result = applyMigrationToConvertedConfig(result, params.targetVersion);
+      }
       logger.info('sync', 'convert complete', { mode: useAi ? 'ai' : 'deterministic' });
 
       // Write debug log with generated TF content and warnings
@@ -490,6 +500,7 @@ export function registerIpcHandlers() {
         `Mode: ${useAi ? 'ai' : 'deterministic'}`,
         `Matches: ${params.matches.length}`,
         `Target: ${params.targetOrgUrl}`,
+        `Target Version: ${params.targetVersion ?? 'none'}`,
         `Warnings (${result.warnings.length}):`,
         ...result.warnings.map(w => `  - ${w}`),
         `\n--- Generated HCL (first 5000 chars) ---`,
@@ -745,10 +756,14 @@ export function registerIpcHandlers() {
   });
 
   ipcMain.handle('terraform:run', async (event, { dir, args, swapped }: { dir: string; args: string[]; swapped?: boolean }) => {
+    // Enable TF debug logging. terraform APPENDS to TF_LOG_PATH, so clear any
+    // stale (and still-unredacted) content from a prior run first — otherwise
+    // the post-run scrub below would be redacting an ever-growing file and a
+    // crashed prior run could leave raw secrets sitting on disk indefinitely.
+    const tfLogPath = join(app.getPath('userData'), 'terraform-debug.log');
+    fs.rmSync(tfLogPath, { force: true });
     try {
       const tfEnv: Record<string, string> = {};
-      // Enable TF debug logging
-      const tfLogPath = join(app.getPath('userData'), 'terraform-debug.log');
       tfEnv['TF_LOG'] = 'DEBUG';
       tfEnv['TF_LOG_PATH'] = tfLogPath;
       logger.info('terraform', 'debug log path', { path: tfLogPath });
@@ -789,6 +804,23 @@ export function registerIpcHandlers() {
           ? 'terraform not found — install from https://developer.hashicorp.com/terraform/downloads'
           : message,
       };
+    } finally {
+      // Scrub the raw debug log in place: it captures the API token
+      // (Authorization: SSWS ...), org URLs, emails, and Okta IDs in full
+      // DEBUG output. Wrapped in try/catch so a scrub failure never masks the
+      // run's real result. Best-effort — if the file is missing (run never
+      // started) rmSync-above already handled it and readFileSync throws
+      // harmlessly here.
+      try {
+        if (fs.existsSync(tfLogPath)) {
+          const raw = fs.readFileSync(tfLogPath, 'utf8');
+          fs.writeFileSync(tfLogPath, redactLogText(raw));
+        }
+      } catch (scrubError: unknown) {
+        logger.warn('terraform', 'failed to scrub debug log', {
+          error: scrubError instanceof Error ? scrubError.message : String(scrubError),
+        });
+      }
     }
   });
 

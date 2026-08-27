@@ -67,7 +67,13 @@ export default function ValidatorSection() {
     }
     setFindings(result.data.findings);
     setFixedMaskedFiles(result.data.fixedMaskedFiles);
-    setAcceptedFindingIds(new Set(result.data.findings.map((f: Finding) => f.id)));
+    // Informational-only findings (empty originalSnippet/fixedSnippet — e.g.
+    // breaking-change hints describing a manual migration) have no
+    // mechanical fix to apply, so they shouldn't be pre-selected as "will be
+    // fixed on export".
+    setAcceptedFindingIds(new Set(
+      result.data.findings.filter((f: Finding) => f.originalSnippet !== '').map((f: Finding) => f.id),
+    ));
     setStage('reviewed');
   };
 
@@ -262,7 +268,9 @@ function FindingsGroup({ title, findings }: { title: string; findings: Finding[]
             {expandedIds.has(f.id) && (
               <div className="px-3 pb-3 border-t border-border text-xs space-y-2">
                 <p className="text-text-secondary pt-2">{f.explanation}</p>
-                <pre className="bg-surface-3 rounded p-2 overflow-x-auto font-mono text-text-secondary">{f.fixedSnippet}</pre>
+                {f.fixedSnippet !== '' && (
+                  <pre className="bg-surface-3 rounded p-2 overflow-x-auto font-mono text-text-secondary">{f.fixedSnippet}</pre>
+                )}
               </div>
             )}
           </div>

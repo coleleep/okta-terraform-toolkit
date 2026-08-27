@@ -401,7 +401,29 @@ export const VERSION_RESOURCE_ADDITIONS: Record<ProviderVersion, { type: string;
   ],
   '6.15.0': [],
 
-  '7.0.0': [],
+  '7.0.0': [
+    {
+      type: 'users',
+      config: `
+# okta_user_subscription — manage a user's notification subscriptions (added in v7.0.0)
+# notification_type and user_id are required; channels is optional; id and status are computed.
+# resource "okta_user_subscription" "example" {
+#   user_id           = okta_user.example.id
+#   notification_type = "APP_ASSIGNMENT"
+#   channels          = ["EMAIL"]
+# }`,
+    },
+    {
+      type: 'captchas',
+      config: `
+# okta_org_captcha — assign an org-wide CAPTCHA instance to specific pages (added in v7.0.0;
+# already present in the live provider registry, newly tracked in OTTO starting v7.0.0)
+# resource "okta_org_captcha" "example" {
+#   captcha_id     = okta_captcha.example.id
+#   enabled_pages  = ["SSR", "SIGN_IN"]
+# }`,
+    },
+  ],
 
 };
 
@@ -477,8 +499,112 @@ export const VERSION_ATTRIBUTE_NOTES: Record<ProviderVersion, string[]> = {
   '6.15.0': [
     'Bug-fix release, no new resources or attributes. Two behavior fixes matter for generated HCL: okta_app_signon_policy_rules `chains` JSON no longer needs manually alphabetized keys in jsonencode() — the provider now normalizes key order during the plan phase (previously could cause "Provider produced inconsistent result after apply"). okta_admin_role_custom with okta.workflows.read/okta.workflows.invoke permissions no longer perpetually drifts on plan/apply (previously required an ignore_changes workaround due to API auto-expanding to extra *.flows.* permissions).',
   ],
-  '7.0.0': [],
+  '7.0.0': [
+    'BREAKING: okta_threat_insight_settings: network_excludes renamed to exclude_zones. Update existing configs.',
+    'BREAKING: okta_role_subscription (resource): role_type renamed to role_ref. status is now computed (read-only) — it can no longer be set in config; remove it and manage subscription state via notification_type instead. New computed attribute: channels.',
+    'BREAKING: okta_role_subscription (data source): role_type renamed to role_ref. notification_type is now a computed output — pass the notification type as id instead (id is now required). New computed attribute: channels.',
+    'BREAKING: okta_template_sms: translations changed from a nested block (one block per language) to a single map(string) attribute (keys are ISO 639-1 language codes). Existing configs must replace the translations block with a map assignment. type and template are now optional (previously required). New attribute: name.',
+    'okta_email_template_settings: recipients attribute is now optional (previously required).',
+    'okta_threat_insight_settings: new computed attributes created, last_updated added.',
+    'okta_template_sms: new computed attributes created, last_updated added.',
+    'New resource: okta_user_subscription (manage a user\'s notification subscriptions)',
+    'okta_org_captcha: not new to the provider (available since v6.14.0) — newly available in OTTO\'s v7.0.0 schema/template support.',
+    'New data source: okta_threat_insight_settings',
+    'New data source: okta_user_subscription (read a user\'s notification subscription)',
+    'okta_role_subscription (data source): new computed attribute channels added.',
+    'New data source: okta_trusted_origin',
+    'New data source: okta_captcha',
+  ],
 };
+
+/**
+ * Structured breaking changes for attributes that were renamed, removed, or
+ * had their type/requiredness changed in a given provider version. Unlike
+ * VERSION_ATTRIBUTE_NOTES (free-text, for display only), this map is
+ * consumed by code: the validator (to upgrade generic "unknown attribute"
+ * findings into specific fix guidance) and the Sync convert path (to
+ * deterministically rewrite or flag affected HCL).
+ */
+export interface BreakingChange {
+  resource: string;
+  attribute: string;
+  kind: 'renamed' | 'removed' | 'type_changed' | 'requiredness_changed';
+  replacement?: string; // populated when kind === 'renamed'
+  note: string;
+  // Which HCL block kind this change applies to. Undefined/omitted means it
+  // applies to both the resource and data source blocks of the same name.
+  blockKind?: 'resource' | 'data_source';
+}
+
+export const VERSION_BREAKING_CHANGES: Record<ProviderVersion, BreakingChange[]> = {
+  '6.6.1': [],
+  '6.7.0': [],
+  '6.8.0': [],
+  '6.9.0': [],
+  '6.10.0': [],
+  '6.11.0': [],
+  '6.12.0': [],
+  '6.13.0': [],
+  '6.14.0': [],
+  '6.15.0': [],
+  '7.0.0': [
+    {
+      resource: 'okta_threat_insight_settings',
+      attribute: 'network_excludes',
+      kind: 'renamed',
+      replacement: 'exclude_zones',
+      note: 'network_excludes was renamed to exclude_zones in provider v7.0.0.',
+    },
+    {
+      resource: 'okta_role_subscription',
+      attribute: 'role_type',
+      kind: 'renamed',
+      replacement: 'role_ref',
+      note: 'role_type was renamed to role_ref in provider v7.0.0 (applies to both the resource and data source).',
+    },
+    {
+      resource: 'okta_role_subscription',
+      attribute: 'status',
+      kind: 'removed',
+      note: 'status became a computed (read-only) attribute in provider v7.0.0 — it can no longer be set in config. Remove it and manage subscription state via notification_type instead. (Note: the attribute still exists in the API/schema; "removed" here describes that it is no longer settable, not that it vanished.)',
+      blockKind: 'resource',
+    },
+    {
+      resource: 'okta_role_subscription',
+      attribute: 'notification_type',
+      kind: 'requiredness_changed',
+      note: 'On the okta_role_subscription data source, notification_type became a computed (read-only) output in provider v7.0.0 — it can no longer be used to look up a subscription. Pass the notification type via id instead.',
+      blockKind: 'data_source',
+    },
+    {
+      resource: 'okta_role_subscription',
+      attribute: 'id',
+      kind: 'requiredness_changed',
+      note: 'On the okta_role_subscription data source, id became required in provider v7.0.0 (previously optional) — it must now be set to the notification type to look up.',
+      blockKind: 'data_source',
+    },
+    {
+      resource: 'okta_template_sms',
+      attribute: 'translations',
+      kind: 'type_changed',
+      note: 'translations changed from a nested block (repeated {language, template} blocks) to a single map(string) attribute in provider v7.0.0. This cannot be auto-migrated — update the block manually.',
+    },
+  ],
+};
+
+/**
+ * Get all breaking changes applicable for a given version (cumulative,
+ * same pattern as getAttributeNotesForVersion).
+ */
+export function getBreakingChangesForVersion(version: string): BreakingChange[] {
+  const changes: BreakingChange[] = [];
+  for (const v of SUPPORTED_VERSIONS) {
+    if (compareVersions(v, version) <= 0) {
+      changes.push(...VERSION_BREAKING_CHANGES[v]);
+    }
+  }
+  return changes;
+}
 
 /**
  * Get all version additions applicable for a given version (cumulative).
