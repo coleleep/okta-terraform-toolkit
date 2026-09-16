@@ -128,7 +128,11 @@ export async function parseLogFile(filePath: string): Promise<LogAnalysis> {
 
       // Request tracking
       if (line.includes('performing request:')) {
-        const urlMatch = line.match(/url=(https?:\/\/[^\s]+)/);
+        // The provider quotes the URL (url="https://...") whenever the query
+        // string contains characters like %22 or &, which happens on any
+        // filtered/paginated call — e.g. okta_app data source label lookups.
+        // Unquoted URLs must still match so plain calls like /users/me aren't broken.
+        const urlMatch = line.match(/url="?(https?:\/\/[^"\s]+)"?/);
         if (urlMatch) {
           totalRequests++;
           currentEndpoint = normalizeEndpoint(urlMatch[1]);

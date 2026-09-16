@@ -83,6 +83,21 @@ describe('parseLogFile — rate limit bucket keying', () => {
     expect(post?.lowestRemaining).toBe(12);
   });
 
+  it('captures calls whose URL is quoted because the query string contains %22 or &', async () => {
+    const filePath = writeLog([
+      `${PREFIX} performing request: method=GET url="https://acme.okta.com/api/v1/apps?filter=status+eq+%22ACTIVE%22&limit=1&q=TF+Test+App+%232"`,
+      `${PREFIX} HTTP/2.0 200 OK`,
+      `${PREFIX} X-Rate-Limit-Limit: 600`,
+      `${PREFIX} X-Rate-Limit-Remaining: 599`,
+    ]);
+
+    const result = await parseLogFile(filePath);
+
+    const row = result.endpoints.find(e => e.pattern === '/api/v1/apps' && e.method === 'GET');
+    expect(row?.totalCalls).toBe(1);
+    expect(row?.minRateLimit).toBe(600);
+  });
+
   it('attributes 429s to the method that was rate limited', async () => {
     const filePath = writeLog([
       `${PREFIX} performing request: method=GET url=https://acme.okta.com/api/v1/users?limit=200`,
