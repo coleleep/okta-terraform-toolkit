@@ -10,7 +10,7 @@ import { RESOURCE_DICTIONARY, effectiveEndpoint } from '../../shared/resource-di
 import { SCOPE_REQUIREMENTS, API_KEY_ONLY_ENDPOINTS } from '../../shared/scopes';
 import { SUPPORTED_VERSIONS, VERSION_ATTRIBUTE_NOTES, getAdditionsForVersion } from '../../shared/versions';
 import { redact } from './redact';
-import { vaultProject } from './redact-vault';
+import { vaultProject, LOG_ANALYSIS_PATTERNS } from './redact-vault';
 
 // --- Claude Configuration Management ---
 
@@ -323,8 +323,9 @@ export async function interpretLog(analysis: LogAnalysis, probeResult?: ProbeRes
   // decodeError, generateSolution), this one uses vaultProject: its
   // fixed-shape Okta ID matching (20-char alphanumeric, not a prefix list)
   // catches ID types redact()'s prefix list misses (oty, exk, prm, rst, ...)
-  // — see redact-vault.ts.
-  const { maskedFiles } = vaultProject({ 'log-analysis': JSON.stringify(analysis, null, 2) });
+  // — see redact-vault.ts. LOG_ANALYSIS_PATTERNS drops hcl_pii_attr, which would
+  // otherwise mask the app-generated LogIssue.title as if it were a job title.
+  const { maskedFiles } = vaultProject({ 'log-analysis': JSON.stringify(analysis, null, 2) }, LOG_ANALYSIS_PATTERNS);
   const cleanAnalysis = maskedFiles['log-analysis'];
   const response = await createMessage({
     max_tokens: 1024,

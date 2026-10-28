@@ -221,7 +221,10 @@ const VAULT_PATTERNS: VaultPattern[] = [
   ),
 ];
 
-export function vaultProject(files: Record<string, string>): VaultResult {
+export function vaultProject(
+  files: Record<string, string>,
+  patterns: VaultPattern[] = VAULT_PATTERNS
+): VaultResult {
   // Map from real value -> token, so the same value gets one token across the whole project.
   const valueToToken = new Map<string, string>();
   const entries: VaultEntry[] = [];
@@ -252,7 +255,7 @@ export function vaultProject(files: Record<string, string>): VaultResult {
 
   for (const [filename, content] of Object.entries(files)) {
     let masked = content;
-    for (const pattern of VAULT_PATTERNS) {
+    for (const pattern of patterns) {
       masked = masked.replace(pattern.regex, (...args) => {
         // Every pattern's regex has named capture groups (hclAttr/hclVal vs
         // jsonAttr/jsonVal), so replace() always passes the groups object as
@@ -324,6 +327,19 @@ export function vaultProject(files: Record<string, string>): VaultResult {
   return { maskedFiles, entries };
 }
 
+// hcl_pii_attr is attribute-name-anchored (matches `"title": "value"`,
+// `"department": "value"`, etc.) — a correct signal in real HCL/tfstate
+// content, where those are Okta user profile attributes. LogAnalysis is a
+// plain app-internal struct, not HCL/tfstate: its "title" is LogIssue.title
+// (an app-generated summary sentence, e.g. "6 requests (19%) hit rate limits
+// (429)"), not anyone's job title. Scanning the whole serialized object with
+// this pattern turns unrelated struct fields into masked tokens. The other
+// patterns are all value-shape-anchored (an Okta ID's 20-char shape, an
+// @domain, an org's .okta.com host, a token/JWT/PEM prefix) and stay safe to
+// run against arbitrary JSON, since they only fire on text that actually
+// looks like the thing being redacted.
+export const LOG_ANALYSIS_PATTERNS = VAULT_PATTERNS.filter(p => p.kind !== 'hcl_pii_attr');
+
 // Redacts a parsed TF_LOG analysis before it leaves the main process for the
 // renderer (on-screen display) or the LLM (interpretLog). A customer's
 // terraform-debug.log routinely embeds org URLs, emails, and Okta IDs inside
@@ -335,7 +351,7 @@ export function vaultProject(files: Record<string, string>): VaultResult {
 // tokenization is idempotent (GENERATED_TOKEN_SHAPE), so re-running downstream
 // in interpretLog is a no-op.
 export function redactLogAnalysis(analysis: LogAnalysis): LogAnalysis {
-  const { maskedFiles } = vaultProject({ 'log-analysis': JSON.stringify(analysis) });
+  const { maskedFiles } = vaultProject({ 'log-analysis': JSON.stringify(analysis) }, LOG_ANALYSIS_PATTERNS);
   return JSON.parse(maskedFiles['log-analysis']) as LogAnalysis;
 }
 
