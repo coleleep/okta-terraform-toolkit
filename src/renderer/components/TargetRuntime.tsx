@@ -136,7 +136,7 @@ export default function TargetRuntime() {
             {' '}of {targetAnalysis.coverage.relevant} rate limit bucket{targetAnalysis.coverage.relevant === 1 ? '' : 's'}
             {targetAnalysis.coverage.missingLabels.length > 0 && (
               <span className="text-amber-600">
-                {' '}\u2014 no data for {targetAnalysis.coverage.missingLabels.join(', ')}
+                {' \u2014 no data for '}{targetAnalysis.coverage.missingLabels.join(', ')}
               </span>
             )}
           </div>

@@ -34,7 +34,7 @@ Both must pass before any commit. There is no CI enforcing this.
 
 Conventional commits with a substantive body explaining **why**, not just what. The bodies are long on purpose — they're the durable record of reasoning. See `6118ead` or `7ec8bdb` for the expected shape.
 
-**AI attribution trailers depend on which remote you're working against.** An Okta-issued `prepare-commit-msg` hook (`okta-ai-attribution`) appends `Co-authored-by: Claude` automatically. In the Okta work repo, leave it active — the disclosure is the point. In a personal clone it's unwanted; disable it with `git config --unset core.hooksPath`. The hook is reinstalled per-machine by Okta tooling, so `.githooks/` is gitignored rather than deleted. Never hand-write an attribution trailer either way; let the hook be the only thing that adds one.
+**AI attribution trailers are hook-driven, not hand-written.** An Okta-issued `prepare-commit-msg` hook (`okta-ai-attribution`) appends `Co-authored-by: Claude` automatically — leave it active; the disclosure is the point. It's reinstalled per-machine by Okta tooling, so `.githooks/` is gitignored rather than deleted. Don't unset `core.hooksPath` to suppress it — the hook gets re-enabled regardless, so disabling it locally just creates a temporary, inconsistent state. Never hand-write an attribution trailer either way; let the hook be the only thing that adds one.
 
 Signing is disabled repo-locally (`commit.gpgsign false`) because gpg's pinentry can't prompt from an agent shell. Global signing is deliberately left on for org repos with signature-requiring branch protection.
 
