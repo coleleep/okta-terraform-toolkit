@@ -1,4 +1,4 @@
-import { getClient } from './claude';
+import { createMessage } from './claude';
 import { VaultEntry, VaultResult, Finding, ValidatorAnalysis } from '../../shared/types';
 import { loadSchema } from '../../shared/schema-loader';
 import type { ProviderSchema, ResourceSchema } from '../../shared/provider-schemas/schema-types';
@@ -342,7 +342,6 @@ In originalSnippet, copy the EXACT text from the masked file that the fix replac
 }
 
 export async function analyzeProject(maskedFiles: Record<string, string>, version: string): Promise<ValidatorAnalysis> {
-  const client = getClient();
   const schema = loadSchema(version);
   const systemPrompt = buildValidatorSystemPrompt(schema, version, maskedFiles);
 
@@ -350,8 +349,7 @@ export async function analyzeProject(maskedFiles: Record<string, string>, versio
     .map(([name, content]) => `--- ${name} ---\n${content}`)
     .join('\n\n');
 
-  const response = await client.messages.create({
-    model: 'claude-sonnet-4-6',
+  const response = await createMessage({
     max_tokens: 8192,
     system: systemPrompt,
     messages: [{

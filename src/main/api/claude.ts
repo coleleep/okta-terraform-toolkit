@@ -149,6 +149,77 @@ export function getClient(): Anthropic {
   });
 }
 
+// --- Model selection with fallback ---
+
+// Ordered by preference. Used as the ranking when the gateway's live model list
+// is available, and as the blind fallback order when it is not. The two Okta
+// LiteLLM gateways expose different model lists (llm.es.atko.services has no
+// claude-sonnet-4-6), so never assume one ID exists everywhere.
+export const MODEL_CHAIN = ['claude-sonnet-5-5', 'claude-sonnet-5', 'claude-sonnet-4-6', 'claude-haiku-4-5'];
+
+const MODEL_LIST_TTL_MS = 15 * 60 * 1000;
+let modelListCache: { baseUrl: string; ids: string[]; fetchedAt: number } | null = null;
+
+// Live model IDs from the gateway's /v1/models, cached. Returns null if the
+// lookup fails so callers fall back to trying MODEL_CHAIN blindly.
+async function fetchAvailableModels(client: Anthropic): Promise<string[] | null> {
+  const baseUrl = String(client.baseURL);
+  if (modelListCache && modelListCache.baseUrl === baseUrl && Date.now() - modelListCache.fetchedAt < MODEL_LIST_TTL_MS) {
+    return modelListCache.ids;
+  }
+  try {
+    const page = await client.models.list({ limit: 1000 }, { timeout: 10000, maxRetries: 0 });
+    const ids = page.data.map(m => m.id);
+    if (ids.length === 0) return null;
+    modelListCache = { baseUrl, ids, fetchedAt: Date.now() };
+    return ids;
+  } catch {
+    return null;
+  }
+}
+
+// Candidate models in try-order: MODEL_CHAIN entries the gateway offers, then
+// any other claude-sonnet-* it offers (newest first), so a retired chain
+// doesn't break AI when a newer Sonnet is available.
+export function pickCandidates(available: string[] | null): string[] {
+  if (!available) return [...MODEL_CHAIN];
+  const offered = new Set(available);
+  const fromChain = MODEL_CHAIN.filter(m => offered.has(m));
+  const extraSonnets = available
+    .filter(id => /^claude-sonnet-\d/.test(id) && !MODEL_CHAIN.includes(id))
+    .sort((x, y) => y.localeCompare(x, undefined, { numeric: true }));
+  return [...fromChain, ...extraSonnets];
+}
+
+function isModelUnavailable(err: unknown): boolean {
+  if (!(err instanceof Anthropic.APIError)) return false;
+  const msg = String(err.message);
+  if (err.status === 404) return true;
+  return (err.status === 403 || err.status === 400) &&
+    /team_model_access_denied|model.*(not available|invalid|not found)/i.test(msg);
+}
+
+export async function createMessage(
+  params: Omit<Anthropic.MessageCreateParamsNonStreaming, 'model'>,
+): Promise<Anthropic.Message> {
+  const client = getClient();
+  const candidates = pickCandidates(await fetchAvailableModels(client));
+  const tried: string[] = [];
+  for (const model of candidates) {
+    try {
+      return await client.messages.create({ ...params, model });
+    } catch (err) {
+      if (!isModelUnavailable(err)) throw err;
+      console.warn(`[claude] model ${model} unavailable, trying next`);
+      tried.push(model);
+    }
+  }
+  modelListCache = null; // stale list or revoked access: re-fetch on the next call
+  throw new Error(
+    `No available Claude model for this key (tried ${tried.join(', ') || 'none; gateway offers no supported Claude model'}). Check the models your gateway exposes at /v1/models.`
+  );
+}
+
 // --- Log Interpreter ---
 
 function buildScopeContext(): string {
@@ -245,7 +316,6 @@ Read and write limits are separate buckets, so the same path may appear once per
 }
 
 export async function interpretLog(analysis: LogAnalysis, probeResult?: ProbeResult): Promise<ClaudeInterpretation> {
-  const client = getClient();
   const scopeContext = buildScopeContext();
   const rateLimitContext = buildRateLimitContext(analysis, probeResult);
 
@@ -256,8 +326,7 @@ export async function interpretLog(analysis: LogAnalysis, probeResult?: ProbeRes
   // — see redact-vault.ts.
   const { maskedFiles } = vaultProject({ 'log-analysis': JSON.stringify(analysis, null, 2) });
   const cleanAnalysis = maskedFiles['log-analysis'];
-  const response = await client.messages.create({
-    model: 'claude-sonnet-4-6',
+  const response = await createMessage({
     max_tokens: 1024,
     system: `${LOG_SYSTEM_PROMPT}\n\n${rateLimitContext}\n\n${scopeContext}`,
     messages: [{
@@ -313,10 +382,8 @@ Match the resource the user actually named. "1200 users" means okta_user, not ok
 If a resource the user mentions is not in the table, OMIT it and say so in your text response. Do NOT substitute a similar resource. These counts feed rate limit calculations that go into customer-facing capacity requests, so a plausible-but-wrong resource is worse than a missing one.`;
 
 export async function buildWorkload(description: string): Promise<CustomWorkloadEntry[]> {
-  const client = getClient();
 
-  const response = await client.messages.create({
-    model: 'claude-sonnet-4-6',
+  const response = await createMessage({
     max_tokens: 1024,
     system: WORKLOAD_SYSTEM_PROMPT,
     messages: [{
@@ -415,10 +482,8 @@ Respond with a JSON object matching this schema exactly:
 Be specific and actionable. If the error involves permissions, name the exact scope or role needed. If it's a config issue, show the exact setting to change. Don't hedge.`;
 
 export async function decodeError(errorText: string): Promise<ErrorDecoderResult> {
-  const client = getClient();
 
-  const response = await client.messages.create({
-    model: 'claude-sonnet-4-6',
+  const response = await createMessage({
     max_tokens: 1024,
     system: ERROR_DECODER_PROMPT,
     messages: [{
@@ -528,10 +593,8 @@ When you call the set_solution tool, generate real valid HCL in the hcl fields. 
 
 
 export async function generateSolution(description: string, providerVersion: string): Promise<SolutionResult> {
-  const client = getClient();
 
-  const response = await client.messages.create({
-    model: 'claude-sonnet-4-6',
+  const response = await createMessage({
     max_tokens: 8192,
     system: buildSolutionSystemPrompt(providerVersion),
     messages: [{
@@ -615,7 +678,6 @@ export async function convertConfig(
   resourceMatches: Array<{ sourceAddress: string; sourceId: string; sourceName: string; targetId: string | null; status: string; level?: number; parentSourceId?: string | null; parentTargetId?: string | null }>,
   targetOrgUrl: string,
 ): Promise<ConvertedConfig> {
-  const client = getClient();
 
   // Build hierarchical match context showing parent-child relationships
   const topLevel = resourceMatches.filter(m => !m.level || m.level === 0);
@@ -651,8 +713,7 @@ export async function convertConfig(
   // to the user's own org. Redacting it corrupts the generated HCL with literal
   // placeholder strings like "[OKTA_ID]" instead of real values.
 
-  const response = await client.messages.create({
-    model: 'claude-sonnet-4-6',
+  const response = await createMessage({
     max_tokens: 32768,
     system: `You are an expert at converting Terraform configurations between Okta orgs.
 

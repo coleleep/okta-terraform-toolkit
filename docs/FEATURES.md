@@ -123,7 +123,7 @@ src/
 │   │   ├── target-analyzer.ts   # Target org capacity analysis
 │   │   ├── sync.ts              # Resource discovery, matching, diffing
 │   │   ├── sync-convert.ts      # Deterministic HCL conversion
-│   │   ├── claude.ts            # AI-powered conversion & analysis (Claude 3)
+│   │   ├── claude.ts            # AI-powered conversion & analysis (Claude via LiteLLM)
 │   │   ├── terraform.ts         # In-app terraform runner with live output
 │   │   ├── rollback.ts          # Tfstate rollback bundle management
 │   │   ├── okta-provider-manager.ts  # Provider version download & mirror
@@ -180,6 +180,7 @@ src/
 ├── preload.ts          # Secure IPC bridge with whitelisted commands
 └── __tests__/          # Jest unit tests (node environment — no jsdom, so no component tests)
     ├── claude-config.test.ts       # AI config management
+    ├── claude-model-fallback.test.ts  # Model discovery and fallback
     ├── provider-v6.*.test.ts       # Version-specific provider tests
     └── redact.test.ts              # Sensitive data redaction
 scripts/
@@ -189,7 +190,7 @@ test-data/              # Reusable Terraform fixtures
 └── sync-comprehensive/ # Groups, apps, auth servers test
 ```
 
-**Stack:** Electron 33 · React 18 · TypeScript 5.6 · Tailwind CSS 3 · Zustand 4 · Webpack 5 · Jest · Anthropic Claude 3
+**Stack:** Electron 33 · React 18 · TypeScript 5.6 · Tailwind CSS 3 · Zustand 4 · Webpack 5 · Jest · Anthropic Claude (Sonnet)
 
 ## Authentication
 
@@ -199,13 +200,17 @@ OTTO requires an Okta API token with Super Admin permissions. Some endpoints use
 
 ## AI Features
 
-OTTO uses Claude 3 (via OCM-managed LiteLLM) to power advanced troubleshooting and configuration workflows:
+OTTO uses Claude Sonnet (via OCM-managed LiteLLM) to power advanced troubleshooting and configuration workflows:
 
 - **Workload description** — describe your Terraform use case in plain English and get parsed resource selections with recommendations
 - **Config conversion** — regenerate HCL for a different org with correct IDs, handling complex cross-org ID mappings
 - **Log interpretation** — explain what went wrong in a failed Terraform run with step-by-step remediation
 - **Error decoding** — translate Okta API errors into actionable fixes and configuration adjustments
 - **Custom recommendations** — analyze your probing results and suggest volume-specific optimization strategies
+
+### Model fallback
+
+All AI calls go through `createMessage()` in `src/main/api/claude.ts`. It asks the gateway which models your key can use (`/v1/models`, cached 15 minutes), then tries the ones in `MODEL_CHAIN` in preference order (`claude-sonnet-5-5` → `claude-sonnet-5` → `claude-sonnet-4-6` → `claude-haiku-4-5`). If none of those are offered, it uses the newest other `claude-sonnet-*` the gateway lists, so a retired model doesn't break AI. If the lookup itself fails, it tries `MODEL_CHAIN` blindly. A model rejected as unavailable (403 `team_model_access_denied`, or 404) moves on to the next candidate; other errors (auth, rate limit) are not retried. Different LiteLLM gateways expose different model lists, which is why this is dynamic.
 
 ### Setup
 
