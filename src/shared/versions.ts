@@ -1,6 +1,6 @@
-export const SUPPORTED_VERSIONS = ['6.6.1', '6.7.0', '6.8.0', '6.9.0', '6.10.0', '6.11.0', '6.12.0', '6.13.0', '6.14.0', '6.15.0', '7.0.0'] as const;
+export const SUPPORTED_VERSIONS = ['6.6.1', '6.7.0', '6.8.0', '6.9.0', '6.10.0', '6.11.0', '6.12.0', '6.13.0', '6.14.0', '6.15.0', '7.0.0', '7.1.0'] as const;
 export type ProviderVersion = (typeof SUPPORTED_VERSIONS)[number];
-export const DEFAULT_VERSION: ProviderVersion = '7.0.0';
+export const DEFAULT_VERSION: ProviderVersion = '7.1.0';
 
 /**
  * Compare two semver strings. Returns -1 if a < b, 0 if equal, 1 if a > b.
@@ -425,6 +425,8 @@ export const VERSION_RESOURCE_ADDITIONS: Record<ProviderVersion, { type: string;
     },
   ],
 
+  '7.1.0': [],
+
 };
 
 /**
@@ -515,6 +517,7 @@ export const VERSION_ATTRIBUTE_NOTES: Record<ProviderVersion, string[]> = {
     'New data source: okta_trusted_origin',
     'New data source: okta_captcha',
   ],
+  '7.1.0': [],
 };
 
 /**
