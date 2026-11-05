@@ -19,7 +19,6 @@ describe('v7.0.0 version registration', () => {
   it('DEFAULT_VERSION is the newest supported version', () => {
     const newest = SUPPORTED_VERSIONS[SUPPORTED_VERSIONS.length - 1];
     expect(DEFAULT_VERSION).toBe(newest);
-    expect(DEFAULT_VERSION).toBe('7.0.0');
   });
 
   it('isAvailableIn returns true for 7.0.0 in 7.0.0, false in 6.15.0', () => {

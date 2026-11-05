@@ -86,8 +86,9 @@ versionsContent = versionsContent.replace(
   /export const SUPPORTED_VERSIONS = \[.*?\] as const;/,
   newVersionsLine
 );
-// Add empty entries for new versions in VERSION_RESOURCE_ADDITIONS and VERSION_ATTRIBUTE_NOTES.
-// Both are Record<ProviderVersion, ...> so every version in the union needs an entry.
+// Add empty entries for new versions in VERSION_RESOURCE_ADDITIONS, VERSION_ATTRIBUTE_NOTES,
+// and VERSION_BREAKING_CHANGES. All are Record<ProviderVersion, ...> so every version in the
+// union needs an entry.
 const newVersions = allVersions.filter(v => !existingVersions.includes(v));
 for (const v of newVersions) {
   // Insert `  'X.X.X': [],` before the closing `};` of each record.
@@ -99,8 +100,12 @@ for (const v of newVersions) {
     .replace(
       /(export const VERSION_ATTRIBUTE_NOTES[\s\S]*?)(};)/,
       (_, body, close) => `${body}  '${v}': [],\n${close}`
+    )
+    .replace(
+      /(export const VERSION_BREAKING_CHANGES[\s\S]*?)(};)/,
+      (_, body, close) => `${body}  '${v}': [],\n${close}`
     );
-  console.log(`✓ Added empty '${v}' entries to VERSION_RESOURCE_ADDITIONS and VERSION_ATTRIBUTE_NOTES`);
+  console.log(`✓ Added empty '${v}' entries to VERSION_RESOURCE_ADDITIONS, VERSION_ATTRIBUTE_NOTES, and VERSION_BREAKING_CHANGES`);
 }
 
 // Advance DEFAULT_VERSION to the newest schema-backed version.

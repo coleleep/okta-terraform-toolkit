@@ -593,6 +593,7 @@ export const VERSION_BREAKING_CHANGES: Record<ProviderVersion, BreakingChange[]>
       note: 'translations changed from a nested block (repeated {language, template} blocks) to a single map(string) attribute in provider v7.0.0. This cannot be auto-migrated — update the block manually.',
     },
   ],
+  '7.1.0': [],
 };
 
 /**
