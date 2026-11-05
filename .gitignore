@@ -10,6 +10,9 @@ dist/
 # Allow test fixture state files (contain only fake IDs)
 !test-data/**/source.tfstate
 
+# Local-only demo data
+test-data/*-demo/
+
 # Local agent working files (brainstorm sessions)
 .superpowers/
 
