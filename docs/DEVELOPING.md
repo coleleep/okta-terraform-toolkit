@@ -38,6 +38,8 @@ Conventional commits with a substantive body explaining **why**, not just what. 
 
 **Bump the app version when a release-worthy change set lands.** New provider version support, features, or notable fixes get a `chore: bump version to X.Y.Z` commit with a short body listing what's in the release (see `37a8084`). Minor for new capability, patch for fixes only. `npm version X.Y.Z --no-git-tag-version` updates both `package.json` and `package-lock.json`, but it also expands the one-line `electronmon.patterns` array — revert that so the diff is only the version.
 
+**Every version bump gets a tag** — that's the point of bumping. Once the bump PR merges, tag the merge commit on `main` and push it: `git tag vX.Y.Z <merge-sha> && git push origin vX.Y.Z`. Lightweight tags, matching `v1.0.0`–`v1.2.0`.
+
 Signing is disabled repo-locally (`commit.gpgsign false`) because gpg's pinentry can't prompt from an agent shell. Global signing is deliberately left on for org repos with signature-requiring branch protection.
 
 ## This repo is public
