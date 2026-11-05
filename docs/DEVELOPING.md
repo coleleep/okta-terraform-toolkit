@@ -24,11 +24,11 @@ grep -c "some-distinctive-string-from-your-change" dist/renderer/index.js
 ## The verification gate
 
 ```bash
-npx jest          # 319 tests as of 2026-08-21
+npx jest          # 398 tests as of 2026-11-05
 npx tsc --noEmit  # must be silent, exit 0
 ```
 
-Both must pass before any commit. There is no CI enforcing this.
+Both must pass before any commit. CI (`.github/workflows/ci.yml`) runs them plus `validate-schema.js` on every PR, and `main` is branch-protected to require that `schema-validate` check — nothing merges red, including bot PRs.
 
 ## Commit conventions
 
@@ -73,6 +73,12 @@ A mismatch merges fine, renders fine, and then matches nothing — reporting "no
 **8. Rate limit buckets are attributed by path, not by resolved resource.** A request to `/api/v1/domains/{bogus-id}` returns 404 **with the correct bucket's rate limit header**. Verified: two independent captures, one using real sample IDs and one using a placeholder, agreed on every overlapping bucket. This is why `probe.ts` reads headers off error responses, and why the capture script needs no real resource IDs.
 
 **9. Count attempts, not inputs.** The capture script guarded that it parsed enough endpoint definitions, then silently probed only two thirds of them because its phase filters didn't partition the set. A parse-count check passed happily. Assert on what was actually attempted.
+
+**10. New provider versions arrive half-done.** `provider-schema-sync.yml` runs daily; when okta/terraform-provider-okta cuts a release it extracts the schema, runs `scripts/update-schema-loader.js`, and opens an auto-merge PR. That script bumps `SUPPORTED_VERSIONS` and `DEFAULT_VERSION` and seeds an **empty** entry in every `Record<ProviderVersion, ...>` in `versions.ts` — so the version compiles, but OTTO knows nothing about it yet. Follow up by hand:
+
+- Fill in `VERSION_RESOURCE_ADDITIONS`, `VERSION_ATTRIBUTE_NOTES` (these feed the AI solution builder's prompt), and `VERSION_BREAKING_CHANGES`; add new resources to `RESOURCE_DICTIONARY`; add a `provider-vX.Y.Z.test.ts`.
+- Don't trust the provider CHANGELOG alone. Diff the two schema JSON files and read the release's commit range — v7.1.0 shipped `okta_app_oauth.dpop_bound_access_tokens` and an `okta_group_memberships` error-handling fix that the CHANGELOG never mentioned.
+- Adding a new `Record<ProviderVersion, ...>` to `versions.ts`? Add it to `update-schema-loader.js` too. Missing one is a compile error — that's exactly how the v7.1.0 sync broke `main` (and merged anyway, before branch protection existed). `update-schema-loader.test.ts` now catches it.
 
 ## Decisions not to relitigate
 
