@@ -278,6 +278,13 @@ export const RESOURCE_DICTIONARY: ResourceDictionaryEntry[] = [
     parentType: 'customRoles',
     parentLabel: 'Custom Roles',
   },
+
+  // ─── v7.1.0 Governance additions ───
+  {
+    terraformResource: 'okta_request_conditions',
+    parentType: 'governance',
+    parentLabel: 'Governance',
+  },
 ];
 
 /**
