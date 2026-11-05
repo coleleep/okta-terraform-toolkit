@@ -23,6 +23,7 @@ rate-limit-capture.json
 # Local-only: design docs, presentation material, internal one-pager
 docs/planning/
 docs/ONE-PAGER.md
+docs/ONE-PAGER.html
 demo-video/
 
 # Okta-issued prepare-commit-msg hook, reinstalled per-machine by Okta tooling.
