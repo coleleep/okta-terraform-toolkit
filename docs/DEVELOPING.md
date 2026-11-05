@@ -36,6 +36,8 @@ Conventional commits with a substantive body explaining **why**, not just what. 
 
 **AI attribution trailers are hook-driven, not hand-written.** An Okta-issued `prepare-commit-msg` hook (`okta-ai-attribution`) appends `Co-authored-by: Claude` automatically — leave it active; the disclosure is the point. It's reinstalled per-machine by Okta tooling, so `.githooks/` is gitignored rather than deleted. Don't unset `core.hooksPath` to suppress it — the hook gets re-enabled regardless, so disabling it locally just creates a temporary, inconsistent state. Never hand-write an attribution trailer either way; let the hook be the only thing that adds one.
 
+**Bump the app version when a release-worthy change set lands.** New provider version support, features, or notable fixes get a `chore: bump version to X.Y.Z` commit with a short body listing what's in the release (see `37a8084`). Minor for new capability, patch for fixes only. `npm version X.Y.Z --no-git-tag-version` updates both `package.json` and `package-lock.json`, but it also expands the one-line `electronmon.patterns` array — revert that so the diff is only the version.
+
 Signing is disabled repo-locally (`commit.gpgsign false`) because gpg's pinentry can't prompt from an agent shell. Global signing is deliberately left on for org repos with signature-requiring branch protection.
 
 ## This repo is public
