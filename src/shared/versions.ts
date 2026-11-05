@@ -425,7 +425,59 @@ export const VERSION_RESOURCE_ADDITIONS: Record<ProviderVersion, { type: string;
     },
   ],
 
-  '7.1.0': [],
+  '7.1.0': [
+    {
+      type: 'governance',
+      config: `
+# okta_request_conditions — manage a resource's request conditions in one block (added in v7.1.0)
+# Applies conditions one at a time in priority order, so Okta's priorities match config
+# (multiple okta_request_condition resources are created in parallel, making order nondeterministic).
+# Conditions are matched by name; renaming one deletes and recreates it. Conditions not declared
+# here are left untouched. Don't manage the same resource with both this and okta_request_condition.
+# resource "okta_request_conditions" "example" {
+#   resource_id = "<resource_id>"
+#
+#   condition {
+#     name                 = "Engineering"
+#     approval_sequence_id = "<approval_sequence_id>"
+#     priority             = 0
+#     status               = "ACTIVE"
+#     access_scope_settings {
+#       type = "RESOURCE_DEFAULT"
+#     }
+#     requester_settings {
+#       type = "GROUPS"
+#       ids {
+#         id = okta_group.engineering.id
+#       }
+#     }
+#   }
+#
+#   condition {
+#     name                 = "Everyone else"
+#     approval_sequence_id = "<approval_sequence_id>"
+#     priority             = 1
+#     status               = "ACTIVE"
+#     access_scope_settings {
+#       type = "RESOURCE_DEFAULT"
+#     }
+#     requester_settings {
+#       type = "EVERYONE"
+#     }
+#   }
+# }
+#
+# Migrating from okta_request_condition: keep condition names unchanged so they're adopted, not recreated.
+# removed {
+#   from = okta_request_condition.engineering
+#   lifecycle { destroy = false }
+# }
+# import {
+#   to = okta_request_conditions.example
+#   id = "<resource_id>"
+# }`,
+    },
+  ],
 
 };
 
@@ -517,7 +569,14 @@ export const VERSION_ATTRIBUTE_NOTES: Record<ProviderVersion, string[]> = {
     'New data source: okta_trusted_origin',
     'New data source: okta_captcha',
   ],
-  '7.1.0': [],
+  '7.1.0': [
+    'New resource: okta_request_conditions — manages all request conditions of a resource in one block and applies them one at a time in priority order. Use it when condition priority matters: multiple okta_request_condition resources are created in parallel, so their effective priority in Okta is nondeterministic. Do not manage the same resource with both.',
+    'okta_request_condition: reordering ids in access_scope_settings or requester_settings no longer fails with "Provider produced inconsistent result after apply".',
+    'okta_policy_rule_signon, okta_policy_rule_mfa: a policy\'s default rule can now be imported and updated (previously failed with "Default Rule is immutable"). Removing a default rule from config drops it from state instead of attempting a delete. Okta still manages priority, network_connection, network_includes, network_excludes, users_excluded and session_persistent on default rules — values set for them are ignored.',
+    'okta_policy_rule_signon, okta_policy_rule_mfa: new computed (read-only) attribute system — true for the policy\'s default rule. Never set it in config.',
+    'okta_app_oauth: new optional attribute dpop_bound_access_tokens (bool) — when true, the authorization server rejects token requests from this client that lack a DPoP header. Not listed in the v7.1.0 CHANGELOG (provider PR #2950).',
+    'okta_group_memberships: API errors during update are now surfaced. Previously a failed add/remove (e.g. 403 E0000006 when the group has an Application Administrator role binding) was silently swallowed and the apply reported success, leaving drift. Not listed in the v7.1.0 CHANGELOG (provider PR #2921).',
+  ],
 };
 
 /**

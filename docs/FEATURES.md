@@ -98,7 +98,15 @@ Upload `.tf`, `.tfstate`, or `.tfvars` files and validate them for correctness a
 
 ## Supported Provider Versions
 
-6.6.1 through 7.0.0 (7.0.0 is the default). Version-specific resource additions and attribute changes are tracked automatically. Provider v7.0.0 includes breaking changes (see below) — OTTO's Validate and Sync tabs surface migration hints for affected attributes automatically.
+6.6.1 through 7.1.0 (7.1.0 is the default). Version-specific resource additions and attribute changes are tracked automatically. Provider v7.0.0 includes breaking changes (see below) — OTTO's Validate and Sync tabs surface migration hints for affected attributes automatically.
+
+**v7.1.0 changes** (no breaking changes):
+
+- New resource `okta_request_conditions`: manages all request conditions of a resource in one block, applied in priority order
+- `okta_policy_rule_signon` / `okta_policy_rule_mfa`: default rules can now be imported and updated; new read-only `system` attribute
+- `okta_request_condition`: reordering `ids` no longer causes an inconsistent-result error
+- `okta_app_oauth`: new optional `dpop_bound_access_tokens` attribute (in the schema, not the provider CHANGELOG)
+- `okta_group_memberships`: update errors are no longer silently swallowed (in the provider commits, not the CHANGELOG)
 
 **v7.0.0 breaking changes:**
 
