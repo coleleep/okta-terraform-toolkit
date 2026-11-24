@@ -1,6 +1,6 @@
-export const SUPPORTED_VERSIONS = ['6.6.1', '6.7.0', '6.8.0', '6.9.0', '6.10.0', '6.11.0', '6.12.0', '6.13.0', '6.14.0', '6.15.0', '7.0.0', '7.1.0'] as const;
+export const SUPPORTED_VERSIONS = ['6.6.1', '6.7.0', '6.8.0', '6.9.0', '6.10.0', '6.11.0', '6.12.0', '6.13.0', '6.14.0', '6.15.0', '7.0.0', '7.1.0', '8.0.0'] as const;
 export type ProviderVersion = (typeof SUPPORTED_VERSIONS)[number];
-export const DEFAULT_VERSION: ProviderVersion = '7.1.0';
+export const DEFAULT_VERSION: ProviderVersion = '8.0.0';
 
 /**
  * Compare two semver strings. Returns -1 if a < b, 0 if equal, 1 if a > b.
@@ -479,6 +479,8 @@ export const VERSION_RESOURCE_ADDITIONS: Record<ProviderVersion, { type: string;
     },
   ],
 
+  '8.0.0': [],
+
 };
 
 /**
@@ -577,6 +579,7 @@ export const VERSION_ATTRIBUTE_NOTES: Record<ProviderVersion, string[]> = {
     'okta_app_oauth: new optional attribute dpop_bound_access_tokens (bool) — when true, the authorization server rejects token requests from this client that lack a DPoP header. Not listed in the v7.1.0 CHANGELOG (provider PR #2950).',
     'okta_group_memberships: API errors during update are now surfaced. Previously a failed add/remove (e.g. 403 E0000006 when the group has an Application Administrator role binding) was silently swallowed and the apply reported success, leaving drift. Not listed in the v7.1.0 CHANGELOG (provider PR #2921).',
   ],
+  '8.0.0': [],
 };
 
 /**
@@ -653,6 +656,7 @@ export const VERSION_BREAKING_CHANGES: Record<ProviderVersion, BreakingChange[]>
     },
   ],
   '7.1.0': [],
+  '8.0.0': [],
 };
 
 /**
